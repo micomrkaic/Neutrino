@@ -1,0 +1,38 @@
+# Block expressions: ( stmt; stmt; expr ) — a scoped statement sequence whose
+# value is the last expression. Bindings are local to the block.
+(1; 2; 3)
+=> 3
+(let x = 5; x + 1)
+=> 6
+(let x = 3; let y = 4; sqrt(x*x + y*y))
+=> 5
+# later statements see earlier bindings
+let g = fn n -> (let a = n + 1; let b = a * 2; b); g(10)
+=> 22
+# block as a function body
+let f = fn n -> (let sq = n * n; sq + 1); f(4)
+=> 17
+# block-local bindings do not leak to the enclosing scope
+(let q = 7; q); q
+=> !undefined name 'q'
+# a block-local shadows an outer binding, which is restored afterwards
+let w = 1; (let w = 2; w); w
+=> 1
+# return from inside a block exits the enclosing function
+let h = fn n -> (let d = n * 2; if d > 10 then return 99 else d end); h(8)
+=> 99
+let h = fn n -> (let d = n * 2; if d > 10 then return 99 else d end); h(3)
+=> 6
+# block expression as a pipe stage, with @
+5 |> (let d = @ * 2; d + 1)
+=> 11
+[10, 20, 30] |> (let s = sum(@); s)
+=> 60
+# grouping and operator sections are unaffected by the block syntax
+(1 + 2)
+=> 3
+(42)
+=> 42
+# nested blocks
+(let a = (let b = 2; b * 3); a + 1)
+=> 7

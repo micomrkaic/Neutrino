@@ -1,0 +1,42 @@
+# Control-flow escapes: break, continue, return
+let s = 0; for i = 1:10 do if i > 5 then break end; s = s + i end; s
+=> 15
+let s = 0; for i = 1:10 do if mod(i, 2) == 0 then continue end; s = s + i end; s
+=> 25
+# nested loops: break exits the inner loop only
+let c = 0; for i = 1:3 do for j = 1:3 do if j == 2 then break end; c = c + 1 end end; c
+=> 3
+# multiple break statements in one loop (first reached wins)
+let s = 0; for i = 1:10 do if i == 3 then break end; if i == 7 then break end; s = s + i end; s
+=> 3
+# while + break
+let i = 0; let s = 0; while true do i = i + 1; if i > 5 then break end; s = s + i end; s
+=> 15
+# while + continue
+let i = 0; let s = 0; while i < 10 do i = i + 1; if mod(i, 2) == 0 then continue end; s = s + i end; s
+=> 25
+# return from a function's loop body
+let f = fn n -> (for i = 1:n do if i * i > 20 then return i end end); f(100)
+=> 5
+# return from nested loops
+let g = fn n -> (for i = 1:5 do for j = 1:5 do if i * j == 6 then return [i, j] end end end); g(0)
+=> [2, 3]
+# return from inside a while loop
+let w = fn n -> (while true do if n > 5 then return n end; n = n + 1 end); w(0)
+=> 6
+# break inside a let..in body unwinds both scopes
+let s = 0; for i = 1:10 do let big = i > 3 in (if big then break end); s = s + i end; s
+=> 6
+# continue inside a let..in body
+let s = 0; for i = 1:6 do let odd = mod(i, 2) == 1 in (if odd then continue end); s = s + i end; s
+=> 12
+# return through a let..in and a loop
+let r = fn n -> (let total = 0 in (for i = 1:n do if i > 3 then return i end; total = total end)); r(10)
+=> 4
+# escapes are statements; misuse outside their context is a compile error
+break
+=> !inside a loop
+continue
+=> !inside a loop
+return 5
+=> !inside a function

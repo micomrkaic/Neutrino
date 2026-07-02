@@ -196,6 +196,26 @@ static const char *match_command(const char *line, const char *word)
 }
 
 /* ------------------------------------------------------------------ */
+static void print_banner(bool color)
+{
+    if (color) {
+        fputs(" \033[38;2;32;139;255m╭─╴\033[0m   \033[38;2;32;139;255m╶─╮\033[0m    \033[38;2;32;139;255m _   _            _        _             \033[0m\n", stdout);
+        fputs("   \033[38;2;70;96;140m▪\033[0m \033[38;2;70;96;140m▪\033[0m \033[38;2;70;96;140m▪\033[0m      \033[38;2;32;139;255m| \\ | | ___ _   _| |_ _ __(_)_ __   ___  \033[0m\n", stdout);
+        fputs(" \033[38;2;106;91;255m·\033[0m \033[38;2;70;96;140m▪\033[0m \033[38;2;0;194;214m◉\033[0m \033[38;2;70;96;140m▪\033[0m \033[38;2;106;91;255m·\033[0m    \033[38;2;32;139;255m|  \\| |/ _ \\ | | | __| '__| | '_ \\ / _ \\ \033[0m\n", stdout);
+        fputs("   \033[38;2;70;96;140m▪\033[0m \033[38;2;70;96;140m▪\033[0m \033[38;2;70;96;140m▪\033[0m      \033[38;2;32;139;255m| |\\  |  __/ |_| | |_| |  | | | | | (_) |\033[0m\n", stdout);
+        fputs(" \033[38;2;32;139;255m╰─╴\033[0m   \033[38;2;32;139;255m╶─╯\033[0m    \033[38;2;32;139;255m|_| \\_|\\___|\\__,_|\\__|_|  |_|_| |_|\\___/ \033[0m\n", stdout);
+        fputs("              \033[38;2;120;132;150ma small functional array language\033[0m\n", stdout);
+    } else {
+        fputs(" ╭─╴   ╶─╮     _   _            _        _             \n", stdout);
+        fputs("   ▪ ▪ ▪      | \\ | | ___ _   _| |_ _ __(_)_ __   ___  \n", stdout);
+        fputs(" · ▪ ◉ ▪ ·    |  \\| |/ _ \\ | | | __| '__| | '_ \\ / _ \\ \n", stdout);
+        fputs("   ▪ ▪ ▪      | |\\  |  __/ |_| | |_| |  | | | | | (_) |\n", stdout);
+        fputs(" ╰─╴   ╶─╯    |_| \\_|\\___|\\__,_|\\__|_|  |_|_| |_|\\___/ \n", stdout);
+        fputs("              a small functional array language\n", stdout);
+    }
+}
+
+/* ------------------------------------------------------------------ */
 int repl_run(void)
 {
     Interp I;
@@ -219,9 +239,15 @@ int repl_run(void)
     using_history();
     stifle_history(1000);
     read_history(histpath);
-    printf("Neutrino REPL  (readline; Ctrl-D to exit, Ctrl-C to cancel input)\n");
+    if (isatty(fileno(stdin))) {
+        print_banner(isatty(fileno(stdout)) && !getenv("NO_COLOR"));
+        fputs("              type  help  for a tour  \u00b7  Ctrl-D to exit  \u00b7  Ctrl-C cancels\n\n", stdout);
+    }
 #else
-    printf("Neutrino REPL  (Ctrl-D to exit)\n");
+    if (isatty(fileno(stdin))) {
+        print_banner(isatty(fileno(stdout)) && !getenv("NO_COLOR"));
+        fputs("              type  help  for a tour  \u00b7  Ctrl-D to exit\n\n", stdout);
+    }
 #endif
 
     struct sigaction sa; memset(&sa, 0, sizeof sa);

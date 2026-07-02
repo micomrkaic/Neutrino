@@ -1,4 +1,9 @@
-# Neutrino
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/logo-horizontal-dark.svg">
+    <img alt="Neutrino — a small functional array language" src="brand/logo-horizontal.svg" width="520">
+  </picture>
+</p>
 
 A small functional **array language** with Octave-flavoured syntax, implemented
 in C23. Neutrino has a strict numeric tower, first-class functions, immutable

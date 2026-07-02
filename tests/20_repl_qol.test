@@ -1,0 +1,21 @@
+# REPL quality-of-life: bare 0-arg auto-call, system() exit status
+# a bare 0-parameter function name calls it
+let f = fn -> 7; f
+=> 7
+# a function that needs arguments is left as a value
+let g = fn x -> x + 1; g
+=> <fn/1>
+# system() returns the command's exit status
+system("exit 0")
+=> 0
+system("exit 7")
+=> 7
+system("true")
+=> 0
+system("false")
+=> 1
+system(42)
+=> !command string
+# print writes its argument and returns null (null is not echoed)
+print(42)
+=> 42

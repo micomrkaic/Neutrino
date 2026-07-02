@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Added
+- **REPL splash banner.** The interactive shell now opens with an ASCII/Unicode
+  rendering of the Neutrino mark beside a figlet wordmark, in brand colours via
+  ANSI truecolor. Shown only on an interactive TTY (piped input and scripts get
+  no banner); colour is suppressed off-TTY or when `NO_COLOR` is set.
+- **Brand assets** (`brand/`): vector logo set (icon, horizontal/stacked/mono/
+  reversed lockups, README header, favicon, plus a dark-mode lockup), an
+  OpenGraph social card (`og-card.png`, 1200×630), and a brand guide. The
+  project README now leads with the logo, theme-swapped for light/dark.
 - **Block expressions.** `( s1; s2; … ; expr )` is a scoped statement sequence
   used as an expression — its value is the final expression, `let` bindings are
   local to the block, and later statements see earlier ones. Usable as a function

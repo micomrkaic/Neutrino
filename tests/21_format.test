@@ -1,0 +1,21 @@
+# Number display formatting (each input is a fresh process, so set format inline)
+format("long"); 1 / 4
+=> 0.25
+format("long"); 1 / 7
+=> 0.1428571428571428
+format(3); 1 / 3
+=> 0.333
+format(8); sqrt(2)
+=> 1.4142136
+format("short e"); 1234.5
+=> 1.2345e+03
+format("default"); 1 / 3
+=> 0.333333
+# formatting also reaches complex parts
+format(3); 1.23456 + 2.34567i
+=> 1.23+2.35i
+# bad modes
+format("bogus")
+=> !unknown mode
+format([1, 2])
+=> !mode string or a digit count

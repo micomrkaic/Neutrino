@@ -1,0 +1,29 @@
+# Lambdas, currying, recursion, closures, HOFs
+let f = fn x -> x + 1; f(10)
+=> 11
+let f = fn x -> fn y -> x + y; f(3)(4)
+=> 7
+let add = fn x -> fn y -> x + y; let add5 = add(5); add5(10)
+=> 15
+let fib = fn n -> if n < 2 then n else fib(n-1) + fib(n-2) end; fib(10)
+=> 55
+let fact = fn n -> if n <= 1 then 1 else n * fact(n-1) end; fact(6)
+=> 720
+let ev = fn n -> if n == 0 then true else od(n-1) end; let od = fn n -> if n == 0 then false else ev(n-1) end; ev(10)
+=> true
+let compose = fn f -> fn g -> fn x -> f(g(x)); compose(fn a -> a+1)(fn b -> b*2)(20)
+=> 41
+map(fn x -> x .^ 2, 1:5)
+=> [1, 4, 9, 16, 25]
+map(fn x -> x * 2, [1, 2, 3])
+=> [2, 4, 6]
+let mk = fn b -> fn a -> b + a; let f5 = mk(5); f5(1) + f5(2)
+=> 13
+let outer = fn a -> fn b -> fn c -> a + b + c; outer(1)(2)(3)
+=> 6
+let apply = fn f -> fn x -> f(x); apply(fn n -> n * n)(7)
+=> 49
+let acc = 0; for i = 1:100 do let cap = fn x -> x + i; acc = acc + cap(0) end; acc
+=> 5050
+let deep = fn n -> if n == 0 then 0 else 1 + deep(n - 1) end; deep(5000)
+=> 5000

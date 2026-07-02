@@ -1,0 +1,6 @@
+# underdetermined left division -> minimum-norm solution
+# underdetermined left division -> minimum-norm solution
+let A = [1, 1, 1; 1, 2, 3]; let x = A \ [6; 14]; max(abs(A * x - [6; 14])) < 1e-9
+=> true
+let A = [1, 1, 1; 1, 2, 3]; let x = A \ [6; 14]; abs(sum(x .* [1; -2; 1])) < 1e-9
+=> true
