@@ -8,21 +8,38 @@
 /* ---- number display format (Float / Complex parts) ---------------- */
 static NumFmtStyle g_fmt_style = NFMT_G;
 static int         g_fmt_prec  = 6;          /* startup default == bare %g */
+static bool        g_fmt_trail = false;      /* keep trailing zeros ('#'): on for explicit formats */
 
 void value_format_set(NumFmtStyle style, int prec)
 {
     if (prec < 0)  prec = 0;
     if (prec > 17) prec = 17;                /* a double carries ~17 sig digits */
     g_fmt_style = style; g_fmt_prec = prec;
+    g_fmt_trail = true;                      /* an explicitly chosen format is consistent-width */
+}
+static void format_reset_default(void)
+{
+    g_fmt_style = NFMT_G; g_fmt_prec = 6; g_fmt_trail = false;   /* bare %g (golden-compatible) */
+}
+void value_format_get(NumFmtStyle *style, int *prec, bool *trailing)
+{
+    *style = g_fmt_style; *prec = g_fmt_prec; *trailing = g_fmt_trail;
+}
+void value_format_restore(NumFmtStyle style, int prec, bool trailing)
+{
+    g_fmt_style = style; g_fmt_prec = prec; g_fmt_trail = trailing;
 }
 bool value_format_by_name(const char *name)
 {
+    if (strcmp(name, "default") == 0 || strcmp(name, "reset") == 0) {
+        format_reset_default();                          /* bare %g, variable width */
+        return true;
+    }
     struct { const char *n; NumFmtStyle s; int p; } t[] = {
         { "short",   NFMT_G, 5 },  { "long",   NFMT_G, 16 },
         { "short g", NFMT_G, 5 },  { "long g", NFMT_G, 16 },
         { "short e", NFMT_E, 4 },  { "long e", NFMT_E, 15 },
         { "short f", NFMT_F, 4 },  { "long f", NFMT_F, 14 },
-        { "default", NFMT_G, 6 },  { "reset",  NFMT_G, 6 },
     };
     for (size_t i = 0; i < sizeof t / sizeof *t; i++)
         if (strcmp(t[i].n, name) == 0) { value_format_set(t[i].s, t[i].p); return true; }
@@ -40,7 +57,7 @@ const char *value_format_desc(void)
 static void num_spec(char *spec, size_t n)
 {
     char conv = g_fmt_style == NFMT_F ? 'f' : g_fmt_style == NFMT_E ? 'e' : 'g';
-    snprintf(spec, n, "%%.%d%c", g_fmt_prec, conv);
+    snprintf(spec, n, g_fmt_trail && conv == 'g' ? "%%#.%d%c" : "%%.%d%c", g_fmt_prec, conv);
 }
 static void fmt_double(FILE *out, double x)
 {

@@ -1,4 +1,5 @@
 /* eval.c — Neutrino tree-walking evaluator. */
+#define _POSIX_C_SOURCE 200809L   /* open_memstream (used by formatted print) */
 #include "eval.h"
 #include <stdlib.h>
 #include <string.h>
@@ -974,10 +975,94 @@ static Value map_unary(Interp *I, Value v, Value (*f)(Interp *, Value))
     return f(I, v);
 }
 
+static void print_raw(Value v)
+{
+    if (v.kind == VAL_STRING) { StrObj *s = as_str(v); fwrite(s->data, 1, s->len, vout()); }
+    else value_print(vout(), v);
+}
+static void print_raw_to(FILE *f, Value v)
+{
+    if (v.kind == VAL_STRING) { StrObj *s = as_str(v); fwrite(s->data, 1, s->len, f); }
+    else value_print(f, v);
+}
+
+/* A placeholder spec: {:[-][width][.prec][f|e|g]} — all parts optional. */
+typedef struct { int width; bool left; int prec; char conv; } HoleSpec;
+
+/* If t[i..] starts a placeholder, parse it: fill *hs, return its total length.
+ * Return 0 if not a placeholder, -1 if it opens like one but is malformed. */
+static int parse_hole(const char *t, uint32_t len, uint32_t i, HoleSpec *hs)
+{
+    if (t[i] != '{') return 0;
+    if (i + 1 < len && t[i+1] == '{') return 0;            /* '{{' escape, not a hole */
+    uint32_t j = i + 1;
+    *hs = (HoleSpec){ .width = 0, .left = false, .prec = -1, .conv = 0 };
+    if (j < len && t[j] == '}') return 2;                  /* plain {} */
+    if (j >= len || t[j] != ':') return -1;                /* '{x' — not a valid hole */
+    j++;
+    if (j < len && t[j] == '-') { hs->left = true; j++; }
+    while (j < len && t[j] >= '0' && t[j] <= '9') { hs->width = hs->width * 10 + (t[j] - '0'); j++; }
+    if (j < len && t[j] == '.') {
+        j++; hs->prec = 0;
+        while (j < len && t[j] >= '0' && t[j] <= '9') { hs->prec = hs->prec * 10 + (t[j] - '0'); j++; }
+    }
+    if (j < len && (t[j] == 'f' || t[j] == 'e' || t[j] == 'g')) { hs->conv = t[j]; j++; }
+    if (j < len && t[j] == '}') return (int)(j - i + 1);
+    return -1;
+}
+
+/* Emit one value under a spec: temporary format override, optional width pad. */
+static void print_hole(Interp *I, Value v, const HoleSpec *hs)
+{
+    NumFmtStyle ss; int sp; bool st;
+    value_format_get(&ss, &sp, &st);
+    if (hs->conv || hs->prec >= 0) {
+        NumFmtStyle style = hs->conv == 'f' ? NFMT_F : hs->conv == 'e' ? NFMT_E
+                          : hs->conv == 'g' ? NFMT_G : ss;
+        value_format_set(style, hs->prec >= 0 ? hs->prec : sp);   /* trailing on */
+    }
+    if (hs->width > 0) {                                   /* render, then justify */
+        char *buf = nullptr; size_t sz = 0;
+        FILE *ms = open_memstream(&buf, &sz);
+        if (!ms) { value_format_restore(ss, sp, st); runtime_error(I, "print: out of memory"); }
+        print_raw_to(ms, v);
+        fclose(ms);
+        fprintf(vout(), "%*s", hs->left ? -hs->width : hs->width, buf ? buf : "");
+        free(buf);
+    } else {
+        print_raw(v);
+    }
+    value_format_restore(ss, sp, st);
+}
+
 static Value bi_print(Interp *I, Value *args, uint32_t n)
 {
-    (void)I;
-    for (uint32_t i = 0; i < n; i++) { if (i) fputc(' ', vout()); value_print(vout(), args[i]); }
+    if (n >= 1 && args[0].kind == VAL_STRING && memchr(as_str(args[0])->data, '{', as_str(args[0])->len)) {
+        StrObj *t = as_str(args[0]);                    /* template mode: "a {} b {:.3f}" */
+        uint32_t holes = 0;                             /* validate before any output */
+        HoleSpec hs;
+        for (uint32_t i = 0; i < t->len; i++) {
+            if (t->data[i] == '{' && i + 1 < t->len && t->data[i+1] == '{') { i++; continue; }
+            if (t->data[i] == '}' && i + 1 < t->len && t->data[i+1] == '}') { i++; continue; }
+            int hl = parse_hole(t->data, t->len, i, &hs);
+            if (hl < 0) runtime_error(I, "print: malformed placeholder (use {}, {:.3f}, {:8}, {:e}, ...)");
+            if (hl > 0) { holes++; i += (uint32_t)hl - 1; }
+        }
+        if (holes > n - 1) runtime_error(I, "print: %u {} placeholder(s) but only %u argument(s)", holes, n - 1);
+        if (holes < n - 1) runtime_error(I, "print: %u argument(s) without a {} placeholder", (n - 1) - holes);
+        uint32_t next = 1;
+        for (uint32_t i = 0; i < t->len; i++) {
+            char ch = t->data[i];
+            if (ch == '{' && i + 1 < t->len && t->data[i+1] == '{') { fputc('{', vout()); i++; continue; }
+            if (ch == '}' && i + 1 < t->len && t->data[i+1] == '}') { fputc('}', vout()); i++; continue; }
+            int hl = parse_hole(t->data, t->len, i, &hs);
+            if (hl > 0) { print_hole(I, args[next++], &hs); i += (uint32_t)hl - 1; continue; }
+            fputc(ch, vout());
+        }
+        fputc('\n', vout());
+        return val_null();
+    }
+    for (uint32_t i = 0; i < n; i++) { if (i) fputc(' ', vout()); print_raw(args[i]); }
     fputc('\n', vout());
     return val_null();
 }
@@ -1184,7 +1269,7 @@ typedef struct { const char *name, *sig, *desc, *cat; } BuiltinDoc;
 
 static const BuiltinDoc builtin_docs[] = {
     /* core ------------------------------------------------------------ */
-    { "print", "print(...)",        "print arguments separated by spaces, then a newline", "core" },
+    { "print", "print(...) | print(tmpl, ...)", "print values; template fills {} in order; {:[-][w][.p][f|e|g]} formats a hole ({{ }} literal)", "core" },
     { "who",   "who",               "list the variables you have defined (name, type, shape)", "core" },
     { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" },

@@ -123,6 +123,8 @@ typedef enum { NFMT_G, NFMT_F, NFMT_E } NumFmtStyle;
 void        value_format_set(NumFmtStyle style, int prec);
 bool        value_format_by_name(const char *name);  /* "short"/"long"/"short e"/... ; false if unknown */
 const char *value_format_desc(void);                 /* human label of the current setting */
+void        value_format_get(NumFmtStyle *style, int *prec, bool *trailing);   /* snapshot */
+void        value_format_restore(NumFmtStyle style, int prec, bool trailing);  /* put a snapshot back */
 
 /* output stream indirection — lets the REPL capture output for paging */
 FILE *vout(void);                /* current output stream (defaults to stdout) */

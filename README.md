@@ -137,11 +137,33 @@ as an integer.
 **Display.** `format` controls how numbers print: `format long` shows full
 double precision, `format short` is terser, `format short e` switches to
 scientific notation, and `format` on its own (or `format("...")` / `format(n)`
-in a script) reports or sets it. `more on` pages long output through `$PAGER`;
-`more off` (the default) lets it scroll. The interactive shell prints matrices
-as aligned, multi-line blocks; `pretty off` falls back to the compact
+in a script) reports or sets it. Explicitly chosen formats keep trailing zeros
+for consistent width (`format(4)` prints `2.000`, `1.414`, `3.162` — never a
+bare `2` between decimalled neighbours); the startup default (`format default`)
+uses the terse variable-width form. `more on` pages long output through
+`$PAGER`; `more off` (the default) lets it scroll. The interactive shell prints
+matrices as aligned, multi-line blocks; `pretty off` falls back to the compact
 single-line `[a, b; c, d]` form (which round-trips as input), `pretty on`
 restores alignment.
+
+**Formatted printing.** When `print`'s first argument is a string containing
+`{}` placeholders, each is filled by the following arguments in order; `{{` and
+`}}` emit literal braces, string arguments print without quotes, and numbers
+follow the current `format` setting. A placeholder can carry its own spec,
+`{:[-][width][.prec][f|e|g]}`: width right-justifies (leading `-`
+left-justifies), `.prec` and the conversion override the global format for that
+one hole (and are restored afterwards) — applied element-wise if the argument is
+an array. Placeholder/argument count mismatches and malformed specs are errors
+caught before any output is written:
+
+```
+print("x = {}, |r| = {}", x, norm)       ->  x = 3.5, |r| = 1.414
+print("pi = {:.3f}", 3.14159)            ->  pi = 3.142
+print("[{:8.3f}]", sqrt(2))              ->  [   1.414]
+print("[{:-8.3f}]", sqrt(2))             ->  [1.414   ]
+print("{:.2f}", [1.234, 5.678])          ->  [1.23, 5.68]
+print("a {{literal}} brace", ...)        ->  a {literal} brace
+```
 
 ---
 
