@@ -1,0 +1,65 @@
+# REPL quality-of-life: bare 0-arg auto-call, system() exit status
+# a bare 0-parameter function name calls it
+let f = fn -> 7; f
+=> 7
+# a function that needs arguments is left as a value
+let g = fn x -> x + 1; g
+=> <fn/1>
+# system() returns the command's exit status
+system("exit 0")
+=> 0
+system("exit 7")
+=> 7
+system("true")
+=> 0
+system("false")
+=> 1
+system(42)
+=> !command string
+# print writes its argument and returns null (null is not echoed)
+print(42)
+=> 42
+# print with {} template formatting
+print("x = {}, y = {}", 3.5, [1, 2; 3, 4])
+=> x = 3.5, y = [1, 2; 3, 4]
+print("say {}", "hi")
+=> say hi
+print("a {{literal}} brace and {}", 1)
+=> a {literal} brace and 1
+print("hello")
+=> hello
+format(4); print("val {}", sqrt(2))
+=> val 1.414
+print("too {} many {}", 1)
+=> !placeholder(s) but only
+print("unused {}", 1, 2)
+=> !without a {} placeholder
+# {:spec} per-placeholder formats: {:[-][width][.prec][f|e|g]}
+print("pi = {:.3f}", 3.14159265)
+=> pi = 3.142
+print("big = {:e}", 1234.5)
+=> big = 1.234500e+03
+print("[{:8.3f}]", sqrt(2))
+=> [   1.414]
+print("[{:-8.3f}]", sqrt(2))
+=> [1.414   ]
+print("[{:6}]", 42)
+=> [    42]
+print("[{:-6}] end", "hi")
+=> [hi    ] end
+print("mix {:.1f} {:.4f}", 2.5, 2.5)
+=> mix 2.5 2.5000
+print("{:.2f}", [1.234, 5.678])
+=> [1.23, 5.68]
+# a spec does not disturb the global format state ({:.2f} would give 0.33)
+let _ = print("{:.2f}", 1.2345)
+=> 1.23
+print("bad {:q}", 1)
+=> !malformed placeholder
+print("bad {x}", 1)
+=> !malformed placeholder
+# dis: bytecode introspection
+dis(sqrt)
+=> <builtin sqrt: native code, no bytecode>
+dis(42)
+=> !expected a function

@@ -1,0 +1,21 @@
+# Decompositions, via invariants that reduce to clean values
+eig([2, 0; 0, 3]).values
+=> [2; 3]
+eig([2, 1; 1, 2]).values
+=> [1; 3]
+svd([3, 0; 0, 4]).S
+=> [4; 3]
+let f = chol([4, 0; 0, 9]); f * f'
+=> [4, 0; 0, 9]
+let f = chol([4, 2; 2, 5]); f * f'
+=> [4, 2; 2, 5]
+chol([4, 2; 2, 5])
+=> [2, 0; 1, 2]
+let f = lu([4, 3; 6, 3]); f.L * f.U
+=> [6, 3; 4, 3]
+let f = qr([1, 1; 0, 1]); round(f.Q * f.R)
+=> [1, 1; 0, 1]
+let A = [2, 0; 0, 3]; let f = svd(A); round(f.U * diag(f.S) * f.V')
+=> [2, 0; 0, 3]
+let A = [4, 1; 1, 3]; let f = qr(A); round(f.Q' * f.Q)
+=> [1, 0; 0, 1]

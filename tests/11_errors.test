@@ -1,0 +1,31 @@
+# Error paths: each must raise (not crash), matched on a stable substring
+undefined_var
+=> !undefined name
+foo(3)
+=> !undefined name
+let f = fn x -> x; f(1, 2)
+=> !argument(s), got 2
+[1, 2] + [1, 2, 3]
+=> !shape mismatch
+[1, 2, 3] * [1, 2, 3]
+=> !matmul inner dimensions
+1 + "x"
+=> !arithmetic on non-numbers
+if 5 then 1 else 2 end
+=> !condition must be Bool
+gamma(2 + 3i)
+=> !expected a real number
+sqrt("hi")
+=> !expected a number
+let r = {a = 1}; r.b
+=> !record has no field
+x = 5
+=> !assignment to undefined name
+let a = [1, 2, 3]; a[10]
+=> !out of bounds
+[1, 2; 3]
+=> !row 2 has width
+2 +
+=> !expected an expression
+let = 5
+=> !expected name after 'let'

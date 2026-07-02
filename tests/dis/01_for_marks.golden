@@ -1,0 +1,32 @@
+== stmt 1 ==  (6 bytes, 1 consts, 1 names, 0 protos)
+0000     1  CONST          #0   ; 0
+0003     |  DEFINE         'acc'
+
+== stmt 2 ==  (57 bytes, 4 consts, 5 names, 0 protos)
+0000     1  CONST          #0   ; 1
+0003     |  CONST          #1   ; 1
+0006     |  CONST          #2   ; 5
+0009     |  RANGE
+0010     |  FOR_BEGIN
+0011     |  MARK_PUSH
+0012     |  FOR_NEXT       'i', end -> 0054
+0017     |  GET_VAR        'acc'
+0020     |  GET_VAR        'i'
+0023     |  CONST          #3   ; 3
+0026     |  BINOP          ==
+0028     |  JUMP_IF_FALSE  -> 0040
+0031     |  POP
+0032     |  MARK_RESET
+0033     |  SCOPE_POP
+0034     |  LOOP           -> 0012
+0037     |  JUMP           -> 0044
+0040     |  POP
+0041     |  GET_VAR        'i'
+0044     |  BINOP          +
+0046     |  SET_VAR        'acc'
+0049     |  POP
+0050     |  SCOPE_POP
+0051     |  LOOP           -> 0012
+0054     |  MARK_POP
+0055     |  FOR_END
+0056     |  NULL

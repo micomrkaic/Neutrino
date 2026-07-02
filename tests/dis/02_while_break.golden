@@ -1,0 +1,34 @@
+== stmt 1 ==  (6 bytes, 1 consts, 1 names, 0 protos)
+0000     1  CONST          #0   ; 0
+0003     |  DEFINE         'i'
+
+== stmt 2 ==  (56 bytes, 3 consts, 4 names, 0 protos)
+0000     1  MARK_PUSH
+0001     |  GET_VAR        'i'
+0004     |  CONST          #0   ; 5
+0007     |  BINOP          <
+0009     |  JUMP_IF_FALSE  -> 0053
+0012     |  POP
+0013     |  SCOPE_PUSH
+0014     |  GET_VAR        'i'
+0017     |  CONST          #1   ; 1
+0020     |  BINOP          +
+0022     |  SET_VAR        'i'
+0025     |  POP
+0026     |  GET_VAR        'i'
+0029     |  CONST          #2   ; 3
+0032     |  BINOP          ==
+0034     |  JUMP_IF_FALSE  -> 0046
+0037     |  POP
+0038     |  MARK_RESET
+0039     |  SCOPE_POP
+0040     |  JUMP           -> 0054
+0043     |  JUMP           -> 0048
+0046     |  POP
+0047     |  NULL
+0048     |  POP
+0049     |  SCOPE_POP
+0050     |  LOOP           -> 0001
+0053     |  POP
+0054     |  MARK_POP
+0055     |  NULL

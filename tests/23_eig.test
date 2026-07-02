@@ -1,0 +1,33 @@
+# eig returns {values, vectors}. Tests use invariants, not vector snapshots.
+# Hermitian: ascending real eigenvalues
+eig([2, 0; 0, 3]).values
+=> [2; 3]
+eig([2, 1; 1, 2]).values
+=> [1; 3]
+eig([4, 1, 0; 1, 4, 1; 0, 1, 4]).values
+=> [2.58579; 4; 5.41421]
+# Hermitian eigenvectors are orthonormal: V'*V = I
+let s = eig([2, 1; 1, 2]); let d = s.vectors' * s.vectors - eye(2); max(abs(d)) < 1e-12
+=> true
+# eigodefn holds: A*V = V*diag(values)
+let s = eig([5, 4, 2; 4, 5, 2; 2, 2, 2]); let r = [5,4,2;4,5,2;2,2,2]*s.vectors - s.vectors*diag(s.values); max(abs(r)) < 1e-9
+=> true
+# Nonsymmetric, real eigenvalues (upper triangular -> diagonal)
+eig([2, 5; 0, 3]).values
+=> [2; 3]
+# Nonsymmetric, complex-conjugate pair
+eig([0, -1; 1, 0]).values
+=> [-1i; 1i]
+eig([1, -2; 1, 3]).values
+=> [2-1i; 2+1i]
+# Spectral invariants for a general matrix: sum(values)=trace, prod(values)=det
+let A = [1, 2, 3; 4, 5, 6; 7, 8, 10]; abs(sum(eig(A).values) - trace(A)) < 1e-9
+=> true
+let A = [1, 2, 3; 4, 5, 6; 7, 8, 10]; abs(prod(eig(A).values) - det(A)) < 1e-9
+=> true
+# Nonsymmetric eigenvector residual A*V - V*diag(values) ~ 0
+let s = eig([1, 2, 3; 4, 5, 6; 7, 8, 10]); let r = [1,2,3;4,5,6;7,8,10]*s.vectors - s.vectors*diag(s.values); max(abs(r)) < 1e-8
+=> true
+# non-square is rejected
+eig([1, 2, 3; 4, 5, 6])
+=> !square

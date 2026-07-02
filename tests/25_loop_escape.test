@@ -1,0 +1,26 @@
+# break/continue fired mid-expression: stranded temporaries are released and
+# the value stack is restored to the loop-body base (previously wrong values).
+let acc = 0; for i = 1:5 do acc = acc + (if i == 3 then continue else i end) end; acc
+=> 12
+let acc = 0; for i = 1:5 do acc = acc + (if i == 3 then break else i end) end; acc
+=> 3
+let acc = 0; let i = 0; while i < 5 do i = i + 1; acc = acc + (if i == 3 then continue else i end) end; acc
+=> 12
+let acc = 0; let i = 0; while i < 5 do i = i + 1; acc = acc + (if i == 3 then break else i end) end; acc
+=> 3
+# nested loops: inner escape resets only the inner loop's base
+let t = 0; for i = 1:3 do for j = 1:3 do t = t + (if j == 2 then continue else j end) end end; t
+=> 12
+let deep = 0; for a = 1:2 do for b = 1:2 do for c = 1:2 do deep = deep + (1 + (if c == 2 then break else 10 end)) end end end; deep
+=> 44
+# continue inside a block-expression inside an expression, in a function
+let g = fn xs -> (let total = 0; for i = 1:numel(xs) do total = total + (let v = xs[i]; if v < 0 then continue else v end) end; total); g([1, -2, 3, -4, 5])
+=> 9
+# return from a loop inside a function, called from an outer loop's mid-expression
+let f = fn n -> (let s = 0; for i = 1:10 do s = s + (if i > n then return s else i end) end; s); let t = 0; for k = 1:3 do t = t + (if k == 2 then continue else f(k) end) end; t
+=> 7
+# statement-position escapes still behave
+let s = 0; for i = 1:10 do if i > 4 then break end; s = s + i end; s
+=> 10
+let s = 0; for i = 1:6 do if i == 2 then continue end; s = s + i end; s
+=> 19

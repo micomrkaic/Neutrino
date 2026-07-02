@@ -1,0 +1,31 @@
+# let .. in : local bindings as an expression (works in any expression position)
+let y = 5 in y + 1
+=> 6
+let f = fn x -> let y = x + 1 in y * y; f(4)
+=> 25
+let f = fn x -> let a = x * 2 in let b = a + 1 in a + b; f(10)
+=> 41
+let g = fn n -> let sq = fn k -> k * k in sq(n) + sq(n + 1); g(3)
+=> 25
+let quad = fn a -> fn b -> fn c -> fn x -> let t = a * x + b in t * x + c; quad(1)(2)(3)(4)
+=> 27
+let dist = fn x1 -> fn y1 -> fn x2 -> fn y2 -> let dx = x2 - x1 in let dy = y2 - y1 in sqrt(dx*dx + dy*dy); dist(0)(0)(3)(4)
+=> 5
+let outer = 100 in let inner = fn x -> x + outer in inner(5)
+=> 105
+let fact = fn n -> if n <= 1 then 1 else let m = fact(n-1) in n * m end; fact(6)
+=> 720
+let x = 10 in let x = 20 in x
+=> 20
+let a = 1 in a + (let a = 100 in a) + a
+=> 102
+let v = [1, 2, 3] in sum(v) + prod(v)
+=> 12
+if true then let z = 7 in z * 2 else 0 end
+=> 14
+let mean2 = fn xs -> let s = sum(xs) in let n = size(xs)[2] in s / n; mean2([2, 4, 6, 8])
+=> 5
+let x = 5 in undefined_thing
+=> !undefined name
+let x = nope in 5
+=> !undefined name

@@ -1,0 +1,12 @@
+== stmt 1 ==  (7 bytes, 0 consts, 1 names, 1 protos)
+0000     1  CLOSURE        fn#0, nup=0
+0004     |  DEFINE         'g'
+
+== stmt 1.fn#0 ==  (6 bytes, 0 consts, 0 names, 1 protos; arity 1)
+0000     1  GET_LOCAL      slot 1
+0002     |  CLOSURE        fn#0, nup=1
+
+== stmt 1.fn#0.fn#0 ==  (6 bytes, 0 consts, 0 names, 0 protos; arity 1)
+0000     1  GET_UPVALUE    up 0
+0002     |  GET_LOCAL      slot 1
+0004     |  BINOP          +
