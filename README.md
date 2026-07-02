@@ -703,5 +703,11 @@ the elementwise math library and complex accessors (`real`/`imag`/`conj`/
 
 ## Reserved words
 
-`let in fn if then else end true false null for while do` are in use;
-`return` is reserved for future control flow.
+`let in fn if then else end true false null for while do break continue return`
+are in use.
+
+## License
+
+GPL-3.0 — see [LICENSE](LICENSE). Neutrino is free software: you can
+redistribute it and/or modify it under the terms of the GNU General Public
+License v3; derivative works must remain under the same terms.
