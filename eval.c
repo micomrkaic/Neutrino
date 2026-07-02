@@ -1,5 +1,5 @@
 /* eval.c — Neutrino tree-walking evaluator. */
-#define _POSIX_C_SOURCE 200809L   /* open_memstream (used by formatted print) */
+#define _XOPEN_SOURCE 700         /* open_memstream + jn/yn Bessel (superset of POSIX.1-2008) */
 #include "eval.h"
 #include <stdlib.h>
 #include <string.h>
@@ -1321,6 +1321,17 @@ static const BuiltinDoc builtin_docs[] = {
     { "mod",   "mod(a, b)",          "modulo, result takes the sign of b (elementwise)", "math" },
     { "rem",   "rem(a, b)",          "remainder, result takes the sign of a (elementwise)", "math" },
     { "gamma", "gamma(x)",           "gamma function (real, elementwise)", "math" },
+    { "erf",   "erf(x)",             "error function (real, elementwise)", "math" },
+    { "erfc",  "erfc(x)",            "complementary error function 1 - erf(x)", "math" },
+    { "beta",  "beta(a, b)",         "beta function (a, b > 0, elementwise)", "math" },
+    { "lbeta", "lbeta(a, b)",        "log of the beta function", "math" },
+    { "gammainc","gammainc(x, a)",   "regularized lower incomplete gamma P(a, x) (the chi^2 CDF)", "math" },
+    { "betainc","betainc(x, a, b)",  "regularized incomplete beta I_x(a, b) (Student-t / F CDFs)", "math" },
+    { "norminv","norminv(p)",        "standard normal quantile (inverse CDF)", "math" },
+    { "digamma","digamma(x)",        "digamma psi(x) = d/dx log gamma(x)", "math" },
+    { "besselj","besselj(n, x)",     "Bessel function of the first kind, integer order n", "math" },
+    { "bessely","bessely(n, x)",     "Bessel function of the second kind, integer order n (x > 0)", "math" },
+    { "kron",  "kron(A, B)",         "Kronecker product: (m x n) kron (p x q) -> (mp x nq)", "linalg" },
     { "lgamma","lgamma(x)",          "log of |gamma(x)| (real, elementwise)", "math" },
     /* trig ------------------------------------------------------------ */
     { "sin",   "sin(x)",  "sine (complex-aware, elementwise)", "trig" },
@@ -1345,7 +1356,6 @@ static const BuiltinDoc builtin_docs[] = {
     /* linear algebra -------------------------------------------------- */
     { "dot",   "dot(a, b)",          "inner product of two vectors", "linalg" },
     { "norm",  "norm(x) | norm(x, p)","vector p-norm (p = 1 or 2, default 2); matrix Frobenius norm", "linalg" },
-    { "kron",  "kron(A, B)",         "Kronecker product", "linalg" },
     { "trace", "trace(A)",           "sum of the diagonal", "linalg" },
     { "det",   "det(A)",             "determinant via LU", "linalg" },
     { "inv",   "inv(A)",             "matrix inverse (solves A \\ I)", "linalg" },
@@ -1696,27 +1706,6 @@ static Value bi_norm(Interp *I, Value *args, uint32_t n)
     }
     if (p == 1) { double s = 0; for (size_t k = 0; k < nn; k++) s += vmag(arr_get(a, k)); return val_float(s); }
     runtime_error(I, "norm: only p = 1 or 2 supported");
-}
-
-static Value bi_kron(Interp *I, Value *args, uint32_t n)
-{
-    (void)n;
-    if (!is_array(args[0]) || !is_array(args[1])) runtime_error(I, "kron: expected two matrices");
-    ArrObj *A = as_arr(args[0]), *B = as_arr(args[1]);
-    uint32_t m = A->rows, na = A->cols, p = B->rows, q = B->cols;
-    uint32_t R = m * p, C = na * q;
-    size_t total = (size_t)R * C;
-    Value *tmp = total ? malloc(total * sizeof *tmp) : nullptr;
-    for (uint32_t i = 0; i < m; i++)
-        for (uint32_t j = 0; j < na; j++) {
-            Value aij = arr_get(A, (size_t)i * na + j);
-            for (uint32_t k = 0; k < p; k++)
-                for (uint32_t l = 0; l < q; l++)
-                    tmp[((size_t)(i*p+k)) * C + (j*q+l)] = scalar_arith_k(I, AR_MUL, aij, arr_get(B, (size_t)k*q+l));
-        }
-    Value r = pack_array(tmp, total, R, C);
-    free(tmp);
-    return r;
 }
 
 static Value bi_reshape(Interp *I, Value *args, uint32_t n)
@@ -2360,7 +2349,233 @@ ROUND_UNARY(trunc, trunc)
 REAL_ONLY(cbrt,   cbrt)
 REAL_ONLY(gamma,  tgamma)
 REAL_ONLY(lgamma, lgamma)
+REAL_ONLY(erf,    erf)
+REAL_ONLY(erfc,   erfc)
 #undef REAL_ONLY
+
+/* ---- special functions (real domain, elementwise via map_unary/map_binary) ---- */
+static Value map_binary(Interp *I, Value a, Value b, Value (*f)(Interp *, Value, Value));
+
+static double want_real(Interp *I, Value v, const char *who)
+{
+    if (v.kind != VAL_INT && v.kind != VAL_FLOAT)
+        runtime_error(I, "%s: expected a real number, got %s", who, type_name(v.kind));
+    return as_double(v);
+}
+
+/* Regularized lower incomplete gamma P(a, x): series for x < a+1, else
+ * 1 - continued fraction for Q (Lentz). Numerical Recipes structure. */
+static double gammainc_P(Interp *I, double x, double a)
+{
+    if (x < 0.0 || a <= 0.0) runtime_error(I, "gammainc: requires x >= 0 and a > 0");
+    if (x == 0.0) return 0.0;
+    double lg = lgamma(a);
+    if (x < a + 1.0) {                       /* series: P = e^{-x} x^a / Gamma(a) * sum */
+        double ap = a, sum = 1.0 / a, del = sum;
+        for (int i = 0; i < 500; i++) {
+            ap += 1.0; del *= x / ap; sum += del;
+            if (fabs(del) < fabs(sum) * 1e-16) break;
+        }
+        return sum * exp(-x + a * log(x) - lg);
+    }
+    double b = x + 1.0 - a, c = 1e300, d = 1.0 / b, h = d;   /* Lentz for Q */
+    for (int i = 1; i < 500; i++) {
+        double an = -i * (i - a);
+        b += 2.0;
+        d = an * d + b; if (fabs(d) < 1e-300) d = 1e-300;
+        c = b + an / c; if (fabs(c) < 1e-300) c = 1e-300;
+        d = 1.0 / d;
+        double del = d * c; h *= del;
+        if (fabs(del - 1.0) < 1e-16) break;
+    }
+    return 1.0 - exp(-x + a * log(x) - lg) * h;
+}
+
+/* Regularized incomplete beta I_x(a, b): Lentz continued fraction with the
+ * symmetry I_x(a,b) = 1 - I_{1-x}(b,a) for convergence. */
+static double betacf(double x, double a, double b)
+{
+    double qab = a + b, qap = a + 1.0, qam = a - 1.0;
+    double c = 1.0, d = 1.0 - qab * x / qap;
+    if (fabs(d) < 1e-300) d = 1e-300;
+    d = 1.0 / d;
+    double h = d;
+    for (int m = 1; m <= 500; m++) {
+        int m2 = 2 * m;
+        double aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+        d = 1.0 + aa * d; if (fabs(d) < 1e-300) d = 1e-300;
+        c = 1.0 + aa / c; if (fabs(c) < 1e-300) c = 1e-300;
+        d = 1.0 / d; h *= d * c;
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+        d = 1.0 + aa * d; if (fabs(d) < 1e-300) d = 1e-300;
+        c = 1.0 + aa / c; if (fabs(c) < 1e-300) c = 1e-300;
+        d = 1.0 / d;
+        double del = d * c; h *= del;
+        if (fabs(del - 1.0) < 1e-16) break;
+    }
+    return h;
+}
+static double betainc_I(Interp *I, double x, double a, double b)
+{
+    if (a <= 0.0 || b <= 0.0) runtime_error(I, "betainc: requires a > 0 and b > 0");
+    if (x < 0.0 || x > 1.0)   runtime_error(I, "betainc: requires 0 <= x <= 1");
+    if (x == 0.0) return 0.0;
+    if (x == 1.0) return 1.0;
+    double front = exp(lgamma(a + b) - lgamma(a) - lgamma(b)
+                       + a * log(x) + b * log(1.0 - x));
+    if (x < (a + 1.0) / (a + b + 2.0)) return front * betacf(x, a, b) / a;
+    return 1.0 - front * betacf(1.0 - x, b, a) / b;
+}
+
+/* Normal quantile: Acklam's rational approximation refined by one Halley
+ * step against erfc, giving ~1e-15 accuracy across (0, 1). */
+static double norminv_d(Interp *I, double p)
+{
+    if (p < 0.0 || p > 1.0) runtime_error(I, "norminv: requires 0 <= p <= 1");
+    if (p == 0.0) return -INFINITY;
+    if (p == 1.0) return  INFINITY;
+    static const double A[] = { -3.969683028665376e+01,  2.209460984245205e+02,
+        -2.759285104469687e+02,  1.383577518672690e+02, -3.066479806614716e+01,
+         2.506628277459239e+00 };
+    static const double B[] = { -5.447609879822406e+01,  1.615858368580409e+02,
+        -1.556989798598866e+02,  6.680131188771972e+01, -1.328068155288572e+01 };
+    static const double C[] = { -7.784894002430293e-03, -3.223964580411365e-01,
+        -2.400758277161838e+00, -2.549732539343734e+00,  4.374664141464968e+00,
+         2.938163982698783e+00 };
+    static const double D[] = {  7.784695709041462e-03,  3.224671290700398e-01,
+         2.445134137142996e+00,  3.754408661907416e+00 };
+    double q, r, xx;
+    if (p < 0.02425) {
+        q = sqrt(-2.0 * log(p));
+        xx = (((((C[0]*q+C[1])*q+C[2])*q+C[3])*q+C[4])*q+C[5]) /
+             ((((D[0]*q+D[1])*q+D[2])*q+D[3])*q+1.0);
+    } else if (p <= 0.97575) {
+        q = p - 0.5; r = q * q;
+        xx = (((((A[0]*r+A[1])*r+A[2])*r+A[3])*r+A[4])*r+A[5])*q /
+             (((((B[0]*r+B[1])*r+B[2])*r+B[3])*r+B[4])*r+1.0);
+    } else {
+        q = sqrt(-2.0 * log(1.0 - p));
+        xx = -(((((C[0]*q+C[1])*q+C[2])*q+C[3])*q+C[4])*q+C[5]) /
+              ((((D[0]*q+D[1])*q+D[2])*q+D[3])*q+1.0);
+    }
+    double e = 0.5 * erfc(-xx / M_SQRT2) - p;                 /* one Halley step */
+    double u = e * sqrt(2.0 * M_PI) * exp(xx * xx / 2.0);
+    return xx - u / (1.0 + xx * u / 2.0);
+}
+
+/* Digamma psi(x): reflection for x < 0.5, recurrence up to x >= 6,
+ * then the asymptotic series. */
+static double digamma_d(Interp *I, double x)
+{
+    if (x <= 0.0 && x == floor(x)) runtime_error(I, "digamma: pole at non-positive integer");
+    double result = 0.0;
+    if (x < 0.5) {                            /* psi(x) = psi(1-x) - pi*cot(pi*x) */
+        result -= M_PI / tan(M_PI * x);
+        x = 1.0 - x;
+    }
+    while (x < 10.0) { result -= 1.0 / x; x += 1.0; }
+    double inv = 1.0 / x, inv2 = inv * inv;
+    result += log(x) - 0.5 * inv
+            - inv2 * (1.0/12.0 - inv2 * (1.0/120.0 - inv2 * (1.0/252.0
+              - inv2 * (1.0/240.0 - inv2 * (1.0/132.0)))));
+    return result;
+}
+
+static Value sc_digamma(Interp *I, Value v) { return val_float(digamma_d(I, want_real(I, v, "digamma"))); }
+static Value bi_digamma(Interp *I, Value *a, uint32_t n) { (void)n; return map_unary(I, a[0], sc_digamma); }
+
+static Value sc_norminv(Interp *I, Value v) { return val_float(norminv_d(I, want_real(I, v, "norminv"))); }
+static Value bi_norminv(Interp *I, Value *a, uint32_t n) { (void)n; return map_unary(I, a[0], sc_norminv); }
+
+static Value sc_lbeta(Interp *I, Value a, Value b)
+{
+    double x = want_real(I, a, "lbeta"), y = want_real(I, b, "lbeta");
+    if (x <= 0.0 || y <= 0.0) runtime_error(I, "lbeta: requires a > 0 and b > 0");
+    return val_float(lgamma(x) + lgamma(y) - lgamma(x + y));
+}
+static Value bi_lbeta(Interp *I, Value *a, uint32_t n) { (void)n; return map_binary(I, a[0], a[1], sc_lbeta); }
+static Value sc_beta(Interp *I, Value a, Value b)
+{
+    Value l = sc_lbeta(I, a, b);
+    return val_float(exp(l.as.f));
+}
+static Value bi_beta(Interp *I, Value *a, uint32_t n) { (void)n; return map_binary(I, a[0], a[1], sc_beta); }
+
+static Value sc_gammainc(Interp *I, Value xv, Value av)
+{
+    return val_float(gammainc_P(I, want_real(I, xv, "gammainc"), want_real(I, av, "gammainc")));
+}
+static Value bi_gammainc(Interp *I, Value *a, uint32_t n) { (void)n; return map_binary(I, a[0], a[1], sc_gammainc); }
+
+/* betainc(x, a, b): 3-arg — x may be an array; a, b are real scalars. */
+static Value bi_betainc(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    double a = want_real(I, args[1], "betainc"), b = want_real(I, args[2], "betainc");
+    Value xv = args[0];
+    if (is_num(xv)) return val_float(betainc_I(I, want_real(I, xv, "betainc"), a, b));
+    if (!is_array(xv)) runtime_error(I, "betainc: expected a real x, got %s", type_name(xv.kind));
+    ArrObj *xa = as_arr(xv);
+    if (xa->elt == ELT_COMPLEX) runtime_error(I, "betainc: expected real x");
+    size_t nn = (size_t)xa->rows * xa->cols;
+    Value out = val_array(ELT_FLOAT, xa->rows, xa->cols);
+    for (size_t k = 0; k < nn; k++)
+        ((double *)as_arr(out)->data)[k] = betainc_I(I, as_double(arr_get(xa, k)), a, b);
+    return out;
+}
+
+/* Bessel J_n / Y_n: integer order n (scalar), elementwise over x. */
+static Value sc_besselj(Interp *I, Value nv, Value xv)
+{
+    double nd = want_real(I, nv, "besselj");
+    if (nd != floor(nd)) runtime_error(I, "besselj: order must be an integer");
+    return val_float(jn((int)nd, want_real(I, xv, "besselj")));
+}
+static Value bi_besselj(Interp *I, Value *a, uint32_t n) { (void)n; return map_binary(I, a[0], a[1], sc_besselj); }
+static Value sc_bessely(Interp *I, Value nv, Value xv)
+{
+    double nd = want_real(I, nv, "bessely");
+    if (nd != floor(nd)) runtime_error(I, "bessely: order must be an integer");
+    double x = want_real(I, xv, "bessely");
+    if (x <= 0.0) runtime_error(I, "bessely: requires x > 0");
+    return val_float(yn((int)nd, x));
+}
+static Value bi_bessely(Interp *I, Value *a, uint32_t n) { (void)n; return map_binary(I, a[0], a[1], sc_bessely); }
+
+/* Kronecker product: (m x n) kron (p x q) -> (mp x nq), any numeric element types. */
+static Value bi_kron(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    Value av = args[0], bv = args[1];
+    if (is_num(av) && is_num(bv)) return scalar_arith_k(I, AR_MUL, numify(av), numify(bv));
+    if (is_num(av)) return map_binary(I, av, bv, fold_mul);   /* scalar (x) B == scaling */
+    if (is_num(bv)) return map_binary(I, av, bv, fold_mul);
+    if (!is_array(av) || !is_array(bv))
+        runtime_error(I, "kron: expected numeric arrays");
+    ArrObj *A = as_arr(av), *B = as_arr(bv);
+    uint64_t R = (uint64_t)A->rows * B->rows, C = (uint64_t)A->cols * B->cols;
+    if (R > 100000000ULL || C > 100000000ULL || R * C > 100000000ULL)
+        runtime_error(I, "kron: result too large (%llux%llu)", (unsigned long long)R, (unsigned long long)C);
+    size_t cells = (size_t)(R * C);
+    Value *tmp = malloc((cells ? cells : 1) * sizeof *tmp);
+    jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
+    volatile size_t done = 0;
+    if (setjmp(I->jmp)) array_build_abort(I, tmp, done, saved);
+    for (size_t r = 0; r < R; r++) {                    /* output order: done stays exact */
+        uint32_t i = (uint32_t)(r / B->rows), k = (uint32_t)(r % B->rows);
+        for (size_t cc = 0; cc < C; cc++) {
+            uint32_t j = (uint32_t)(cc / B->cols), l = (uint32_t)(cc % B->cols);
+            Value aij = numify(arr_get(A, (size_t)i * A->cols + j));
+            Value bkl = numify(arr_get(B, (size_t)k * B->cols + l));
+            tmp[r * C + cc] = scalar_arith_k(I, AR_MUL, aij, bkl);
+            done = r * C + cc + 1;
+        }
+    }
+    memcpy(I->jmp, saved, sizeof(jmp_buf));
+    Value out = pack_array(tmp, cells, (uint32_t)R, (uint32_t)C);
+    free(tmp);
+    return out;
+}
 
 static Value sc_sign(Interp *I, Value v) { (void)I;
     if (v.kind == VAL_INT)   return val_int((v.as.i > 0) - (v.as.i < 0));
@@ -2908,6 +3123,16 @@ EnvObj *globals_new(void)
     def_builtin(e, "cbrt",    bi_cbrt,    1, 1);
     def_builtin(e, "gamma",   bi_gamma,   1, 1);
     def_builtin(e, "lgamma",  bi_lgamma,  1, 1);
+    def_builtin(e, "erf",     bi_erf,     1, 1);
+    def_builtin(e, "erfc",    bi_erfc,    1, 1);
+    def_builtin(e, "beta",    bi_beta,    2, 2);
+    def_builtin(e, "lbeta",   bi_lbeta,   2, 2);
+    def_builtin(e, "gammainc",bi_gammainc,2, 2);
+    def_builtin(e, "betainc", bi_betainc, 3, 3);
+    def_builtin(e, "norminv", bi_norminv, 1, 1);
+    def_builtin(e, "digamma", bi_digamma, 1, 1);
+    def_builtin(e, "besselj", bi_besselj, 2, 2);
+    def_builtin(e, "bessely", bi_bessely, 2, 2);
     def_builtin(e, "atan2",   bi_atan2,   2, 2);
     def_builtin(e, "hypot",   bi_hypot,   2, 2);
     def_builtin(e, "mod",     bi_mod,     2, 2);

@@ -5,6 +5,16 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Added
+- **Special functions.** `erf`/`erfc`, `beta`/`lbeta`, regularized incomplete
+  gamma `gammainc(x, a)` (the chi-square CDF) and beta `betainc(x, a, b)` (the
+  Student-t / F CDFs), the normal quantile `norminv(p)` (Acklam + one Halley
+  refinement, ~1e-15), `digamma`, and integer-order Bessel `besselj`/`bessely`.
+  All real-domain, elementwise over arrays, cross-checked against SciPy, and the
+  build stays `-lm`-only (no GSL). With these primitives the classical CDFs and
+  quantiles are one-liners in-language, e.g. `normcdf = fn x -> 0.5 * erfc(-x / sqrt(2))`.
+- **`kron(A, B)`** Kronecker product, for all numeric element types (complex
+  included), with scalar operands treated as scaling and an overflow guard on
+  the result shape. (Replaces an earlier minimal implementation.)
 - **Bytecode disassembler.** `neutrino --dis file.nu` lists each statement's
   compiled chunk (mnemonics, resolved constants/names, absolute jump targets,
   line annotations, recursive function protos); `dis(f)` does the same for a

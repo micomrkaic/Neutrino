@@ -528,6 +528,13 @@ sin  cos  tan   asin  acos  atan   atan2(y,x)       trig + 2-arg arctangent
 sinh cosh tanh  asinh acosh atanh                   hyperbolic + inverses
 floor ceil round trunc  sign  cbrt                  rounding, sign, cube root
 gamma  lgamma                                       gamma, log-gamma (real)
+erf(x)  erfc(x)                                     error function and complement
+beta(a,b)  lbeta(a,b)                               beta function and its log
+gammainc(x,a)                                       regularized lower incomplete gamma P(a,x)
+betainc(x,a,b)                                      regularized incomplete beta I_x(a,b)
+norminv(p)                                          standard normal quantile
+digamma(x)                                          psi(x) = d/dx log gamma(x)
+besselj(n,x)  bessely(n,x)                          Bessel J_n, Y_n (integer order)
 hypot(a,b)  mod(a,b)  rem(a,b)                       sqrt(a^2+b^2), modulo, remainder
 real  imag  conj  angle (arg)                        complex part / conjugate / phase
                   Unary forms apply to a scalar or elementwise over an array;
@@ -584,6 +591,7 @@ lu(A)             LU with partial pivoting -> {L, U, p}   (P*A = L*U)
 qr(A)             Householder QR -> {Q, R}                 (real or complex)
 chol(A)           Cholesky factor L (lower), L*L' = A      (SPD / Hermitian PD)
 eig(A)            eigendecomposition -> {values, vectors} (Hermitian or general)
+kron(A, B)        Kronecker product: (m x n) kron (p x q) -> (mp x nq)
 svd(A)            thin SVD -> {U, S, V},  A = U*diag(S)*V'  (S descending)
 ```
 
