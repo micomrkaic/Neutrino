@@ -38,6 +38,9 @@ typedef enum : uint8_t {
     OP_FOR_NEXT,       /* u16 name, u16 end : if done jump end; else push     */
                        /*           scope, bind name = iter[idx], idx++       */
     OP_FOR_END,        /*           : pop [iterable, index]                   */
+    OP_MARK_PUSH,      /*           : record sp (loop-body base) on the mark stack */
+    OP_MARK_POP,       /*           : drop the top mark (normal loop exit)    */
+    OP_MARK_RESET,     /*           : release stack down to the top mark (break/continue) */
     /* --- stage 2b: functions --- */
     OP_CLOSURE,        /* u16 proto, u8 nup : pop nup captured values as the    */
                        /*           closure's upvalue snapshots                  */

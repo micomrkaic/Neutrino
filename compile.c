@@ -435,6 +435,7 @@ static void compile_node(Interp *I, Compiler *cc, AstNode *n)
 
     case AST_WHILE: {
         if (cc->nloops >= 8) compile_error(I, n, "loops nested too deeply");
+        chunk_emit(c, OP_MARK_PUSH, L);                 /* record the body's stack base */
         uint32_t loop_start = c->code_len;
         compile_node(I, cc, n->as.whileloop.cond);
         uint32_t exit = emit_jump(c, OP_JUMP_IF_FALSE, L);
@@ -453,9 +454,10 @@ static void compile_node(Interp *I, Compiler *cc, AstNode *n)
         emit_loop(I, n, c, loop_start, L);
         patch_jump(I, n, c, exit);
         chunk_emit(c, OP_POP, L);                        /* drop the false condition */
-        for (int b = 0; b < cc->loops[li].nbreaks; b++)  /* break lands on the NULL below */
+        for (int b = 0; b < cc->loops[li].nbreaks; b++)  /* break lands on the MARK_POP below */
             patch_jump(I, n, c, cc->loops[li].breaks[b]);
         cc->nloops--;
+        chunk_emit(c, OP_MARK_POP, L);
         chunk_emit(c, OP_NULL, L);
         break;
     }
@@ -464,6 +466,7 @@ static void compile_node(Interp *I, Compiler *cc, AstNode *n)
         if (cc->nloops >= 8) compile_error(I, n, "loops nested too deeply");
         compile_node(I, cc, n->as.forloop.iter);
         chunk_emit(c, OP_FOR_BEGIN, L);
+        chunk_emit(c, OP_MARK_PUSH, L);                 /* base above [iterable, index] */
         uint32_t loop_start = c->code_len;
         chunk_emit(c, OP_FOR_NEXT, L);
         uint32_t name = chunk_add_name(c, n->as.forloop.var, n->as.forloop.varlen);
@@ -482,9 +485,10 @@ static void compile_node(Interp *I, Compiler *cc, AstNode *n)
         chunk_emit(c, OP_SCOPE_POP, L);
         emit_loop(I, n, c, loop_start, L);
         patch_jump(I, n, c, exit);
-        for (int b = 0; b < cc->loops[li].nbreaks; b++)  /* break lands on FOR_END below */
+        for (int b = 0; b < cc->loops[li].nbreaks; b++)  /* break lands on the MARK_POP below */
             patch_jump(I, n, c, cc->loops[li].breaks[b]);
         cc->nloops--;
+        chunk_emit(c, OP_MARK_POP, L);
         chunk_emit(c, OP_FOR_END, L);
         chunk_emit(c, OP_NULL, L);
         break;
@@ -493,6 +497,7 @@ static void compile_node(Interp *I, Compiler *cc, AstNode *n)
     case AST_BREAK: {
         if (cc->nloops == 0) compile_error(I, n, "'break' is only valid inside a loop");
         int li = cc->nloops - 1;
+        chunk_emit(c, OP_MARK_RESET, L);                /* drop mid-expression temporaries */
         for (int s = cc->loops[li].scope_base; s < cc->scope_count; s++) chunk_emit(c, OP_SCOPE_POP, L);
         if (cc->loops[li].nbreaks >= 32) compile_error(I, n, "too many 'break' statements in one loop");
         cc->loops[li].breaks[cc->loops[li].nbreaks++] = emit_jump(c, OP_JUMP, L);
@@ -502,6 +507,7 @@ static void compile_node(Interp *I, Compiler *cc, AstNode *n)
     case AST_CONTINUE: {
         if (cc->nloops == 0) compile_error(I, n, "'continue' is only valid inside a loop");
         int li = cc->nloops - 1;
+        chunk_emit(c, OP_MARK_RESET, L);                /* drop mid-expression temporaries */
         for (int s = cc->loops[li].scope_base; s < cc->scope_count; s++) chunk_emit(c, OP_SCOPE_POP, L);
         emit_loop(I, n, c, cc->loops[li].cont_target, L);
         break;

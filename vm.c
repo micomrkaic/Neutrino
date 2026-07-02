@@ -33,6 +33,7 @@ typedef struct {
     Chunk   *chunk;
     uint32_t ip;
     uint32_t slot_base;  /* slot 0 = closure (self); slots 1.. = params; then temps */
+    uint32_t mark_base;  /* marks stack height at frame entry (restored on return)   */
     CloObj  *closure;    /* the executing closure (for upvalues); null at top level  */
     EnvObj  *env;        /* loop/global scope; starts = globals, loops push children */
 } CallFrame;
@@ -42,6 +43,7 @@ typedef struct {
     CallFrame *frames; uint32_t nframe, fcap;
     EnvObj    *globals;  /* floor for scope unwind; never released by a frame */
     int64_t   *end_dims; uint32_t end_sp, end_cap;  /* 'end' context: 2 dims per frame */
+    uint32_t  *marks;  uint32_t nmark, mcap;        /* loop-body sp bases (break/continue reset) */
 } VM;
 
 #define VM_MAX_FRAMES 200000   /* direct recursion: frame-stack depth   */
@@ -103,6 +105,7 @@ static CallFrame *push_frame(VM *st, Chunk *chunk, CloObj *closure, uint32_t slo
     }
     CallFrame *fr = &st->frames[st->nframe++];
     fr->chunk = chunk; fr->ip = 0; fr->slot_base = slot_base;
+    fr->mark_base = st->nmark;
     fr->closure = closure; fr->env = st->globals;
     return fr;
 }
@@ -121,6 +124,7 @@ static Value vm_run(Interp *I, Chunk *ch, Value closure, Value *args, uint32_t a
     st->frames = nullptr; st->nframe = 0; st->fcap = 0;
     st->globals = I->globals;
     st->end_dims = nullptr; st->end_sp = 0; st->end_cap = 0;
+    st->marks = nullptr; st->nmark = 0; st->mcap = 0;
     stack_grow(st);
 
     CloObj *clo = closure.kind == VAL_CLOSURE ? as_clo(closure) : nullptr;
@@ -139,7 +143,7 @@ static Value vm_run(Interp *I, Chunk *ch, Value closure, Value *args, uint32_t a
             CallFrame *fr = &st->frames[f];
             while (fr->env != st->globals) scope_pop(st, fr);
         }
-        free(st->stack); free(st->frames); free(st->end_dims); free(st);
+        free(st->stack); free(st->frames); free(st->end_dims); free(st->marks); free(st);
         memcpy(I->jmp, saved, sizeof(jmp_buf));
         vm_depth--;
         *ok = false;
@@ -158,9 +162,10 @@ static Value vm_run(Interp *I, Chunk *ch, Value closure, Value *args, uint32_t a
             Value result = st->sp > fr->slot_base ? st->stack[--st->sp] : val_null();
             while (fr->env != st->globals) scope_pop(st, fr);
             while (st->sp > fr->slot_base) value_release(st->stack[--st->sp]);
+            st->nmark = fr->mark_base;                  /* discard this frame's loop marks */
             st->nframe--;
             if (st->nframe == 0) {
-                free(st->stack); free(st->frames); free(st->end_dims); free(st);
+                free(st->stack); free(st->frames); free(st->end_dims); free(st->marks); free(st);
                 memcpy(I->jmp, saved, sizeof(jmp_buf));
                 vm_depth--;
                 *ok = true;
@@ -286,9 +291,10 @@ static Value vm_run(Interp *I, Chunk *ch, Value closure, Value *args, uint32_t a
             Value result = st->sp > fr->slot_base ? st->stack[--st->sp] : val_null();
             while (fr->env != st->globals) scope_pop(st, fr);
             while (st->sp > fr->slot_base) value_release(st->stack[--st->sp]);
+            st->nmark = fr->mark_base;                  /* discard this frame's loop marks */
             st->nframe--;
             if (st->nframe == 0) {
-                free(st->stack); free(st->frames); free(st->end_dims); free(st);
+                free(st->stack); free(st->frames); free(st->end_dims); free(st->marks); free(st);
                 memcpy(I->jmp, saved, sizeof(jmp_buf));
                 vm_depth--;
                 *ok = true;
@@ -367,6 +373,21 @@ static Value vm_run(Interp *I, Chunk *ch, Value closure, Value *args, uint32_t a
         }
         case OP_FOR_END:
             value_release(PEEK(1)); st->sp -= 2;
+            break;
+
+        case OP_MARK_PUSH:
+            if (st->nmark == st->mcap) {
+                st->mcap = st->mcap ? st->mcap * 2 : 16;
+                st->marks = realloc(st->marks, st->mcap * sizeof *st->marks);
+                if (!st->marks) abort();
+            }
+            st->marks[st->nmark++] = st->sp;
+            break;
+        case OP_MARK_POP:
+            st->nmark--;
+            break;
+        case OP_MARK_RESET:                              /* break/continue: drop mid-expression temporaries */
+            while (st->sp > st->marks[st->nmark - 1]) { st->sp--; value_release(st->stack[st->sp]); }
             break;
 
         case OP_CLOSURE: {

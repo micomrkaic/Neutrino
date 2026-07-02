@@ -79,18 +79,13 @@ compiled.
 
 ## Language features
 
-- **Block expressions sequence statements; `break`/`continue` inside one are a
-  caveat.** `( s1; s2; … ; expr )` is a scoped statement sequence whose value is
-  the final expression — usable as a function body, a pipe stage, or anywhere an
-  expression is expected, with `let` bindings local to the block. (Outside a
-  block, parentheses still group a single expression.) One sharp edge, shared
-  with `if`-expressions and **pre-dating** block expressions: `break` or
-  `continue` evaluated *inside a sub-expression that has operands mid-flight*
-  (e.g. `acc + (… continue …)`) leaves the value stack unbalanced and yields a
-  wrong result — it is not memory-unsafe, but such escapes should sit at
-  statement position in a loop body, not buried inside an arithmetic expression.
-  Closing this needs the loop to record and restore the value-stack base across
-  a non-local exit.
+- **Block expressions sequence statements.** `( s1; s2; … ; expr )` is a scoped
+  statement sequence whose value is the final expression — usable as a function
+  body, a pipe stage, or anywhere an expression is expected, with `let` bindings
+  local to the block. (Outside a block, parentheses still group a single
+  expression.) `break`, `continue`, and `return` are safe anywhere inside one,
+  including mid-expression: each loop records its value-stack base and a
+  non-local exit releases any in-flight temporaries back to it.
 - **Indexed assignment is name-targeted and bounded.** `a[i] = x` (and slices,
   gather, mask, `:`, `end`, 2-D) works with copy-on-write, but the target must be
   a plain name (`a`, not `rec.field[i]` or `a[i][j]`), indices must be in range
