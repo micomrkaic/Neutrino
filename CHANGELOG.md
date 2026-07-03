@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Added
+- **The Neutrino Manual** (`MANUAL.md`): a full user guide — REPL, types,
+  operators with a precedence table, scope rules, control flow, functions and
+  the pipe, arrays and indexing, linear algebra, complex, special functions,
+  RNG, formatting, scripts/tools, a builtin reference *generated from the
+  interpreter's own doc table*, and a grammar summary. Every REPL transcript in
+  it is machine-verified against the interpreter by `tests/run_manual.sh`,
+  which runs as part of `make test` — the manual cannot silently drift from
+  the implementation.
 - **Special functions.** `erf`/`erfc`, `beta`/`lbeta`, regularized incomplete
   gamma `gammainc(x, a)` (the chi-square CDF) and beta `betainc(x, a, b)` (the
   Student-t / F CDFs), the normal quantile `norminv(p)` (Acklam + one Halley

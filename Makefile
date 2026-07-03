@@ -68,6 +68,7 @@ vmtest-asan: $(VM_SRCS)
 test: vmtest $(BIN)
 	@bash tests/run.sh
 	@bash tests/run_dis.sh
+	@bash tests/run_manual.sh
 
 # Same corpus, every input run under AddressSanitizer/UBSan; fails on any leak.
 test-asan: vmtest-asan

@@ -5,6 +5,9 @@
   </picture>
 </p>
 
+**[Read the manual](MANUAL.md)** — the full guide to the language, REPL, and tools,
+with every example verified against the interpreter.
+
 A small functional **array language** with Octave-flavoured syntax, implemented
 in C23. Neutrino has a strict numeric tower, first-class functions, immutable
 refcounted values, complex numbers, logical (boolean) arrays, `for`/`while`
