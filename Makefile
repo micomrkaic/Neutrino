@@ -74,6 +74,13 @@ test: vmtest $(BIN)
 test-asan: vmtest-asan
 	@bash tests/run.sh --asan
 
+# Regenerate MANUAL.pdf from MANUAL.md (needs pandoc + xelatex; the styling
+# header is optional). On a full TeX Live / MacTeX install the stock template
+# works as-is.
+manual:
+	pandoc MANUAL.md -o MANUAL.pdf --pdf-engine=xelatex --toc --toc-depth=2 \
+	  -V geometry:margin=2.4cm -V fontsize=10pt -V colorlinks=true
+
 run:    $(BIN); ./$(BIN)
 repl:   $(BIN); ./$(BIN)
 sample: $(BIN); ./$(BIN) --sample

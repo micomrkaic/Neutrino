@@ -5,7 +5,7 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Added
-- **The Neutrino Manual** (`MANUAL.md`): a full user guide — REPL, types,
+- **The Neutrino Manual** (`MANUAL.md`, plus a typeset `MANUAL.pdf` — regenerate with `make manual`): a full user guide — REPL, types,
   operators with a precedence table, scope rules, control flow, functions and
   the pipe, arrays and indexing, linear algebra, complex, special functions,
   RNG, formatting, scripts/tools, a builtin reference *generated from the
