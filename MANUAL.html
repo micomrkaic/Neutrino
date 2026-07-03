@@ -1,0 +1,1121 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<title>MANUAL.html</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+
+</head>
+
+<body>
+
+<h1 id="the-neutrino-manual">The Neutrino Manual</h1>
+<p><em>A small functional array language — user manual for the language,
+the REPL, and the tools.</em></p>
+<p>This manual covers Neutrino as implemented: every example below was
+executed against the interpreter and shows its actual output. For a
+quick pitch and build instructions see the <a
+href="README.md">README</a>; for the honest list of sharp edges see <a
+href="KNOWN_LIMITATIONS.md">KNOWN_LIMITATIONS</a>.</p>
+<h2 id="contents">Contents</h2>
+<ol type="1">
+<li><a href="#1-getting-started">Getting started</a></li>
+<li><a href="#2-the-repl">The REPL</a></li>
+<li><a href="#3-values-and-types">Values and types</a></li>
+<li><a href="#4-operators-and-expressions">Operators and
+expressions</a></li>
+<li><a href="#5-variables-and-scope">Variables and scope</a></li>
+<li><a href="#6-control-flow">Control flow</a></li>
+<li><a href="#7-functions">Functions</a></li>
+<li><a href="#8-arrays-and-matrices">Arrays and matrices</a></li>
+<li><a href="#9-linear-algebra">Linear algebra</a></li>
+<li><a href="#10-complex-numbers">Complex numbers</a></li>
+<li><a href="#11-special-functions-and-statistics">Special functions and
+statistics</a></li>
+<li><a href="#12-random-numbers">Random numbers</a></li>
+<li><a href="#13-output-and-formatting">Output and formatting</a></li>
+<li><a href="#14-scripts-and-tools">Scripts and tools</a></li>
+<li><a href="#15-builtin-reference">Builtin reference</a></li>
+<li><a href="#16-grammar-summary">Grammar summary</a></li>
+</ol>
+<hr />
+<h2 id="getting-started">1. Getting started</h2>
+<p>Build (a C23 compiler and <code>libm</code>; readline optional — see
+the README for macOS notes):</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span>            <span class="co"># ./neutrino, the REPL</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">make</span> test       <span class="co"># golden suite + codegen goldens</span></span></code></pre></div>
+<p>Start the REPL and type an expression; its value echoes back:</p>
+<pre><code>neutrino&gt; 2 + 3 * 4
+14
+neutrino&gt; [1, 2; 3, 4] * [5; 6]
+[ 17
+   39 ]</code></pre>
+<p>A trailing <code>;</code> evaluates a statement but suppresses the
+echo. <code>#</code> and <code>%</code> both start a comment that runs
+to end of line. Ctrl-D exits; Ctrl-C cancels the current input.</p>
+<h2 id="the-repl">2. The REPL</h2>
+<p>The interactive shell adds conveniences on top of the language. None
+of them apply to scripts — they are REPL features.</p>
+<p><strong>Commands</strong> (typed bare, not as function calls):</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Command</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>help</code> / <code>help(f)</code></td>
+<td>catalogue of all builtins / details on one</td>
+</tr>
+<tr class="even">
+<td><code>who</code></td>
+<td>your variables, with type and shape</td>
+</tr>
+<tr class="odd">
+<td><code>format …</code></td>
+<td>number display: <code>format long</code>,
+<code>format short e</code>, <code>format(8)</code>, <code>format</code>
+to show</td>
+</tr>
+<tr class="even">
+<td><code>pretty on\|off</code></td>
+<td>aligned multi-line matrix display (default on in the REPL)</td>
+</tr>
+<tr class="odd">
+<td><code>more on\|off</code></td>
+<td>page long output through <code>$PAGER</code> (default off)</td>
+</tr>
+<tr class="even">
+<td><code>!cmd</code></td>
+<td>run a shell command (<code>!ls</code>,
+<code>!git status</code>)</td>
+</tr>
+<tr class="odd">
+<td><code>dis(f)</code></td>
+<td>disassemble a function’s bytecode</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Autocall.</strong> A bare name that is a zero-argument
+builtin or closure is called: <code>who</code>, <code>help</code>,
+<code>rand</code> work without parentheses, and so does your own
+<code>let f = fn -&gt; 42; f</code>.</p>
+<p><strong>Line editing.</strong> With readline (or macOS libedit), you
+get history (persisted to <code>~/.neutrino_history</code>), completion
+on builtin and variable names, and the usual Emacs keys. Multi-line
+constructs continue with a <code>...&gt;</code> prompt until the
+<code>end</code> arrives.</p>
+<p><strong>Display defaults.</strong> The REPL prints matrices as
+aligned blocks (<code>pretty on</code>) and numbers in a terse
+6-significant-digit format; both are configurable — see <a
+href="#13-output-and-formatting">Output and formatting</a>.</p>
+<h2 id="values-and-types">3. Values and types</h2>
+<p>Neutrino has nine value kinds. The scalar kinds:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Type</th>
+<th>Literals</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>Int</code></td>
+<td><code>42</code>, <code>-7</code></td>
+<td>64-bit signed; overflow wraps silently (documented footgun)</td>
+</tr>
+<tr class="even">
+<td><code>Float</code></td>
+<td><code>3.14</code>, <code>1e-9</code>, <code>2.5e3</code></td>
+<td>IEEE double</td>
+</tr>
+<tr class="odd">
+<td><code>Bool</code></td>
+<td><code>true</code>, <code>false</code></td>
+<td>distinct from numbers: <code>1 == true</code> is an error</td>
+</tr>
+<tr class="even">
+<td><code>Complex</code></td>
+<td><code>2i</code>, <code>1 + 3i</code>, <code>2.5i</code></td>
+<td>double re/im pair</td>
+</tr>
+<tr class="odd">
+<td><code>String</code></td>
+<td><code>"hello"</code></td>
+<td><strong>inert</strong>: strings display, print, and pass around, but
+have no operations — no concatenation, comparison, or indexing
+(yet)</td>
+</tr>
+<tr class="even">
+<td><code>Null</code></td>
+<td><code>null</code></td>
+<td>the “no value” value; a suppressed or valueless statement yields
+it</td>
+</tr>
+</tbody>
+</table>
+<p>And the compound kinds: <code>Array</code> (the 2-D numeric matrix —
+every array is rows x cols; a scalar is <em>not</em> a 1x1 array),
+<code>Record</code> (<code>{x = 1, y = 2}</code>, fields via
+<code>.x</code>), and <code>Function</code> (builtins and closures).</p>
+<p>The type discipline is strict rather than coercive: <code>Bool</code>
+does not silently become a number in arithmetic or comparison
+(<code>1 == true</code> errors), and mixing <code>Bool</code> with
+numerics in an array literal is an error. The one deliberate blur:
+<code>Int</code> and <code>Float</code> compare and combine freely
+(<code>5 == 5.0</code> is <code>true</code>), and <code>/</code> always
+produces a <code>Float</code> (<code>4 / 2</code> is
+<code>2.0</code>).</p>
+<p>Floating point behaves like floating point:</p>
+<pre><code>neutrino&gt; 0.1 + 0.2 == 0.3
+false
+neutrino&gt; 5 / 0
+inf</code></pre>
+<p>Division by zero yields <code>inf</code>/<code>nan</code> rather than
+an error — test with <code>isfinite</code>/<code>isnan</code> where it
+matters.</p>
+<h2 id="operators-and-expressions">4. Operators and expressions</h2>
+<p>From loosest to tightest binding:</p>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Level</th>
+<th>Operators</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>pipe</td>
+<td><code>\|&gt;</code></td>
+<td>left-assoc; see <a href="#7-functions">Functions</a></td>
+</tr>
+<tr class="even">
+<td>logical or</td>
+<td><code>\|\|</code></td>
+<td>short-circuit</td>
+</tr>
+<tr class="odd">
+<td>logical and</td>
+<td><code>&amp;&amp;</code></td>
+<td>short-circuit</td>
+</tr>
+<tr class="even">
+<td>elementwise or</td>
+<td><code>\|</code></td>
+<td>on logicals/arrays</td>
+</tr>
+<tr class="odd">
+<td>elementwise and</td>
+<td><code>&amp;</code></td>
+<td>on logicals/arrays</td>
+</tr>
+<tr class="even">
+<td>comparison</td>
+<td><code>== ~= &lt; &lt;= &gt; &gt;=</code></td>
+<td>elementwise on arrays -&gt; logical array</td>
+</tr>
+<tr class="odd">
+<td>range</td>
+<td><code>a:b</code>, <code>a:step:b</code></td>
+<td>inclusive; float steps fine</td>
+</tr>
+<tr class="even">
+<td>additive</td>
+<td><code>+ -</code></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td>multiplicative</td>
+<td><code>* / .* ./ \ .\</code></td>
+<td><code>*</code> is the <strong>matrix</strong> product on matrices;
+<code>.*</code> elementwise; <code>\</code> left division (solve)</td>
+</tr>
+<tr class="even">
+<td>unary</td>
+<td><code>- ! ~</code></td>
+<td>binds looser than <code>^</code>: <code>-2^2</code> is
+<code>-4</code></td>
+</tr>
+<tr class="odd">
+<td>power</td>
+<td><code>^ .^</code></td>
+<td>right-assoc: <code>2^3^2</code> is <code>512</code>; <code>^</code>
+on a square matrix is the matrix power</td>
+</tr>
+<tr class="even">
+<td>postfix</td>
+<td><code>'</code> <code>.'</code> <code>f(x)</code> <code>a[i]</code>
+<code>.field</code></td>
+<td><code>'</code> is <strong>conjugate</strong> transpose,
+<code>.'</code> plain</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>.</code>-prefixed operators are the elementwise family,
+exactly as in Octave:</p>
+<pre><code>neutrino&gt; [1, 2, 3] .* [4, 5, 6]
+[4, 10, 18]
+neutrino&gt; 2 .^ [1, 2, 3]
+[2, 4, 8]
+neutrino&gt; [1i, 2]&#39;          # conjugate transpose
+[  -1i
+  2+0i ]</code></pre>
+<p>Scalars broadcast against arrays in every elementwise operation
+(<code>[1, 2] + 1</code> is <code>[2, 3]</code>); two arrays must agree
+in shape exactly.</p>
+<h2 id="variables-and-scope">5. Variables and scope</h2>
+<p><code>let name = value</code> is the binding
+<strong>statement</strong>: at the top level it creates a global; inside
+a loop body or block it creates a local scoped to that construct. A bare
+<code>name = value</code> (no <code>let</code>) is
+<strong>assignment</strong>: it walks outward through the enclosing
+scopes and updates the nearest existing <code>name</code> — this is how
+a loop body updates an accumulator defined outside it.</p>
+<p><code>let name = value in body</code> is the binding
+<strong>expression</strong>: <code>name</code> is visible only in
+<code>body</code>, and the whole thing evaluates to <code>body</code>.
+Bindings nest and shadow:</p>
+<pre><code>neutrino&gt; let a = 1 in a + (let a = 100 in a) + a
+102</code></pre>
+<h2 id="control-flow">6. Control flow</h2>
+<p><code>if</code> is an expression:</p>
+<pre><code>neutrino&gt; let x = 5; if x &gt; 3 then &quot;big&quot; else &quot;small&quot; end
+&quot;big&quot;</code></pre>
+<p>The <code>else</code> branch is optional; if the condition is false
+and there is no <code>else</code>, the result is <code>null</code>.
+Conditions must be <code>Bool</code> — a number is not a condition.</p>
+<p>Loops are statements (they yield <code>null</code>):</p>
+<pre><code>neutrino&gt; let s = 0; for i = 1:10 do s = s + i end; s
+55
+neutrino&gt; let n = 1; while n &lt; 100 do n = n * 2 end; n
+128</code></pre>
+<p><code>break</code> leaves the nearest loop, <code>continue</code>
+skips to its next iteration, and <code>return [value]</code> exits the
+enclosing function. All three are safe anywhere — including
+mid-expression (<code>acc + (if bad then continue else v end)</code>):
+the VM restores the loop’s stack state on a non-local exit.</p>
+<p><strong>Block expressions</strong> sequence statements inside
+parentheses; the value is the final expression, and <code>let</code>
+bindings are local to the block:</p>
+<pre><code>neutrino&gt; (let x = 3; let y = 4; sqrt(x*x + y*y))
+5
+neutrino&gt; (let q = 7; q); q
+error: undefined name &#39;q&#39;          # block locals do not leak</code></pre>
+<p>This is the natural shape for a multi-step function body.</p>
+<h2 id="functions">7. Functions</h2>
+<p><code>fn params -&gt; expr</code> is a lambda; its body is one
+expression (use a block expression or <code>let … in</code> for multiple
+steps). Functions are values: bind them, pass them, return them.</p>
+<pre><code>neutrino&gt; let f = fn x -&gt; x ^ 2 + 1; f(3)
+10
+neutrino&gt; let add = fn a -&gt; fn b -&gt; a + b; add(2)(5)   # currying
+7
+neutrino&gt; let g = fn x -&gt; (let s = x * x; s + 1); g(4)
+17</code></pre>
+<p>Closures capture by value at creation. Recursion works through the
+function’s own name.</p>
+<p><strong>Sections.</strong> A parenthesised expression containing
+<code>_</code> becomes a lambda; each <code>_</code> is a fresh
+parameter, left to right: <code>(_ + 1)</code> is
+<code>fn x -&gt; x + 1</code>, <code>(_ * _)</code> takes two
+arguments.</p>
+<p><strong>map.</strong> <code>map(f, A)</code> applies <code>f</code>
+elementwise: <code>map((_ * 10), [1, 2, 3])</code> is
+<code>[10, 20, 30]</code>.</p>
+<p><strong>The pipe.</strong> <code>x |&gt; rhs</code> feeds a value
+forward. If <code>rhs</code> mentions <code>@</code>, the pipe binds
+<code>@</code> to <code>x</code> and evaluates <code>rhs</code>; if
+<code>rhs</code> is a bare callable, the pipe applies it:</p>
+<pre><code>neutrino&gt; [1, 2, 3, 4] |&gt; sum(@) |&gt; sqrt
+3.16228
+neutrino&gt; 5 |&gt; @ + 1
+6
+neutrino&gt; 9 |&gt; sqrt              # bare callable: sqrt(9)
+3</code></pre>
+<p>Pipes chain left to right, which reads as a data-flow pipeline.</p>
+<h2 id="arrays-and-matrices">8. Arrays and matrices</h2>
+<p>Matrix literals use <code>,</code> between columns and <code>;</code>
+between rows; every array is two-dimensional and
+<strong>1-indexed</strong>. <code>[]</code> is the empty array.</p>
+<p><strong>Indexing</strong> supports scalars, ranges, <code>:</code>
+(everything along a dimension), <code>end</code> (the last index, with
+arithmetic), index vectors (gather), and logical masks:</p>
+<pre><code>neutrino&gt; let A = [1, 2, 3; 4, 5, 6]
+[ 1  2  3
+  4  5  6 ]
+neutrino&gt; size(A)
+[2, 3]
+neutrino&gt; A[2, 3]          # element
+6
+neutrino&gt; A[1, :]          # row
+[1, 2, 3]
+neutrino&gt; A[:, 2]          # column
+[ 2
+  5 ]
+neutrino&gt; A[end, end]
+6
+neutrino&gt; let v = [10, 20, 30, 40]; v[2:3]
+[20, 30]
+neutrino&gt; v[v &gt; 15]        # logical mask
+[20, 30, 40]
+neutrino&gt; v[[1, 4]]        # gather
+[10, 40]</code></pre>
+<p><strong>Indexed assignment</strong> works with the same selectors,
+copy-on-write: <code>A[1, 2] = 9</code>, <code>v[v &lt; 0] = 0</code>,
+<code>A[2, :] = [7, 8, 9]</code>. The target must be a plain name and
+indices must be in range (no auto-growing).</p>
+<p><strong>Logical arrays</strong> come from comparisons and drive
+masking and counting: <code>sum(A &gt; 2)</code> counts,
+<code>any</code>/<code>all</code> test, <code>find(mask)</code> gives
+1-based positions, <code>where(mask, a, b)</code> selects
+elementwise.</p>
+<p><strong>Construction and reshaping</strong>: <code>zeros</code>,
+<code>ones</code>, <code>eye</code>, <code>diag</code>,
+<code>linspace</code>, <code>reshape</code> (row-major),
+<code>repmat</code>, ranges <code>1:n</code>.
+<strong>Reductions</strong> take an optional dimension:
+<code>sum(A, 1)</code> down columns, <code>sum(A, 2)</code> across rows,
+<code>max(A, [], dim)</code> for the extrema.</p>
+<h2 id="linear-algebra">9. Linear algebra</h2>
+<p><code>*</code> is the matrix product; <code>\</code> solves. Square
+systems use LU with partial pivoting; non-square <code>\</code> is least
+squares — overdetermined gives the LS fit, underdetermined the
+minimum-norm solution.</p>
+<pre><code>neutrino&gt; [2, 1; 1, 3] \ [3; 5]
+[ 0.8
+  1.4 ]
+neutrino&gt; [1, 1; 1, 2; 1, 3] \ [1; 2; 2]     # regression: intercept, slope
+[ 0.666667
+       0.5 ]</code></pre>
+<p>The decompositions return records, so the pieces have names:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Call</th>
+<th>Returns</th>
+<th>Identity</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>lu(A)</code></td>
+<td><code>{L, U, p}</code></td>
+<td><code>P*A = L*U</code></td>
+</tr>
+<tr class="even">
+<td><code>qr(A)</code></td>
+<td><code>{Q, R}</code></td>
+<td><code>A = Q*R</code></td>
+</tr>
+<tr class="odd">
+<td><code>chol(A)</code></td>
+<td><code>L</code></td>
+<td><code>L*L' = A</code> (Hermitian PD)</td>
+</tr>
+<tr class="even">
+<td><code>svd(A)</code></td>
+<td><code>{U, S, V}</code></td>
+<td><code>A = U*diag(S)*V'</code></td>
+</tr>
+<tr class="odd">
+<td><code>eig(A)</code></td>
+<td><code>{values, vectors}</code></td>
+<td><code>A*V = V*diag(values)</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>eig</code> handles both Hermitian matrices (Jacobi; real
+ascending eigenvalues, orthonormal vectors) and general ones (complex QR
++ inverse iteration; complex pairs come out right). All of it is
+complex-capable — <code>'</code> being the conjugate transpose is what
+makes the identities hold. <code>kron(A, B)</code> is the Kronecker
+product, <code>det</code>, <code>inv</code>, <code>trace</code>,
+<code>norm</code>, <code>dot</code> round out the set.</p>
+<h2 id="complex-numbers">10. Complex numbers</h2>
+<p>The imaginary literal is a number followed by <code>i</code>. Complex
+values propagate through arithmetic and the math library; results stay
+complex (<code>1i * 1i</code> is <code>-1+0i</code>, not
+<code>-1</code>). <code>real</code>, <code>imag</code>,
+<code>conj</code>, <code>angle</code> access the parts, <code>abs</code>
+is the modulus. Functions with limited real domains return complex off
+it: <code>sqrt(-4)</code> is <code>2i</code>, <code>log(-1)</code> is
+<code>3.14159i</code>, <code>asin(2)</code> is complex.</p>
+<h2 id="special-functions-and-statistics">11. Special functions and
+statistics</h2>
+<p>The special-function set is chosen as <em>primitives</em> from which
+the classical distributions are one-liners:</p>
+<pre><code>neutrino&gt; let normcdf = fn x -&gt; 0.5 * erfc(-x / sqrt(2))
+neutrino&gt; normcdf(1.96)
+0.975002
+neutrino&gt; norminv(0.975)
+1.95996</code></pre>
+<p><code>gammainc(x, a)</code> is the regularized lower incomplete gamma
+— the chi-square CDF is <code>gammainc(x/2, k/2)</code>.
+<code>betainc(x, a, b)</code> is the regularized incomplete beta —
+Student-t and F CDFs fall out of it. <code>erf</code>/<code>erfc</code>,
+<code>beta</code>/<code>lbeta</code>,
+<code>gamma</code>/<code>lgamma</code>, <code>digamma</code>, and
+integer-order Bessel <code>besselj</code>/<code>bessely</code> complete
+the set. All are real-domain, elementwise over arrays, and validated
+against SciPy.</p>
+<h2 id="random-numbers">12. Random numbers</h2>
+<p>The generator is xoshiro256** seeded through splitmix64, and it is
+<strong>reproducible by default</strong>: every fresh session starts
+from the same fixed seed, so a script’s random draws are stable run to
+run. <code>rng(seed)</code> reseeds — same seed, same stream.
+<code>rand</code>, <code>randn</code>, <code>randi</code> draw uniform,
+normal, and integer variates, scalar or matrix-shaped
+(<code>rand(3)</code>, <code>randn(2, 4)</code>).</p>
+<h2 id="output-and-formatting">13. Output and formatting</h2>
+<p><code>format</code> controls how numbers print. Explicitly chosen
+formats keep trailing zeros for consistent width; the startup default is
+terse:</p>
+<pre><code>neutrino&gt; format(4)
+neutrino&gt; for i = 1:3 do print(sqrt(i)) end
+1.000
+1.414
+1.732</code></pre>
+<p><code>print</code> takes either plain values (space-separated) or a
+template whose <code>{}</code> holes are filled in order; a hole can
+carry its own spec <code>{:[-][width][.prec][f|e|g]}</code> for per-hole
+width, precision, and conversion:</p>
+<pre><code>neutrino&gt; print(&quot;sqrt({}) = {:8.4f}&quot;, 2, sqrt(2))
+sqrt(2) =   1.4142</code></pre>
+<p>Strings print without quotes in <code>print</code>; the REPL echo
+shows them quoted (the echo is a representation, <code>print</code> is
+output). <code>pretty on|off</code> toggles the aligned matrix display;
+<code>more on</code> pages long output.</p>
+<h2 id="scripts-and-tools">14. Scripts and tools</h2>
+<p><code>neutrino file.nu</code> runs a script (top level is a statement
+sequence; <code>#</code>/<code>%</code> comments). The binary also
+exposes the compiler pipeline:</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Invocation</th>
+<th>Shows</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>neutrino --tokens file.nu</code></td>
+<td>the token stream</td>
+</tr>
+<tr class="even">
+<td><code>neutrino --ast file.nu</code></td>
+<td>the parse tree</td>
+</tr>
+<tr class="odd">
+<td><code>neutrino --dis file.nu</code></td>
+<td>the compiled bytecode, statement by statement</td>
+</tr>
+</tbody>
+</table>
+<p><code>vmtest</code> is the headless driver used by the test suite: it
+reads stdin line by line and echoes each result, so
+<code>printf 'sum(1:100)\n' | ./vmtest</code> prints <code>5050</code>.
+<code>dis(f)</code> disassembles from inside the language. The golden
+suite (<code>make test</code>) and its ASan twin
+(<code>make test-asan</code>) are how changes prove themselves;
+<code>tests/dis/</code> pins the emitted bytecode for core
+constructs.</p>
+<h2 id="builtin-reference">15. Builtin reference</h2>
+<p><em>Generated from the interpreter’s own documentation table (the
+same data <code>help</code> shows), so it cannot drift from the
+implementation.</em></p>
+<h3 id="core-introspection">Core &amp; introspection</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>print(...) | print(tmpl, ...)</code></td>
+<td>print values; template fills {} in order; {:[-][w][.p][f</td>
+</tr>
+<tr class="even">
+<td><code>who</code></td>
+<td>list the variables you have defined (name, type, shape)</td>
+</tr>
+<tr class="odd">
+<td><code>help / help(f)</code></td>
+<td>help lists every builtin; help(f) describes one</td>
+</tr>
+<tr class="even">
+<td><code>system(cmd)</code></td>
+<td>run a shell command string; return its exit status</td>
+</tr>
+<tr class="odd">
+<td><code>dis(f)</code></td>
+<td>disassemble a function’s bytecode (compiler/VM introspection)</td>
+</tr>
+<tr class="even">
+<td><code>format / format(m)</code></td>
+<td>show or set number display: “short”, “long”, “short e”, or a digit
+count</td>
+</tr>
+<tr class="odd">
+<td><code>size(x)</code></td>
+<td>[rows, cols] of x (a scalar is 1x1)</td>
+</tr>
+<tr class="even">
+<td><code>length(x)</code></td>
+<td>longest dimension of x (0 if empty)</td>
+</tr>
+<tr class="odd">
+<td><code>numel(x)</code></td>
+<td>number of elements (rows*cols)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="array-construction">Array construction</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>zeros(r, c)</code></td>
+<td>r-by-c matrix of zeros</td>
+</tr>
+<tr class="even">
+<td><code>ones(r, c)</code></td>
+<td>r-by-c matrix of ones</td>
+</tr>
+<tr class="odd">
+<td><code>eye(n)</code></td>
+<td>n-by-n identity matrix</td>
+</tr>
+<tr class="even">
+<td><code>diag(x)</code></td>
+<td>vector -&gt; diagonal matrix; matrix -&gt; its diagonal as a
+column</td>
+</tr>
+<tr class="odd">
+<td><code>linspace(a, b, n)</code></td>
+<td>row of n points evenly spaced from a to b inclusive</td>
+</tr>
+<tr class="even">
+<td><code>reshape(A, r, c)</code></td>
+<td>reinterpret A’s elements as r-by-c (row-major), element count must
+match</td>
+</tr>
+<tr class="odd">
+<td><code>repmat(A, m, n)</code></td>
+<td>tile A into an m-by-n grid of copies</td>
+</tr>
+</tbody>
+</table>
+<h3 id="reductions">Reductions</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>sum(A) | sum(A, dim)</code></td>
+<td>sum of all elements, or along dim (1 = columns, 2 = rows)</td>
+</tr>
+<tr class="even">
+<td><code>prod(A) | prod(A, dim)</code></td>
+<td>product of all elements, or along dim</td>
+</tr>
+<tr class="odd">
+<td><code>mean(A) | mean(A, dim)</code></td>
+<td>mean of all elements, or along dim</td>
+</tr>
+<tr class="even">
+<td><code>min(A) | min(a, b) | min(A, [], dim)</code></td>
+<td>smallest element; elementwise min; or min along dim</td>
+</tr>
+<tr class="odd">
+<td><code>max(A) | max(a, b) | max(A, [], dim)</code></td>
+<td>largest element; elementwise max; or max along dim</td>
+</tr>
+<tr class="even">
+<td><code>any(mask) | any(mask, dim)</code></td>
+<td>true if any element is nonzero/true (overall or along dim)</td>
+</tr>
+<tr class="odd">
+<td><code>all(mask) | all(mask, dim)</code></td>
+<td>true if every element is nonzero/true (overall or along dim)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="array-utilities">Array utilities</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>sort(A)</code></td>
+<td>ascending sort: a vector as a whole, a matrix by column</td>
+</tr>
+<tr class="even">
+<td><code>find(mask)</code></td>
+<td>1-based positions of nonzero/true elements (row-major)</td>
+</tr>
+<tr class="odd">
+<td><code>where(mask) | where(mask, a, b)</code></td>
+<td>indices of true, or pick a where true and b where false</td>
+</tr>
+<tr class="even">
+<td><code>cumsum(A)</code></td>
+<td>cumulative sum along a vector, or down each column</td>
+</tr>
+<tr class="odd">
+<td><code>cumprod(A)</code></td>
+<td>cumulative product along a vector, or down each column</td>
+</tr>
+<tr class="even">
+<td><code>diff(A)</code></td>
+<td>consecutive differences along a vector, or down each column</td>
+</tr>
+<tr class="odd">
+<td><code>flipud(A)</code></td>
+<td>reverse row order (flip up-down)</td>
+</tr>
+<tr class="even">
+<td><code>fliplr(A)</code></td>
+<td>reverse column order (flip left-right)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="mathematical-functions">Mathematical functions</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>abs(x)</code></td>
+<td>absolute value, or complex magnitude</td>
+</tr>
+<tr class="even">
+<td><code>sqrt(x)</code></td>
+<td>square root (complex result for negative reals)</td>
+</tr>
+<tr class="odd">
+<td><code>cbrt(x)</code></td>
+<td>real cube root</td>
+</tr>
+<tr class="even">
+<td><code>exp(x)</code></td>
+<td>e raised to the x (complex-aware)</td>
+</tr>
+<tr class="odd">
+<td><code>log(x)</code></td>
+<td>natural logarithm (complex for negatives)</td>
+</tr>
+<tr class="even">
+<td><code>ln(x)</code></td>
+<td>natural logarithm (alias for log)</td>
+</tr>
+<tr class="odd">
+<td><code>log10(x)</code></td>
+<td>base-10 logarithm (complex for negatives)</td>
+</tr>
+<tr class="even">
+<td><code>log2(x)</code></td>
+<td>base-2 logarithm (complex for negatives)</td>
+</tr>
+<tr class="odd">
+<td><code>sign(x)</code></td>
+<td>-1 / 0 / +1 by sign; z/</td>
+</tr>
+<tr class="even">
+<td><code>floor(x)</code></td>
+<td>round toward -infinity (componentwise on complex)</td>
+</tr>
+<tr class="odd">
+<td><code>ceil(x)</code></td>
+<td>round toward +infinity (componentwise on complex)</td>
+</tr>
+<tr class="even">
+<td><code>round(x)</code></td>
+<td>round to nearest (componentwise on complex)</td>
+</tr>
+<tr class="odd">
+<td><code>trunc(x)</code></td>
+<td>round toward zero</td>
+</tr>
+<tr class="even">
+<td><code>hypot(a, b)</code></td>
+<td>sqrt(a^2 + b^2) without overflow (elementwise)</td>
+</tr>
+<tr class="odd">
+<td><code>mod(a, b)</code></td>
+<td>modulo, result takes the sign of b (elementwise)</td>
+</tr>
+<tr class="even">
+<td><code>rem(a, b)</code></td>
+<td>remainder, result takes the sign of a (elementwise)</td>
+</tr>
+<tr class="odd">
+<td><code>gamma(x)</code></td>
+<td>gamma function (real, elementwise)</td>
+</tr>
+<tr class="even">
+<td><code>erf(x)</code></td>
+<td>error function (real, elementwise)</td>
+</tr>
+<tr class="odd">
+<td><code>erfc(x)</code></td>
+<td>complementary error function 1 - erf(x)</td>
+</tr>
+<tr class="even">
+<td><code>beta(a, b)</code></td>
+<td>beta function (a, b &gt; 0, elementwise)</td>
+</tr>
+<tr class="odd">
+<td><code>lbeta(a, b)</code></td>
+<td>log of the beta function</td>
+</tr>
+<tr class="even">
+<td><code>gammainc(x, a)</code></td>
+<td>regularized lower incomplete gamma P(a, x) (the chi^2 CDF)</td>
+</tr>
+<tr class="odd">
+<td><code>betainc(x, a, b)</code></td>
+<td>regularized incomplete beta I_x(a, b) (Student-t / F CDFs)</td>
+</tr>
+<tr class="even">
+<td><code>norminv(p)</code></td>
+<td>standard normal quantile (inverse CDF)</td>
+</tr>
+<tr class="odd">
+<td><code>digamma(x)</code></td>
+<td>digamma psi(x) = d/dx log gamma(x)</td>
+</tr>
+<tr class="even">
+<td><code>besselj(n, x)</code></td>
+<td>Bessel function of the first kind, integer order n</td>
+</tr>
+<tr class="odd">
+<td><code>bessely(n, x)</code></td>
+<td>Bessel function of the second kind, integer order n (x &gt; 0)</td>
+</tr>
+<tr class="even">
+<td><code>lgamma(x)</code></td>
+<td>log of</td>
+</tr>
+</tbody>
+</table>
+<h3 id="linear-algebra-1">Linear algebra</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>kron(A, B)</code></td>
+<td>Kronecker product: (m x n) kron (p x q) -&gt; (mp x nq)</td>
+</tr>
+<tr class="even">
+<td><code>dot(a, b)</code></td>
+<td>inner product of two vectors</td>
+</tr>
+<tr class="odd">
+<td><code>norm(x) | norm(x, p)</code></td>
+<td>vector p-norm (p = 1 or 2, default 2); matrix Frobenius norm</td>
+</tr>
+<tr class="even">
+<td><code>trace(A)</code></td>
+<td>sum of the diagonal</td>
+</tr>
+<tr class="odd">
+<td><code>det(A)</code></td>
+<td>determinant via LU</td>
+</tr>
+<tr class="even">
+<td><code>inv(A)</code></td>
+<td>matrix inverse (solves A  I)</td>
+</tr>
+<tr class="odd">
+<td><code>lu(A)</code></td>
+<td>LU with partial pivoting -&gt; {L, U, p}, so P<em>A = L</em>U</td>
+</tr>
+<tr class="even">
+<td><code>qr(A)</code></td>
+<td>Householder QR -&gt; {Q, R} (real or complex)</td>
+</tr>
+<tr class="odd">
+<td><code>chol(A)</code></td>
+<td>Cholesky factor L (lower), L*L’ = A (SPD / Hermitian PD)</td>
+</tr>
+<tr class="even">
+<td><code>eig(A)</code></td>
+<td>eigendecomposition -&gt; {values, vectors}; Hermitian (ascending
+real) or general (complex)</td>
+</tr>
+<tr class="odd">
+<td><code>svd(A)</code></td>
+<td>thin SVD -&gt; {U, S, V}, A = U<em>diag(S)</em>V’ (S
+descending)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="trigonometric-hyperbolic">Trigonometric &amp; hyperbolic</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>sin(x)</code></td>
+<td>sine (complex-aware, elementwise)</td>
+</tr>
+<tr class="even">
+<td><code>cos(x)</code></td>
+<td>cosine (complex-aware, elementwise)</td>
+</tr>
+<tr class="odd">
+<td><code>tan(x)</code></td>
+<td>tangent (complex-aware, elementwise)</td>
+</tr>
+<tr class="even">
+<td><code>asin(x)</code></td>
+<td>arcsine (complex outside [-1, 1])</td>
+</tr>
+<tr class="odd">
+<td><code>acos(x)</code></td>
+<td>arccosine (complex outside [-1, 1])</td>
+</tr>
+<tr class="even">
+<td><code>atan(x)</code></td>
+<td>arctangent (complex-aware)</td>
+</tr>
+<tr class="odd">
+<td><code>atan2(y, x)</code></td>
+<td>two-argument arctangent (elementwise)</td>
+</tr>
+<tr class="even">
+<td><code>sinh(x)</code></td>
+<td>hyperbolic sine (complex-aware)</td>
+</tr>
+<tr class="odd">
+<td><code>cosh(x)</code></td>
+<td>hyperbolic cosine (complex-aware)</td>
+</tr>
+<tr class="even">
+<td><code>tanh(x)</code></td>
+<td>hyperbolic tangent (complex-aware)</td>
+</tr>
+<tr class="odd">
+<td><code>asinh(x)</code></td>
+<td>inverse hyperbolic sine (complex-aware)</td>
+</tr>
+<tr class="even">
+<td><code>acosh(x)</code></td>
+<td>inverse hyperbolic cosine (complex below 1)</td>
+</tr>
+<tr class="odd">
+<td><code>atanh(x)</code></td>
+<td>inverse hyperbolic tangent (complex outside (-1, 1))</td>
+</tr>
+</tbody>
+</table>
+<h3 id="complex-accessors">Complex accessors</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>real(z)</code></td>
+<td>real part (elementwise)</td>
+</tr>
+<tr class="even">
+<td><code>imag(z)</code></td>
+<td>imaginary part (elementwise)</td>
+</tr>
+<tr class="odd">
+<td><code>conj(z)</code></td>
+<td>complex conjugate (elementwise)</td>
+</tr>
+<tr class="even">
+<td><code>angle(z)</code></td>
+<td>argument atan2(im, re) (elementwise)</td>
+</tr>
+<tr class="odd">
+<td><code>arg(z)</code></td>
+<td>argument atan2(im, re) (alias for angle)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="random-numbers-1">Random numbers</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>rng(seed)</code></td>
+<td>reseed the generator (xoshiro256**); same seed, same stream</td>
+</tr>
+<tr class="even">
+<td><code>rand() | rand(n) | rand(r, c)</code></td>
+<td>uniform draws on [0, 1)</td>
+</tr>
+<tr class="odd">
+<td><code>randn() | randn(n) | randn(r, c)</code></td>
+<td>standard-normal draws</td>
+</tr>
+<tr class="even">
+<td><code>randi(imax[, r, c]) | randi([lo, hi], ...)</code></td>
+<td>uniform random integers</td>
+</tr>
+</tbody>
+</table>
+<h3 id="predicates">Predicates</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>isnan(x)</code></td>
+<td>elementwise test for NaN -&gt; logical</td>
+</tr>
+<tr class="even">
+<td><code>isinf(x)</code></td>
+<td>elementwise test for +/-Inf -&gt; logical</td>
+</tr>
+<tr class="odd">
+<td><code>isfinite(x)</code></td>
+<td>elementwise test for a finite value -&gt; logical</td>
+</tr>
+</tbody>
+</table>
+<h3 id="higher-order-functions">Higher-order functions</h3>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Signature</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>map(f, A)</code></td>
+<td>apply f to each element of A, returning an array of results</td>
+</tr>
+</tbody>
+</table>
+<h2 id="grammar-summary">16. Grammar summary</h2>
+<p>Reserved words:
+<code>let in fn if then else end true false null for while do break continue return</code>.</p>
+<pre><code>program    := statement*
+statement  := &#39;let&#39; NAME &#39;=&#39; expr            # binding (global at top level)
+            | NAME &#39;=&#39; expr                  # assignment (walks scopes)
+            | lvalue &#39;[&#39; indices &#39;]&#39; &#39;=&#39; expr
+            | &#39;for&#39; NAME &#39;=&#39; expr &#39;do&#39; statement* &#39;end&#39;
+            | &#39;while&#39; expr &#39;do&#39; statement* &#39;end&#39;
+            | &#39;break&#39; | &#39;continue&#39; | &#39;return&#39; expr?
+            | expr
+expr       := &#39;let&#39; NAME &#39;=&#39; expr &#39;in&#39; expr
+            | &#39;if&#39; expr &#39;then&#39; expr (&#39;else&#39; expr)? &#39;end&#39;
+            | &#39;fn&#39; NAME* &#39;-&gt;&#39; expr
+            | &#39;(&#39; statement (&#39;;&#39; statement)* &#39;)&#39;     # block expression
+            | expr binop expr | unop expr | expr postfix
+            | NAME | literal | &#39;[&#39; rows &#39;]&#39; | &#39;{&#39; fields &#39;}&#39;
+            | expr &#39;|&gt;&#39; expr
+postfix    := &quot;&#39;&quot; | &quot;.&#39;&quot; | &#39;(&#39; args &#39;)&#39; | &#39;[&#39; indices &#39;]&#39; | &#39;.&#39; NAME</code></pre>
+<p>Statements separate by newline or <code>;</code> (a trailing
+<code>;</code> also suppresses the REPL echo). Comments run from
+<code>#</code> or <code>%</code> to end of line.</p>
+<hr />
+<p><em>Every example in this manual was executed against the current
+interpreter; the builtin reference is generated from the source. If you
+find a discrepancy, that is a bug — please report it.</em></p>
+
+</body>
+</html>
