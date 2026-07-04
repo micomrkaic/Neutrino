@@ -76,3 +76,12 @@ hist([1, 2, 3], 0)
 => !bin count out of range
 plot([1, 2], [3, 4], 7)
 => !usage
+# axis range validation (fires before gnuplot is invoked)
+hist(rand(1, 100), 10, {yrange = [5, 1]})
+=> !yrange needs lo < hi
+plot([1, 2, 3], {xrange = [1, 2, 3]})
+=> !xrange must be a 2-element vector
+plot([1, 2, 3], {yrange = 7})
+=> !yrange must be a 2-element vector
+hist(rand(1, 100), {xrange = [3, 3]})
+=> !xrange needs lo < hi

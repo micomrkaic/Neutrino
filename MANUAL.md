@@ -376,13 +376,26 @@ neutrino> let x = linspace(0, 10, 200)
 neutrino> plot(x, map(sin, x), {title = "sin(x)", xlabel = "x", grid = true})
 ```
 
-Recognised options: `title`, `xlabel`, `ylabel`, `style` (strings), and `logx`,
-`logy`, `grid` (booleans). `hist(y)` draws a histogram (`hist(y, nbins)` to
-choose the bin count; the default follows Sturges' rule):
+Recognised options: `title`, `xlabel`, `ylabel`, `style` (strings); `logx`,
+`logy`, `grid` (booleans); and `xrange`, `yrange` (`[lo, hi]` vectors) to fix
+an axis instead of letting gnuplot choose. `hist(y)` draws a histogram
+(`hist(y, nbins)` to choose the bin count; the default follows Sturges' rule),
+and accepts the same trailing options record:
 
 ```
 neutrino> rng(7)
 neutrino> hist(randn(1, 5000), 40)
+```
+
+A word of caution that `yrange` exists to address: gnuplot auto-ranges the
+y-axis to the data, which can make pure sampling noise look like structure. A
+histogram of 100 000 uniform draws in 20 bins has bin counts of 5000 +/- 69
+(one binomial standard deviation) — auto-ranged, that +/-1.4% wiggle fills the
+whole plot and looks alarming; anchored at zero it is the flat wall it should
+be:
+
+```
+neutrino> hist(rand(1, 100000), 20, {yrange = [0, 6000]})
 ```
 
 Plots open in a gnuplot window that outlives the command (`gnuplot -persist`).
@@ -465,8 +478,8 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 
 | Signature | Description |
 |---|---|
-| `plot(y) | plot(x, y) | plot(x, Y, opts)` | line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid} |
-| `hist(y) | hist(y, nbins)` | histogram via gnuplot (default bins by Sturges) |
+| `plot(y) | plot(x, y) | plot(x, Y, opts)` | line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange} |
+| `hist(y[, nbins][, opts])` | histogram via gnuplot; opts as in plot (yrange = [0, m] to anchor the axis) |
 
 ### Array construction
 

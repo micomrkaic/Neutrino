@@ -1274,8 +1274,8 @@ static const BuiltinDoc builtin_docs[] = {
     { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" },
     { "dis",   "dis(f)",            "disassemble a function's bytecode (compiler/VM introspection)", "core" },
-    { "plot",  "plot(y) | plot(x, y) | plot(x, Y, opts)", "line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid}", "plot" },
-    { "hist",  "hist(y) | hist(y, nbins)", "histogram via gnuplot (default bins by Sturges)", "plot" },
+    { "plot",  "plot(y) | plot(x, y) | plot(x, Y, opts)", "line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange}", "plot" },
+    { "hist",  "hist(y[, nbins][, opts])", "histogram via gnuplot; opts as in plot (yrange = [0, m] to anchor the axis)", "plot" },
     { "format","format / format(m)", "show or set number display: \"short\", \"long\", \"short e\", or a digit count", "core" },
     { "size",  "size(x)",           "[rows, cols] of x (a scalar is 1x1)", "core" },
     { "length","length(x)",         "longest dimension of x (0 if empty)", "core" },
@@ -1473,6 +1473,51 @@ static ArrObj *want_vec(Interp *I, Value v, const char *who)
     return a;
 }
 
+/* Emit a "set xrange/yrange [lo:hi]" from a 2-element vector option. */
+static void gp_range(Interp *I, FILE *g, const char *axis, Value v, const char *who)
+{
+    if (!is_array(v) || (size_t)as_arr(v)->rows * as_arr(v)->cols != 2 || as_arr(v)->elt == ELT_COMPLEX)
+        runtime_error(I, "%s: %srange must be a 2-element vector [lo, hi]", who, axis);
+    double lo = as_double(arr_get(as_arr(v), 0)), hi = as_double(arr_get(as_arr(v), 1));
+    if (!(lo < hi)) runtime_error(I, "%s: %srange needs lo < hi", who, axis);
+    fprintf(g, "set %srange [%.17g:%.17g]\n", axis, lo, hi);
+}
+
+/* Validate an options record before any gnuplot process exists, so option
+ * errors cannot leak the popen stream. */
+static void gp_check_range(Interp *I, Value v, const char *axis, const char *who)
+{
+    if (!is_array(v) || (size_t)as_arr(v)->rows * as_arr(v)->cols != 2 || as_arr(v)->elt == ELT_COMPLEX)
+        runtime_error(I, "%s: %srange must be a 2-element vector [lo, hi]", who, axis);
+    double lo = as_double(arr_get(as_arr(v), 0)), hi = as_double(arr_get(as_arr(v), 1));
+    if (!(lo < hi)) runtime_error(I, "%s: %srange needs lo < hi", who, axis);
+}
+static void gp_check_opts(Interp *I, Value opts, const char *who)
+{
+    if (opts.kind != VAL_RECORD) return;
+    RecObj *o = as_rec(opts);
+    Value v;
+    if ((v = rec_field(o, "xrange")).kind != VAL_NULL) gp_check_range(I, v, "x", who);
+    if ((v = rec_field(o, "yrange")).kind != VAL_NULL) gp_check_range(I, v, "y", who);
+}
+
+/* Shared options record for plot/hist: title, xlabel, ylabel (strings);
+ * logx, logy, grid (booleans); xrange, yrange ([lo, hi] vectors). */
+static void gp_opts(Interp *I, FILE *g, Value opts)
+{
+    if (opts.kind != VAL_RECORD) return;
+    RecObj *o = as_rec(opts);
+    Value v;
+    if ((v = rec_field(o, "title")).kind == VAL_STRING)  { fputs("set title ", g);  gp_qstr(g, as_str(v)->data, as_str(v)->len); fputc('\n', g); }
+    if ((v = rec_field(o, "xlabel")).kind == VAL_STRING) { fputs("set xlabel ", g); gp_qstr(g, as_str(v)->data, as_str(v)->len); fputc('\n', g); }
+    if ((v = rec_field(o, "ylabel")).kind == VAL_STRING) { fputs("set ylabel ", g); gp_qstr(g, as_str(v)->data, as_str(v)->len); fputc('\n', g); }
+    if ((v = rec_field(o, "logx")).kind == VAL_BOOL && v.as.b) fputs("set logscale x\n", g);
+    if ((v = rec_field(o, "logy")).kind == VAL_BOOL && v.as.b) fputs("set logscale y\n", g);
+    if ((v = rec_field(o, "grid")).kind == VAL_BOOL && v.as.b) fputs("set grid\n", g);
+    if ((v = rec_field(o, "xrange")).kind != VAL_NULL) gp_range(I, g, "x", v, "plot");
+    if ((v = rec_field(o, "yrange")).kind != VAL_NULL) gp_range(I, g, "y", v, "plot");
+}
+
 /* plot(y) | plot(x, y) | plot(x, Y) — trailing string = style, trailing
  * record = {title, xlabel, ylabel, style, logx, logy, grid}. Y's columns
  * are separate series when Y is a matrix with matching rows. */
@@ -1506,17 +1551,9 @@ static Value bi_plot(Interp *I, Value *args, uint32_t n)
         if (xn != npts) runtime_error(I, "plot: x has %u points but y has %u", xn, npts);
     }
 
+    gp_check_opts(I, opts, "plot");
     FILE *g = gp_open(I);
-    if (opts.kind == VAL_RECORD) {
-        RecObj *o = as_rec(opts);
-        Value v;
-        if ((v = rec_field(o, "title")).kind == VAL_STRING)  { fputs("set title ", g);  gp_qstr(g, as_str(v)->data, as_str(v)->len); fputc('\n', g); }
-        if ((v = rec_field(o, "xlabel")).kind == VAL_STRING) { fputs("set xlabel ", g); gp_qstr(g, as_str(v)->data, as_str(v)->len); fputc('\n', g); }
-        if ((v = rec_field(o, "ylabel")).kind == VAL_STRING) { fputs("set ylabel ", g); gp_qstr(g, as_str(v)->data, as_str(v)->len); fputc('\n', g); }
-        if ((v = rec_field(o, "logx")).kind == VAL_BOOL && v.as.b) fputs("set logscale x\n", g);
-        if ((v = rec_field(o, "logy")).kind == VAL_BOOL && v.as.b) fputs("set logscale y\n", g);
-        if ((v = rec_field(o, "grid")).kind == VAL_BOOL && v.as.b) fputs("set grid\n", g);
-    }
+    gp_opts(I, g, opts);
     fputs("plot ", g);
     for (uint32_t s = 0; s < nser; s++) {
         if (s) fputs(", ", g);
@@ -1539,6 +1576,9 @@ static Value bi_plot(Interp *I, Value *args, uint32_t n)
 /* hist(y[, nbins]) — histogram with boxes; default bin count by Sturges. */
 static Value bi_hist(Interp *I, Value *args, uint32_t n)
 {
+    Value opts = val_null();
+    if (n >= 2 && args[n-1].kind == VAL_RECORD) { opts = args[n-1]; n--; }
+    gp_check_opts(I, opts, "hist");                    /* before any allocation */
     ArrObj *Y = want_vec(I, args[0], "hist");
     size_t nn = (size_t)Y->rows * Y->cols;
     int64_t nb = n >= 2 ? as_count(I, args[1], "hist") : (int64_t)(1.0 + log2((double)nn)) ;
@@ -1560,6 +1600,7 @@ static Value bi_hist(Interp *I, Value *args, uint32_t n)
         cnt[b]++;
     }
     FILE *g = gp_open(I);
+    gp_opts(I, g, opts);
     fprintf(g, "set boxwidth %.17g\nset style fill solid 0.6\n", w * 0.95);
     fputs("plot '-' using 1:2 with boxes title \"hist\"\n", g);
     for (int64_t b = 0; b < nb; b++)
@@ -3321,7 +3362,7 @@ EnvObj *globals_new(void)
     def_builtin(e, "system",bi_system,1, 1);
     def_builtin(e, "dis",   bi_dis,   1, 1);
     def_builtin(e, "plot",  bi_plot,  1, 3);
-    def_builtin(e, "hist",  bi_hist,  1, 2);
+    def_builtin(e, "hist",  bi_hist,  1, 3);
     def_builtin(e, "format",bi_format,0, 1);
     return e;
 }

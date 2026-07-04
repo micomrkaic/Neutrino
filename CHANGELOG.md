@@ -5,6 +5,12 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Added
+- **Axis ranges in plots.** `plot` and `hist` options records now accept
+  `xrange` / `yrange` as `[lo, hi]` vectors (`hist(y, 20, {yrange = [0, 6000]})`
+  anchors a histogram's baseline at zero — gnuplot's auto-range otherwise
+  magnifies sampling noise into apparent structure). `hist` accepts the full
+  options record (`title`, labels, `grid`, ...). Range/option validation runs
+  before gnuplot is launched, so errors are clean and leak-free.
 - **Plotting via gnuplot.** `plot(y)` / `plot(x, y)` / `plot(x, Y)` (matrix
   columns as series), with a trailing gnuplot style string or an options record
   `{title, xlabel, ylabel, style, logx, logy, grid}`; `hist(y[, nbins])` draws
