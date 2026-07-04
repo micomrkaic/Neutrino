@@ -5,6 +5,15 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Added
+- **Plotting via gnuplot.** `plot(y)` / `plot(x, y)` / `plot(x, Y)` (matrix
+  columns as series), with a trailing gnuplot style string or an options record
+  `{title, xlabel, ylabel, style, logx, logy, grid}`; `hist(y[, nbins])` draws
+  histograms. Out-of-process and a soft dependency — clean error when gnuplot
+  is absent. `NEUTRINO_PLOT_TERM` / `NEUTRINO_PLOT_OUT` redirect output for
+  scripted rendering (PNG, ASCII `dumb`, ...). SIGPIPE is now ignored
+  process-wide so a missing gnuplot (or pager) reports an error instead of
+  killing the interpreter. A PNG smoke test runs in `make test` and skips
+  gracefully without gnuplot.
 - **The Neutrino Manual** (`MANUAL.md`, plus a typeset `MANUAL.pdf` — regenerate with `make manual`): a full user guide — REPL, types,
   operators with a precedence table, scope rules, control flow, functions and
   the pipe, arrays and indexing, linear algebra, complex, special functions,

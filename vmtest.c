@@ -4,6 +4,7 @@
  * and run as an independent program, so a runtime error in one line does not
  * abort the rest (matching the REPL). Accepted (arena, source) pairs are kept
  * and freed at exit so a clean run reports zero leaks. */
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +42,7 @@ static bool is_blank(const char *s)
 
 int main(void)
 {
+    signal(SIGPIPE, SIG_IGN);   /* broken pipes (gnuplot/pager absent) report via pclose, not death */
     Interp I;
     interp_init(&I);
     EnvObj *globals = globals_new();

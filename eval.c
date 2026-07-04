@@ -1274,6 +1274,8 @@ static const BuiltinDoc builtin_docs[] = {
     { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" },
     { "dis",   "dis(f)",            "disassemble a function's bytecode (compiler/VM introspection)", "core" },
+    { "plot",  "plot(y) | plot(x, y) | plot(x, Y, opts)", "line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid}", "plot" },
+    { "hist",  "hist(y) | hist(y, nbins)", "histogram via gnuplot (default bins by Sturges)", "plot" },
     { "format","format / format(m)", "show or set number display: \"short\", \"long\", \"short e\", or a digit count", "core" },
     { "size",  "size(x)",           "[rows, cols] of x (a scalar is 1x1)", "core" },
     { "length","length(x)",         "longest dimension of x (0 if empty)", "core" },
@@ -1410,6 +1412,161 @@ static Value bi_dis(Interp *I, Value *args, uint32_t n)
     if (v.kind == VAL_BUILTIN) { fprintf(vout(), "<builtin %s: native code, no bytecode>\n", as_blt(v)->name); return val_null(); }
     if (v.kind != VAL_CLOSURE) runtime_error(I, "dis: expected a function, got %s", type_name(v.kind));
     chunk_disassemble(vout(), as_clo(v)->chunk, "fn");
+    return val_null();
+}
+
+/* ------------------------------------------------------------------ */
+/* plotting (gnuplot, out of process)                                  */
+/* ------------------------------------------------------------------ */
+
+/* Look up a record field; null Value if absent. */
+static Value rec_field(RecObj *r, const char *name)
+{
+    size_t len = strlen(name);
+    for (uint32_t i = 0; i < r->count; i++)
+        if (r->keylens[i] == len && memcmp(r->keys[i], name, len) == 0)
+            return r->vals[i];
+    return val_null();
+}
+
+/* Write s into gnuplot double quotes, escaping " and backslash. */
+static void gp_qstr(FILE *g, const char *s, uint32_t len)
+{
+    fputc('"', g);
+    for (uint32_t i = 0; i < len; i++) {
+        char c = s[i];
+        if (c == '"' || c == '\\') fputc('\\', g);
+        if ((unsigned char)c >= 0x20 || c == '\t') fputc(c, g);
+    }
+    fputc('"', g);
+}
+
+static FILE *gp_open(Interp *I)
+{
+    FILE *g = popen("gnuplot -persist 2>/dev/null", "w");
+    if (!g) runtime_error(I, "plot: could not start gnuplot");
+    const char *term = getenv("NEUTRINO_PLOT_TERM");
+    if (term && *term) {
+        fprintf(g, "set terminal %s\n", term);
+        const char *out = getenv("NEUTRINO_PLOT_OUT");
+        if (out && *out) fprintf(g, "set output '%s'\n", out);
+    }
+    return g;
+}
+
+static void gp_close(Interp *I, FILE *g)
+{
+    int rc = pclose(g);
+    if (rc != 0)
+        runtime_error(I, "plot: gnuplot failed (exit %d) — is gnuplot installed?",
+                      rc == -1 ? -1 : WEXITSTATUS(rc));
+}
+
+/* A vector argument for plotting: any 1 x n / n x 1 real array. */
+static ArrObj *want_vec(Interp *I, Value v, const char *who)
+{
+    if (!is_array(v)) runtime_error(I, "%s: expected a vector, got %s", who, type_name(v.kind));
+    ArrObj *a = as_arr(v);
+    if (a->rows != 1 && a->cols != 1) runtime_error(I, "%s: expected a vector, got %ux%u", who, a->rows, a->cols);
+    if (a->elt == ELT_COMPLEX) runtime_error(I, "%s: complex data is not plottable directly (plot real/imag/abs)", who);
+    if ((size_t)a->rows * a->cols == 0) runtime_error(I, "%s: empty data", who);
+    return a;
+}
+
+/* plot(y) | plot(x, y) | plot(x, Y) — trailing string = style, trailing
+ * record = {title, xlabel, ylabel, style, logx, logy, grid}. Y's columns
+ * are separate series when Y is a matrix with matching rows. */
+static Value bi_plot(Interp *I, Value *args, uint32_t n)
+{
+    Value opts = val_null(); const char *style = "lines"; uint32_t style_len = 5;
+    if (n >= 2 && args[n-1].kind == VAL_STRING) {
+        StrObj *s = as_str(args[n-1]);
+        style = s->data; style_len = s->len; n--;
+    } else if (n >= 2 && args[n-1].kind == VAL_RECORD) {
+        opts = args[n-1]; n--;
+        Value sv = rec_field(as_rec(opts), "style");
+        if (sv.kind == VAL_STRING) { style = as_str(sv)->data; style_len = as_str(sv)->len; }
+        else if (sv.kind != VAL_NULL) runtime_error(I, "plot: style must be a string");
+    }
+    if (n < 1 || n > 2) runtime_error(I, "plot: usage plot(y), plot(x, y), plot(x, Y[, style-or-opts])");
+
+    ArrObj *X = nullptr, *Y;                      /* Y may be a matrix: columns are series */
+    if (n == 2) X = want_vec(I, args[0], "plot");
+    Value yv = args[n-1];
+    if (!is_array(yv)) runtime_error(I, "plot: expected numeric data, got %s", type_name(yv.kind));
+    Y = as_arr(yv);
+    if (Y->elt == ELT_COMPLEX) runtime_error(I, "plot: complex data is not plottable directly");
+    if ((size_t)Y->rows * Y->cols == 0) runtime_error(I, "plot: empty data");
+
+    bool yvec = (Y->rows == 1 || Y->cols == 1);
+    uint32_t npts   = yvec ? Y->rows * Y->cols : Y->rows;
+    uint32_t nser   = yvec ? 1 : Y->cols;
+    if (X) {
+        uint32_t xn = X->rows * X->cols;
+        if (xn != npts) runtime_error(I, "plot: x has %u points but y has %u", xn, npts);
+    }
+
+    FILE *g = gp_open(I);
+    if (opts.kind == VAL_RECORD) {
+        RecObj *o = as_rec(opts);
+        Value v;
+        if ((v = rec_field(o, "title")).kind == VAL_STRING)  { fputs("set title ", g);  gp_qstr(g, as_str(v)->data, as_str(v)->len); fputc('\n', g); }
+        if ((v = rec_field(o, "xlabel")).kind == VAL_STRING) { fputs("set xlabel ", g); gp_qstr(g, as_str(v)->data, as_str(v)->len); fputc('\n', g); }
+        if ((v = rec_field(o, "ylabel")).kind == VAL_STRING) { fputs("set ylabel ", g); gp_qstr(g, as_str(v)->data, as_str(v)->len); fputc('\n', g); }
+        if ((v = rec_field(o, "logx")).kind == VAL_BOOL && v.as.b) fputs("set logscale x\n", g);
+        if ((v = rec_field(o, "logy")).kind == VAL_BOOL && v.as.b) fputs("set logscale y\n", g);
+        if ((v = rec_field(o, "grid")).kind == VAL_BOOL && v.as.b) fputs("set grid\n", g);
+    }
+    fputs("plot ", g);
+    for (uint32_t s = 0; s < nser; s++) {
+        if (s) fputs(", ", g);
+        fprintf(g, "'-' using 1:2 with %.*s title \"series %u\"", (int)style_len, style, s + 1);
+    }
+    fputc('\n', g);
+    for (uint32_t s = 0; s < nser; s++) {         /* one inline data block per series */
+        for (uint32_t k = 0; k < npts; k++) {
+            double x = X ? as_double(arr_get(X, k)) : (double)(k + 1);
+            double y = yvec ? as_double(arr_get(Y, k))
+                            : as_double(arr_get(Y, (size_t)k * Y->cols + s));
+            fprintf(g, "%.17g %.17g\n", x, y);
+        }
+        fputs("e\n", g);
+    }
+    gp_close(I, g);
+    return val_null();
+}
+
+/* hist(y[, nbins]) — histogram with boxes; default bin count by Sturges. */
+static Value bi_hist(Interp *I, Value *args, uint32_t n)
+{
+    ArrObj *Y = want_vec(I, args[0], "hist");
+    size_t nn = (size_t)Y->rows * Y->cols;
+    int64_t nb = n >= 2 ? as_count(I, args[1], "hist") : (int64_t)(1.0 + log2((double)nn)) ;
+    if (nb < 1 || nb > 100000) runtime_error(I, "hist: bin count out of range");
+    double lo = as_double(arr_get(Y, 0)), hi = lo;
+    for (size_t k = 1; k < nn; k++) {
+        double v = as_double(arr_get(Y, k));
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+    }
+    if (hi == lo) { lo -= 0.5; hi += 0.5; }
+    double w = (hi - lo) / (double)nb;
+    uint64_t *cnt = calloc((size_t)nb, sizeof *cnt);
+    for (size_t k = 0; k < nn; k++) {
+        double v = as_double(arr_get(Y, k));
+        int64_t b = (int64_t)((v - lo) / w);
+        if (b < 0) b = 0;
+        if (b >= nb) b = nb - 1;
+        cnt[b]++;
+    }
+    FILE *g = gp_open(I);
+    fprintf(g, "set boxwidth %.17g\nset style fill solid 0.6\n", w * 0.95);
+    fputs("plot '-' using 1:2 with boxes title \"hist\"\n", g);
+    for (int64_t b = 0; b < nb; b++)
+        fprintf(g, "%.17g %llu\n", lo + (b + 0.5) * w, (unsigned long long)cnt[b]);
+    fputs("e\n", g);
+    free(cnt);
+    gp_close(I, g);
     return val_null();
 }
 
@@ -3163,6 +3320,8 @@ EnvObj *globals_new(void)
     def_builtin(e, "help",  bi_help,  0, 1);
     def_builtin(e, "system",bi_system,1, 1);
     def_builtin(e, "dis",   bi_dis,   1, 1);
+    def_builtin(e, "plot",  bi_plot,  1, 3);
+    def_builtin(e, "hist",  bi_hist,  1, 2);
     def_builtin(e, "format",bi_format,0, 1);
     return e;
 }

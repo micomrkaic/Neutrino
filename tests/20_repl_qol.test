@@ -63,3 +63,16 @@ dis(sqrt)
 => <builtin sqrt: native code, no bytecode>
 dis(42)
 => !expected a function
+# plot/hist argument validation (fires before gnuplot is invoked)
+plot(42)
+=> !expected numeric data
+plot([1, 2, 3], [1, 2])
+=> !x has 3 points but y has 2
+plot([])
+=> !empty data
+plot([1 + 2i, 3])
+=> !complex data
+hist([1, 2, 3], 0)
+=> !bin count out of range
+plot([1, 2], [3, 4], 7)
+=> !usage

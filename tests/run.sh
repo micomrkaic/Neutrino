@@ -27,6 +27,7 @@ VMTEST="${VMTEST:-./vmtest}"
 
 if [[ ! -x "$VMTEST" ]]; then echo "runner: $VMTEST not built" >&2; exit 2; fi
 for src in *.c *.h; do
+  [[ "$src" == repl.c || "$src" == main.c ]] && continue
   [[ -e "$src" && "$src" -nt "$VMTEST" ]] && { echo "runner: WARNING: $src is newer than $VMTEST (stale binary? run 'make test' / 'make test-asan')" >&2; break; }
 done
 

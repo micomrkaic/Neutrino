@@ -1,6 +1,7 @@
 /* main.c — Neutrino front-end driver.
  *   neutrino [--tokens | --ast | --dis] [file.nu]
  * Default mode evaluates. With no file, runs a built-in sample. */
+#include <signal.h>
 #include "lexer.h"
 #include "parser.h"
 #include "arena.h"
@@ -69,6 +70,7 @@ static void print_diagnostic(const char *src, uint32_t line, uint32_t col, const
 
 int main(int argc, char **argv)
 {
+    signal(SIGPIPE, SIG_IGN);   /* broken pipes (gnuplot/pager absent) report via pclose, not death */
     enum { M_EVAL, M_AST, M_TOKENS, M_DIS } mode = M_EVAL;
     const char *path = nullptr;
     bool want_sample = false;

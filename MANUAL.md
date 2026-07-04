@@ -22,10 +22,11 @@ instructions see the [README](README.md); for the honest list of sharp edges see
 10. [Complex numbers](#10-complex-numbers)
 11. [Special functions and statistics](#11-special-functions-and-statistics)
 12. [Random numbers](#12-random-numbers)
-13. [Output and formatting](#13-output-and-formatting)
-14. [Scripts and tools](#14-scripts-and-tools)
-15. [Builtin reference](#15-builtin-reference)
-16. [Grammar summary](#16-grammar-summary)
+13. [Plotting](#13-plotting)
+14. [Output and formatting](#14-output-and-formatting)
+15. [Scripts and tools](#15-scripts-and-tools)
+16. [Builtin reference](#16-builtin-reference)
+17. [Grammar summary](#17-grammar-summary)
 
 ---
 
@@ -359,7 +360,46 @@ seed, so a script's random draws are stable run to run. `rng(seed)` reseeds —
 same seed, same stream. `rand`, `randn`, `randi` draw uniform, normal, and
 integer variates, scalar or matrix-shaped (`rand(3)`, `randn(2, 4)`).
 
-## 13. Output and formatting
+## 13. Plotting
+
+Plotting is delegated to **gnuplot**, out of process — a soft dependency: the
+language works without it, and `plot` reports cleanly if it is missing
+(`plot: gnuplot failed (exit 127) — is gnuplot installed?`).
+
+`plot(y)` plots a vector against its index; `plot(x, y)` plots pairs; if `y` is
+a **matrix**, each column is a separate series. An optional trailing argument is
+either a gnuplot style string (`"points"`, `"lines lw 2"`, `"impulses"`) or an
+options record:
+
+```
+neutrino> let x = linspace(0, 10, 200)
+neutrino> plot(x, map(sin, x), {title = "sin(x)", xlabel = "x", grid = true})
+```
+
+Recognised options: `title`, `xlabel`, `ylabel`, `style` (strings), and `logx`,
+`logy`, `grid` (booleans). `hist(y)` draws a histogram (`hist(y, nbins)` to
+choose the bin count; the default follows Sturges' rule):
+
+```
+neutrino> rng(7)
+neutrino> hist(randn(1, 5000), 40)
+```
+
+Plots open in a gnuplot window that outlives the command (`gnuplot -persist`).
+For scripted rendering, two environment variables redirect output —
+`NEUTRINO_PLOT_TERM` sets the gnuplot terminal and `NEUTRINO_PLOT_OUT` the
+file:
+
+```sh
+NEUTRINO_PLOT_TERM="pngcairo size 800,500" NEUTRINO_PLOT_OUT=fig.png \
+  ./neutrino script.nu
+```
+
+(`NEUTRINO_PLOT_TERM="dumb size 76,20"` draws ASCII plots straight into the
+terminal, which is occasionally exactly what you want.) Complex data is
+rejected — plot `real(z)`, `imag(z)`, or `abs(z)` explicitly.
+
+## 14. Output and formatting
 
 `format` controls how numbers print. Explicitly chosen formats keep trailing
 zeros for consistent width; the startup default is terse:
@@ -385,7 +425,7 @@ Strings print without quotes in `print`; the REPL echo shows them quoted (the
 echo is a representation, `print` is output). `pretty on|off` toggles the
 aligned matrix display; `more on` pages long output.
 
-## 14. Scripts and tools
+## 15. Scripts and tools
 
 `neutrino file.nu` runs a script (top level is a statement sequence; `#`/`%`
 comments). The binary also exposes the compiler pipeline:
@@ -402,7 +442,7 @@ line and echoes each result, so `printf 'sum(1:100)\n' | ./vmtest` prints
 (`make test`) and its ASan twin (`make test-asan`) are how changes prove
 themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 
-## 15. Builtin reference
+## 16. Builtin reference
 
 *Generated from the interpreter's own documentation table (the same data
 `help` shows), so it cannot drift from the implementation.*
@@ -420,6 +460,13 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `size(x)` | [rows, cols] of x (a scalar is 1x1) |
 | `length(x)` | longest dimension of x (0 if empty) |
 | `numel(x)` | number of elements (rows*cols) |
+
+### Plotting
+
+| Signature | Description |
+|---|---|
+| `plot(y) | plot(x, y) | plot(x, Y, opts)` | line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid} |
+| `hist(y) | hist(y, nbins)` | histogram via gnuplot (default bins by Sturges) |
 
 ### Array construction
 
@@ -557,7 +604,8 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | Signature | Description |
 |---|---|
 | `map(f, A)` | apply f to each element of A, returning an array of results |
-## 16. Grammar summary
+
+## 17. Grammar summary
 
 Reserved words: `let in fn if then else end true false null for while do break
 continue return`.

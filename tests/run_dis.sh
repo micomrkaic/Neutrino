@@ -8,6 +8,7 @@ cd "$(dirname "$0")/.."
 BIN="${NEUTRINO:-./neutrino}"
 [[ -x "$BIN" ]] || { echo "run_dis: $BIN not built" >&2; exit 2; }
 for src in *.c *.h; do
+  [[ "$src" == vmtest.c ]] && continue
   [[ -e "$src" && "$src" -nt "$BIN" ]] && { echo "run_dis: WARNING: $src newer than $BIN (stale binary?)" >&2; break; }
 done
 fails=0; total=0
