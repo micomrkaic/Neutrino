@@ -4,6 +4,13 @@ Notable changes to Neutrino. Newest first.
 
 ## Unreleased
 
+### Fixed
+- **REPL history recall included a trailing newline.** The accumulated input
+  buffer (which carries a `\n` per physical line for the parser) was passed to
+  `add_history` untrimmed, so an up-arrow recalled the command plus a newline
+  that had to be backspaced away. History entries are now trimmed before being
+  added; multi-line constructs remain single entries in-session.
+
 ### Added
 - **Axis ranges in plots.** `plot` and `hist` options records now accept
   `xrange` / `yrange` as `[lo, hi]` vectors (`hist(y, 20, {yrange = [0, 6000]})`

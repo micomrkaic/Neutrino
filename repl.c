@@ -122,6 +122,22 @@ static char *prompt_line(const char *prompt)
 #endif
 }
 
+#ifdef HAVE_READLINE
+/* Add to history without the trailing newline(s) that append_line leaves on
+ * the accumulated buffer (the parser wants them; recalled commands do not).
+ * add_history copies its argument, so a temporary truncation is safe. */
+static void history_add_trimmed(char *s)
+{
+    size_t n = strlen(s), k = n;
+    while (k && (s[k-1] == '\n' || s[k-1] == '\r')) k--;
+    if (k == 0) return;
+    char saved = s[k];
+    s[k] = '\0';
+    add_history(s);
+    s[k] = saved;
+}
+#endif
+
 static char *append_line(char *acc, size_t *len, const char *line)
 {
     size_t ll = strlen(line);
@@ -347,14 +363,14 @@ int repl_run(void)
             print_diag(acc, p.err_tok.line, p.err_tok.col, p.err_msg);
             arena_free(a);
 #ifdef HAVE_READLINE
-            add_history(acc);
+            history_add_trimmed(acc);
 #endif
             free(acc); acc = nullptr; acclen = 0; cont = false;
             continue;
         }
 
 #ifdef HAVE_READLINE
-        add_history(acc);
+        history_add_trimmed(acc);
 #endif
         keep_push(&keep, a, acc);               /* arena + source now owned by the session */
 
