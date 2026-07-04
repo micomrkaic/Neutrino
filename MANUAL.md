@@ -293,6 +293,30 @@ plain name and indices must be in range (no auto-growing).
 dimension: `sum(A, 1)` down columns, `sum(A, 2)` across rows,
 `max(A, [], dim)` for the extrema.
 
+**Descriptive statistics** follow the same conventions. `var` and `std`
+normalize by N-1 by default (`var(A, 1)` divides by N), `median` handles even
+counts by averaging, and `quantile` uses linear interpolation between order
+statistics (the NumPy default):
+
+```
+neutrino> let x = [2, 7, 4, 9, 3]
+neutrino> var(x)
+8.5
+neutrino> quantile(x, [0.25, 0.5, 0.75])
+[3, 4, 7]
+```
+
+`cov(X)` and `corr(X)` treat a matrix's **columns as variables** and rows as
+observations, returning the p x p covariance / Pearson correlation matrix
+(`cov` takes the same `w` normalization as `var`). On two vectors they return
+the scalar: `cov(x, y)`, `corr(x, y)`. A constant column has no correlation to
+speak of — those entries are `nan`:
+
+```
+neutrino> corr([1, 2, 3, 4, 5], [2, 1, 4, 3, 5])
+0.8
+```
+
 ## 9. Linear algebra
 
 `*` is the matrix product; `\` solves. Square systems use LU with partial
@@ -499,6 +523,12 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 |---|---|
 | `sum(A) | sum(A, dim)` | sum of all elements, or along dim (1 = columns, 2 = rows) |
 | `prod(A) | prod(A, dim)` | product of all elements, or along dim |
+| `cov(X[, w]) | cov(x, y[, w])` | covariance matrix of X's columns (rows = observations), or scalar cov of two vectors; w as in var |
+| `corr(X) | corr(x, y)` | Pearson correlation matrix of X's columns, or scalar correlation of two vectors |
+| `var(A) | var(A, w) | var(A, w, dim)` | variance; w = 0 divides by N-1 (default), w = 1 by N |
+| `std(A) | std(A, w) | std(A, w, dim)` | standard deviation (sqrt of var, same normalization) |
+| `median(A) | median(A, dim)` | median of all elements, or along dim |
+| `quantile(x, p)` | quantile(s) of the data at probability p (scalar or vector); linear interpolation |
 | `mean(A) | mean(A, dim)` | mean of all elements, or along dim |
 | `min(A) | min(a, b) | min(A, [], dim)` | smallest element; elementwise min; or min along dim |
 | `max(A) | max(a, b) | max(A, [], dim)` | largest element; elementwise max; or max along dim |

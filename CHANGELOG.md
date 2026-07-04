@@ -12,6 +12,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **`cov` and `corr`.** Covariance and Pearson correlation: matrix form
+  (columns = variables, rows = observations) returns the p x p matrix; two
+  vectors return the scalar. `cov` shares `var`'s `w` normalization. Constant
+  columns yield `nan` correlations, and the float printer now displays NaN
+  without a meaningless sign bit (`nan`, never `-nan`).
+- **Descriptive statistics.** `var(A[, w][, dim])` and `std(...)` (sample N-1
+  default, `w = 1` for population), `median(A[, dim])`, and `quantile(x, p)`
+  (linear interpolation between order statistics, NumPy-compatible; `p` scalar
+  or vector). All follow the reduction family's conventions, work elementwise
+  on logical masks like `sum`, and are cross-checked against NumPy.
 - **Axis ranges in plots.** `plot` and `hist` options records now accept
   `xrange` / `yrange` as `[lo, hi]` vectors (`hist(y, 20, {yrange = [0, 6000]})`
   anchors a histogram's baseline at zero — gnuplot's auto-range otherwise

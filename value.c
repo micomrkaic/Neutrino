@@ -1,4 +1,5 @@
 /* value.c */
+#include <math.h>
 #include "value.h"
 #include "chunk.h"
 #include <stdlib.h>
@@ -61,11 +62,13 @@ static void num_spec(char *spec, size_t n)
 }
 static void fmt_double(FILE *out, double x)
 {
+    if (isnan(x)) { fputs("nan", out); return; }   /* a NaN's sign bit is noise */
     char spec[8]; num_spec(spec, sizeof spec);
     fprintf(out, spec, x);
 }
 static int fmt_double_str(char *buf, size_t cap, double x)
 {
+    if (isnan(x)) return snprintf(buf, cap, "nan");
     char spec[8]; num_spec(spec, sizeof spec);
     return snprintf(buf, cap, spec, x);
 }

@@ -1291,6 +1291,12 @@ static const BuiltinDoc builtin_docs[] = {
     /* reductions ------------------------------------------------------ */
     { "sum",   "sum(A) | sum(A, dim)", "sum of all elements, or along dim (1 = columns, 2 = rows)", "reduce" },
     { "prod",  "prod(A) | prod(A, dim)","product of all elements, or along dim", "reduce" },
+    { "cov",   "cov(X[, w]) | cov(x, y[, w])", "covariance matrix of X's columns (rows = observations), or scalar cov of two vectors; w as in var", "reduce" },
+    { "corr",  "corr(X) | corr(x, y)", "Pearson correlation matrix of X's columns, or scalar correlation of two vectors", "reduce" },
+    { "var",   "var(A) | var(A, w) | var(A, w, dim)", "variance; w = 0 divides by N-1 (default), w = 1 by N", "reduce" },
+    { "std",   "std(A) | std(A, w) | std(A, w, dim)", "standard deviation (sqrt of var, same normalization)", "reduce" },
+    { "median","median(A) | median(A, dim)", "median of all elements, or along dim", "reduce" },
+    { "quantile","quantile(x, p)",   "quantile(s) of the data at probability p (scalar or vector); linear interpolation", "reduce" },
     { "mean",  "mean(A) | mean(A, dim)","mean of all elements, or along dim", "reduce" },
     { "min",   "min(A) | min(a, b) | min(A, [], dim)", "smallest element; elementwise min; or min along dim", "reduce" },
     { "max",   "max(A) | max(a, b) | max(A, [], dim)", "largest element; elementwise max; or max along dim", "reduce" },
@@ -2892,6 +2898,280 @@ static Value bi_max(Interp *I, Value *args, uint32_t n)
     for (size_t k = 1; k < nn; k++) { Value e = arr_get(a, k); if (as_double(e) > as_double(best)) best = e; }
     return best;
 }
+/* ------------------------------------------------------------------ */
+/* descriptive statistics: var, std, median, quantile                  */
+/* ------------------------------------------------------------------ */
+
+/* Copy a value's elements (or one dim-slice) into a double buffer.
+ * Rejects complex; Bool converts as 0/1 like the arithmetic folds. */
+static double stat_elt(Interp *I, Value e, const char *who)
+{
+    if (e.kind == VAL_BOOL) return e.as.b ? 1.0 : 0.0;
+    if (e.kind != VAL_INT && e.kind != VAL_FLOAT)
+        runtime_error(I, "%s: expected real data, got %s", who, type_name(e.kind));
+    return as_double(e);
+}
+
+typedef double (*StatKernel)(Interp *, double *, size_t, double);
+
+static int dbl_cmp(const void *a, const void *b)
+{
+    double x = *(const double *)a, y = *(const double *)b;
+    return (x > y) - (x < y);
+}
+
+/* Two-pass variance. w = 0: sample (N-1, default); w = 1: population (N). */
+static double st_var(Interp *I, double *buf, size_t n, double w)
+{
+    (void)I;
+    if (n == 1) return 0.0;
+    double m = 0.0;
+    for (size_t k = 0; k < n; k++) m += buf[k];
+    m /= (double)n;
+    double ss = 0.0;
+    for (size_t k = 0; k < n; k++) { double d = buf[k] - m; ss += d * d; }
+    return ss / ((w == 1.0) ? (double)n : (double)(n - 1));
+}
+static double st_std(Interp *I, double *buf, size_t n, double w)
+{
+    return sqrt(st_var(I, buf, n, w));
+}
+static double st_median(Interp *I, double *buf, size_t n, double unused)
+{
+    (void)I; (void)unused;
+    qsort(buf, n, sizeof *buf, dbl_cmp);
+    return (n & 1) ? buf[n / 2] : 0.5 * (buf[n/2 - 1] + buf[n/2]);
+}
+/* Linear interpolation between order statistics (NumPy default / R type 7). */
+static double st_quantile(Interp *I, double *buf, size_t n, double p)
+{
+    (void)I;
+    qsort(buf, n, sizeof *buf, dbl_cmp);
+    if (n == 1) return buf[0];
+    double h = (double)(n - 1) * p;
+    size_t lo = (size_t)h;
+    if (lo >= n - 1) return buf[n - 1];
+    double frac = h - (double)lo;
+    return buf[lo] + frac * (buf[lo + 1] - buf[lo]);
+}
+
+/* Apply kernel to every element of v (scalar / whole array). */
+static Value stat_all(Interp *I, Value v, StatKernel f, double param, const char *who)
+{
+    if (is_num(v) && v.kind != VAL_COMPLEX) {
+        double d = stat_elt(I, v, who);
+        return val_float(f(I, &d, 1, param));
+    }
+    if (!is_array(v)) runtime_error(I, "%s: expected numeric data, got %s", who, type_name(v.kind));
+    ArrObj *a = as_arr(v);
+    if (a->elt == ELT_COMPLEX) runtime_error(I, "%s: complex data has no ordering", who);
+    size_t n = (size_t)a->rows * a->cols;
+    if (n == 0) runtime_error(I, "%s: empty data", who);
+    double *buf = malloc(n * sizeof *buf);
+    if (!buf) abort();
+    for (size_t k = 0; k < n; k++) buf[k] = stat_elt(I, arr_get(a, k), who);
+    double r = f(I, buf, n, param);
+    free(buf);
+    return val_float(r);
+}
+
+/* Apply kernel along dim (1 = down columns, 2 = across rows). */
+static Value stat_dim(Interp *I, ArrObj *a, int dim, StatKernel f, double param, const char *who)
+{
+    if (a->elt == ELT_COMPLEX) runtime_error(I, "%s: complex data has no ordering", who);
+    uint32_t slices = (dim == 1) ? a->cols : a->rows;
+    uint32_t len    = (dim == 1) ? a->rows : a->cols;
+    if (len == 0) runtime_error(I, "%s: empty dimension", who);
+    double *buf = malloc((size_t)len * sizeof *buf);
+    if (!buf) abort();
+    Value out = val_array(ELT_FLOAT, dim == 1 ? 1 : a->rows, dim == 1 ? a->cols : 1);
+    double *od = (double *)as_arr(out)->data;
+    for (uint32_t s = 0; s < slices; s++) {
+        for (uint32_t k = 0; k < len; k++) {
+            size_t idx = (dim == 1) ? (size_t)k * a->cols + s : (size_t)s * a->cols + k;
+            buf[k] = stat_elt(I, arr_get(a, idx), who);
+        }
+        od[s] = f(I, buf, len, param);
+    }
+    free(buf);
+    return out;
+}
+
+/* Load column c of a into buf (real data only). */
+static void stat_col(Interp *I, ArrObj *a, uint32_t c, double *buf, const char *who)
+{
+    for (uint32_t r = 0; r < a->rows; r++)
+        buf[r] = stat_elt(I, arr_get(a, (size_t)r * a->cols + c), who);
+}
+
+/* Covariance matrix of X's columns (rows = observations), or of two vectors. */
+static Value cov_matrix(Interp *I, ArrObj *X, double w, const char *who, bool to_corr)
+{
+    if (X->elt == ELT_COMPLEX) runtime_error(I, "%s: complex data has no ordering", who);
+    uint32_t n = X->rows, p = X->cols;
+    if (n == 0 || p == 0) runtime_error(I, "%s: empty data", who);
+    double *cols = malloc((size_t)n * p * sizeof *cols);
+    double *mu   = malloc((size_t)p * sizeof *mu);
+    if (!cols || !mu) abort();
+    for (uint32_t c = 0; c < p; c++) {
+        stat_col(I, X, c, cols + (size_t)c * n, who);
+        double m = 0.0;
+        for (uint32_t r = 0; r < n; r++) m += cols[(size_t)c * n + r];
+        mu[c] = m / (double)n;
+    }
+    double denom = (n == 1) ? 1.0 : ((w == 1.0) ? (double)n : (double)(n - 1));
+    Value out = val_array(ELT_FLOAT, p, p);
+    double *od = (double *)as_arr(out)->data;
+    for (uint32_t i = 0; i < p; i++)
+        for (uint32_t j = i; j < p; j++) {
+            double s = 0.0;
+            const double *xi = cols + (size_t)i * n, *xj = cols + (size_t)j * n;
+            for (uint32_t r = 0; r < n; r++) s += (xi[r] - mu[i]) * (xj[r] - mu[j]);
+            double cij = (n == 1) ? 0.0 : s / denom;
+            od[(size_t)i * p + j] = od[(size_t)j * p + i] = cij;
+        }
+    free(cols); free(mu);
+    if (to_corr) {                             /* snapshot sds first: normalizing in place
+                                                  would corrupt diagonals still to be read */
+        double *sd = malloc((size_t)p * sizeof *sd);
+        if (!sd) abort();
+        for (uint32_t i = 0; i < p; i++) sd[i] = sqrt(od[(size_t)i * p + i]);
+        for (uint32_t i = 0; i < p; i++)
+            for (uint32_t j = 0; j < p; j++)
+                od[(size_t)i * p + j] = (i == j && sd[i] > 0.0)
+                                      ? 1.0
+                                      : od[(size_t)i * p + j] / (sd[i] * sd[j]);   /* 0-variance -> nan */
+        free(sd);
+    }
+    return out;
+}
+
+/* Validate a real vector argument; return its length (no allocation). */
+static size_t stat_veclen(Interp *I, Value v, const char *who)
+{
+    if (!is_array(v)) runtime_error(I, "%s: expected a vector, got %s", who, type_name(v.kind));
+    ArrObj *a = as_arr(v);
+    if (a->rows != 1 && a->cols != 1) runtime_error(I, "%s: expected a vector, got %ux%u", who, a->rows, a->cols);
+    if (a->elt == ELT_COMPLEX) runtime_error(I, "%s: complex data has no ordering", who);
+    size_t n = (size_t)a->rows * a->cols;
+    if (n == 0) runtime_error(I, "%s: empty data", who);
+    return n;
+}
+
+/* Scalar covariance of two equal-length vectors. All validation happens
+ * before any allocation, so no error path needs cleanup. */
+static double cov_pair(Interp *I, Value xv, Value yv, double w, const char *who)
+{
+    size_t nx = stat_veclen(I, xv, who);
+    size_t ny = stat_veclen(I, yv, who);
+    if (nx != ny) runtime_error(I, "%s: vectors differ in length (%zu vs %zu)", who, nx, ny);
+    double *x = malloc(nx * sizeof *x), *y = malloc(nx * sizeof *y);
+    if (!x || !y) abort();
+    ArrObj *xa = as_arr(xv), *ya = as_arr(yv);
+    for (size_t k = 0; k < nx; k++) {
+        x[k] = stat_elt(I, arr_get(xa, k), who);   /* element kinds already vetted */
+        y[k] = stat_elt(I, arr_get(ya, k), who);
+    }
+    double mx = 0.0, my = 0.0;
+    for (size_t k = 0; k < nx; k++) { mx += x[k]; my += y[k]; }
+    mx /= (double)nx; my /= (double)nx;
+    double s = 0.0, sx = 0.0, sy = 0.0;
+    for (size_t k = 0; k < nx; k++) {
+        s  += (x[k] - mx) * (y[k] - my);
+        sx += (x[k] - mx) * (x[k] - mx);
+        sy += (y[k] - my) * (y[k] - my);
+    }
+    free(x); free(y);
+    if (who[2] == 'r') {                       /* "corr": normalize */
+        return s / sqrt(sx * sy);              /* 0-variance -> nan */
+    }
+    double denom = (nx == 1) ? 1.0 : ((w == 1.0) ? (double)nx : (double)(nx - 1));
+    return (nx == 1) ? 0.0 : s / denom;
+}
+
+/* cov(X[, w]) | cov(x, y[, w]);  corr(X) | corr(x, y). */
+static Value bi_cov(Interp *I, Value *args, uint32_t n)
+{
+    double w = 0.0;
+    bool pair = (n >= 2 && is_array(args[1]));
+    uint32_t wpos = pair ? 2 : 1;
+    if (n > wpos) {
+        double wv = stat_elt(I, args[wpos], "cov");
+        if (wv != 0.0 && wv != 1.0) runtime_error(I, "cov: normalization must be 0 (N-1) or 1 (N)");
+        w = wv;
+    }
+    if (pair) return val_float(cov_pair(I, args[0], args[1], w, "cov"));
+    if (!is_array(args[0])) runtime_error(I, "cov: expected numeric data, got %s", type_name(args[0].kind));
+    ArrObj *X = as_arr(args[0]);
+    if (X->rows == 1 || X->cols == 1) return val_float(cov_pair(I, args[0], args[0], w, "cov"));
+    return cov_matrix(I, X, w, "cov", false);
+}
+static Value bi_corr(Interp *I, Value *args, uint32_t n)
+{
+    if (n == 2) return val_float(cov_pair(I, args[0], args[1], 0.0, "corr"));
+    if (!is_array(args[0])) runtime_error(I, "corr: expected numeric data, got %s", type_name(args[0].kind));
+    ArrObj *X = as_arr(args[0]);
+    if (X->rows == 1 || X->cols == 1) return val_float(cov_pair(I, args[0], args[0], 0.0, "corr"));
+    return cov_matrix(I, X, 0.0, "corr", true);
+}
+
+/* var(A) | var(A, w) | var(A, w, dim); w = 0 (N-1, default) or 1 (N). */
+static Value stat_var_common(Interp *I, Value *args, uint32_t n, StatKernel f, const char *who)
+{
+    double w = 0.0;
+    if (n >= 2) {
+        if (args[1].kind == VAL_NULL || (is_array(args[1]) && (size_t)as_arr(args[1])->rows * as_arr(args[1])->cols == 0)) w = 0.0;   /* [] placeholder */
+        else {
+            double wv = stat_elt(I, args[1], who);
+            if (wv != 0.0 && wv != 1.0) runtime_error(I, "%s: normalization must be 0 (N-1) or 1 (N)", who);
+            w = wv;
+        }
+    }
+    if (n == 3) {
+        if (!is_array(args[0])) runtime_error(I, "%s: the dim form needs an array", who);
+        return stat_dim(I, as_arr(args[0]), dim_arg(I, args[2], who), f, w, who);
+    }
+    return stat_all(I, args[0], f, w, who);
+}
+static Value bi_var(Interp *I, Value *args, uint32_t n) { return stat_var_common(I, args, n, st_var, "var"); }
+static Value bi_std(Interp *I, Value *args, uint32_t n) { return stat_var_common(I, args, n, st_std, "std"); }
+
+static Value bi_median(Interp *I, Value *args, uint32_t n)
+{
+    if (n == 2) {
+        if (!is_array(args[0])) runtime_error(I, "median: the dim form needs an array");
+        return stat_dim(I, as_arr(args[0]), dim_arg(I, args[1], "median"), st_median, 0.0, "median");
+    }
+    return stat_all(I, args[0], st_median, 0.0, "median");
+}
+
+/* quantile(x, p): p a probability in [0, 1], scalar or vector -> matching shape. */
+static Value bi_quantile(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    Value pv = args[1];
+    if (is_num(pv)) {
+        double p = stat_elt(I, pv, "quantile");
+        if (p < 0.0 || p > 1.0) runtime_error(I, "quantile: p must be in [0, 1]");
+        return stat_all(I, args[0], st_quantile, p, "quantile");
+    }
+    if (!is_array(pv)) runtime_error(I, "quantile: p must be a probability or a vector of them");
+    ArrObj *pa = as_arr(pv);
+    if (pa->elt == ELT_COMPLEX || (pa->rows != 1 && pa->cols != 1))
+        runtime_error(I, "quantile: p must be a probability or a vector of them");
+    size_t np = (size_t)pa->rows * pa->cols;
+    if (np == 0) runtime_error(I, "quantile: empty p");
+    Value out = val_array(ELT_FLOAT, pa->rows, pa->cols);
+    double *od = (double *)as_arr(out)->data;
+    for (size_t k = 0; k < np; k++) {
+        double p = stat_elt(I, arr_get(pa, k), "quantile");
+        if (p < 0.0 || p > 1.0) runtime_error(I, "quantile: p must be in [0, 1]");
+        Value r = stat_all(I, args[0], st_quantile, p, "quantile");
+        od[k] = r.as.f;
+    }
+    return out;
+}
+
 static Value bi_mean(Interp *I, Value *args, uint32_t n)
 {
     Value v = args[0];
@@ -3337,6 +3617,12 @@ EnvObj *globals_new(void)
     def_builtin(e, "rem",     bi_rem,     2, 2);
     def_builtin(e, "min",     bi_min,     1, 3);
     def_builtin(e, "max",     bi_max,     1, 3);
+    def_builtin(e, "cov",     bi_cov,     1, 3);
+    def_builtin(e, "corr",    bi_corr,    1, 2);
+    def_builtin(e, "var",     bi_var,     1, 3);
+    def_builtin(e, "std",     bi_std,     1, 3);
+    def_builtin(e, "median",  bi_median,  1, 2);
+    def_builtin(e, "quantile",bi_quantile,2, 2);
     def_builtin(e, "mean",    bi_mean,    1, 2);
     def_builtin(e, "prod",    bi_prod,    1, 2);
     def_builtin(e, "length",  bi_length,  1, 1);

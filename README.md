@@ -551,6 +551,11 @@ real  imag  conj  angle (arg)                        complex part / conjugate / 
 sum(A)            sum of elements
 min(A) max(A)     smallest / largest element
 mean(A) prod(A)   arithmetic mean / product
+var(A[, w][, dim])  std(...)                        variance / std dev (w = 0: N-1, w = 1: N)
+median(A) | median(A, dim)                          median overall or along dim
+quantile(x, p)                                      quantiles, linear interpolation (p scalar or vector)
+cov(X[, w]) | cov(x, y[, w])                        covariance matrix of columns / scalar pair cov
+corr(X) | corr(x, y)                                Pearson correlation matrix / scalar
 any(mask) all(mask)   logical reductions
 isnan(x) isinf(x) isfinite(x)   elementwise FP predicates -> logical
 
