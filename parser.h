@@ -17,6 +17,8 @@ typedef struct {
     const char *err_msg;
     char    msgbuf[160];  /* backing store for formatted messages */
     jmp_buf jmp;          /* panic-unwind target */
+    void   **scratch;     /* live parser scratch buffers, freed on parse error */
+    uint32_t scr_len, scr_cap;
     int     in_index;     /* >0 while parsing index args (enables 'end') */
 } Parser;
 

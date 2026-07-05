@@ -52,21 +52,39 @@ static AstNode *node(Parser *p, AstKind k, Token at)
     return ast_alloc(p->arena, k, at.line, at.col);
 }
 
-/* growable scratch vector of node pointers, copied into the arena at close */
-typedef struct { AstNode **data; uint32_t len, cap; } Vec;
+/* growable scratch vector of node pointers, copied into the arena at close.
+ * Every live buffer is registered in p->scratch so that a parse_error longjmp
+ * can free in-flight vectors (found by fuzzing: every parse error leaked). */
+typedef struct { AstNode **data; uint32_t len, cap, reg; } Vec;
+#define VEC_INIT { nullptr, 0, 0, UINT32_MAX }
 
-static void vec_push(Vec *v, AstNode *n)
+static void scratch_set(Parser *p, Vec *v)
+{
+    if (v->reg == UINT32_MAX) {
+        if (p->scr_len == p->scr_cap) {
+            p->scr_cap = p->scr_cap ? p->scr_cap * 2 : 16;
+            p->scratch = realloc(p->scratch, p->scr_cap * sizeof *p->scratch);
+            if (!p->scratch) abort();
+        }
+        v->reg = p->scr_len++;
+    }
+    p->scratch[v->reg] = v->data;
+}
+
+static void vec_push(Parser *p, Vec *v, AstNode *n)
 {
     if (v->len == v->cap) {
         v->cap = v->cap ? v->cap * 2 : 8;
         v->data = realloc(v->data, v->cap * sizeof *v->data);
         if (!v->data) abort();
+        scratch_set(p, v);
     }
     v->data[v->len++] = n;
 }
 
 static AstList vec_seal(Parser *p, Vec *v)
 {
+    if (v->reg != UINT32_MAX) p->scratch[v->reg] = nullptr;
     AstList list = { .items = nullptr, .count = v->len };
     if (v->len) {
         list.items = arena_alloc(p->arena, v->len * sizeof *list.items);
@@ -128,19 +146,19 @@ static AstNode *parse_matrix(Parser *p)
     Token open = p->cur;
     expect(p, TOK_LBRACK, "'['");
     AstNode *m = node(p, AST_MATRIX, open);
-    Vec rows = {0};
+    Vec rows = VEC_INIT;
     skip_newlines(p);
 
     while (!check(p, TOK_RBRACK)) {
         AstNode *row = node(p, AST_ROW, p->cur);
-        Vec elems = {0};
-        vec_push(&elems, parse_expr(p, 0));
+        Vec elems = VEC_INIT;
+        vec_push(p, &elems, parse_expr(p, 0));
         while (accept(p, TOK_COMMA)) {        /* comma continues the row (absorbs newlines) */
             skip_newlines(p);
-            vec_push(&elems, parse_expr(p, 0));
+            vec_push(p, &elems, parse_expr(p, 0));
         }
         row->as.list = vec_seal(p, &elems);
-        vec_push(&rows, row);
+        vec_push(p, &rows, row);
 
         if (check(p, TOK_SEMI) || check(p, TOK_NEWLINE)) {
             while (accept(p, TOK_SEMI) || accept(p, TOK_NEWLINE)) { }
@@ -158,14 +176,14 @@ static AstNode *parse_lambda(Parser *p)
     Token kw = p->cur;
     expect(p, TOK_KW_FN, "'fn'");
     AstNode *lam = node(p, AST_LAMBDA, kw);
-    Vec params = {0};
+    Vec params = VEC_INIT;
     if (!check(p, TOK_ARROW)) {
         do {
             Token id = expect(p, TOK_IDENT, "parameter name");
             AstNode *pn = node(p, AST_IDENT, id);
             pn->as.lit.text = id.start;
             pn->as.lit.len  = id.len;
-            vec_push(&params, pn);
+            vec_push(p, &params, pn);
         } while (accept(p, TOK_COMMA));
     }
     expect(p, TOK_ARROW, "'->' after lambda parameters");
@@ -199,7 +217,7 @@ static AstNode *parse_record(Parser *p)
     Token open = p->cur;
     expect(p, TOK_LBRACE, "'{'");
     AstNode *rec = node(p, AST_RECORD, open);
-    Vec fields = {0};
+    Vec fields = VEC_INIT;
     skip_newlines(p);
 
     while (!check(p, TOK_RBRACE)) {
@@ -222,7 +240,7 @@ static AstNode *parse_record(Parser *p)
         f->as.recfield.name    = name.start;
         f->as.recfield.namelen = name.len;
         f->as.recfield.value   = parse_expr(p, 0);
-        vec_push(&fields, f);
+        vec_push(p, &fields, f);
 
         skip_newlines(p);
         if (!accept(p, TOK_COMMA)) break;  /* no comma ⇒ record must end */
@@ -244,31 +262,31 @@ static bool is_hole(const AstNode *n)
 /* collect '_' holes in evaluation (left-to-right) order, not descending into a
  * nested lambda (which includes already-built inner sections), so each '_'
  * binds to its own innermost grouping. */
-static void collect_holes(AstNode *n, Vec *out)
+static void collect_holes(Parser *p, AstNode *n, Vec *out)
 {
     if (!n) return;
-    if (is_hole(n)) { vec_push(out, n); return; }
+    if (is_hole(n)) { vec_push(p, out, n); return; }
     switch (n->kind) {
     case AST_LAMBDA: return;
-    case AST_UNARY: case AST_POSTFIX: collect_holes(n->as.unary.operand, out); return;
-    case AST_BINARY: collect_holes(n->as.binary.lhs, out); collect_holes(n->as.binary.rhs, out); return;
+    case AST_UNARY: case AST_POSTFIX: collect_holes(p, n->as.unary.operand, out); return;
+    case AST_BINARY: collect_holes(p, n->as.binary.lhs, out); collect_holes(p, n->as.binary.rhs, out); return;
     case AST_RANGE:
-        collect_holes(n->as.range.start, out); collect_holes(n->as.range.step, out); collect_holes(n->as.range.stop, out); return;
+        collect_holes(p, n->as.range.start, out); collect_holes(p, n->as.range.step, out); collect_holes(p, n->as.range.stop, out); return;
     case AST_CALL: case AST_INDEX:
-        collect_holes(n->as.call.callee, out);
-        for (uint32_t i = 0; i < n->as.call.args.count; i++) collect_holes(n->as.call.args.items[i], out);
+        collect_holes(p, n->as.call.callee, out);
+        for (uint32_t i = 0; i < n->as.call.args.count; i++) collect_holes(p, n->as.call.args.items[i], out);
         return;
-    case AST_FIELD: collect_holes(n->as.field.target, out); return;
+    case AST_FIELD: collect_holes(p, n->as.field.target, out); return;
     case AST_IF:
-        collect_holes(n->as.iff.cond, out); collect_holes(n->as.iff.then_e, out); collect_holes(n->as.iff.else_e, out); return;
+        collect_holes(p, n->as.iff.cond, out); collect_holes(p, n->as.iff.then_e, out); collect_holes(p, n->as.iff.else_e, out); return;
     case AST_RECORD: case AST_MATRIX: case AST_ROW: case AST_BLOCK:
-        for (uint32_t i = 0; i < n->as.list.count; i++) collect_holes(n->as.list.items[i], out);
+        for (uint32_t i = 0; i < n->as.list.count; i++) collect_holes(p, n->as.list.items[i], out);
         return;
-    case AST_RECORD_FIELD: collect_holes(n->as.recfield.value, out); return;
-    case AST_LET: collect_holes(n->as.let.value, out); return;
-    case AST_ASSIGN: collect_holes(n->as.binary.rhs, out); return;
-    case AST_FOR: collect_holes(n->as.forloop.iter, out); collect_holes(n->as.forloop.body, out); return;
-    case AST_WHILE: collect_holes(n->as.whileloop.cond, out); collect_holes(n->as.whileloop.body, out); return;
+    case AST_RECORD_FIELD: collect_holes(p, n->as.recfield.value, out); return;
+    case AST_LET: collect_holes(p, n->as.let.value, out); return;
+    case AST_ASSIGN: collect_holes(p, n->as.binary.rhs, out); return;
+    case AST_FOR: collect_holes(p, n->as.forloop.iter, out); collect_holes(p, n->as.forloop.body, out); return;
+    case AST_WHILE: collect_holes(p, n->as.whileloop.cond, out); collect_holes(p, n->as.whileloop.body, out); return;
     default: return;
     }
 }
@@ -278,12 +296,12 @@ static void collect_holes(AstNode *n, Vec *out)
  * names can never collide with a user binding. */
 static AstNode *maybe_section(Parser *p, AstNode *e)
 {
-    Vec holes = {0};
-    collect_holes(e, &holes);
+    Vec holes = VEC_INIT;
+    collect_holes(p, e, &holes);
     if (holes.len == 0) { free(holes.data); return e; }
 
     AstNode *lam = ast_alloc(p->arena, AST_LAMBDA, e->line, e->col);
-    Vec params = {0};
+    Vec params = VEC_INIT;
     for (uint32_t i = 0; i < holes.len; i++) {
         char *nm = arena_alloc(p->arena, 16);
         int len = snprintf(nm, 16, "_@%u", i);
@@ -291,7 +309,7 @@ static AstNode *maybe_section(Parser *p, AstNode *e)
         holes.data[i]->as.lit.len  = (uint32_t)len;
         AstNode *pn = ast_alloc(p->arena, AST_IDENT, e->line, e->col);
         pn->as.lit.text = nm; pn->as.lit.len = (uint32_t)len;
-        vec_push(&params, pn);
+        vec_push(p, &params, pn);
     }
     lam->as.lambda.params = vec_seal(p, &params);
     lam->as.lambda.body   = e;
@@ -303,12 +321,12 @@ static AstNode *maybe_section(Parser *p, AstNode *e)
 static AstNode *parse_block_until_end(Parser *p)
 {
     AstNode *block = node(p, AST_BLOCK, p->cur);
-    Vec stmts = {0};
+    Vec stmts = VEC_INIT;
     while (accept(p, TOK_NEWLINE) || accept(p, TOK_SEMI)) { }
     while (!check(p, TOK_KW_END) && !check(p, TOK_EOF)) {
         AstNode *s = parse_statement(p);
         if (check(p, TOK_SEMI)) s->silent = true;
-        vec_push(&stmts, s);
+        vec_push(p, &stmts, s);
         if (check(p, TOK_KW_END) || check(p, TOK_EOF)) break;
         if (!check(p, TOK_NEWLINE) && !check(p, TOK_SEMI))
             parse_error(p, "expected newline or ';' in loop body");
@@ -376,12 +394,12 @@ static AstNode *parse_nud(Parser *p)
         skip_newlines(p);
         if (check(p, TOK_SEMI)) {                  /* block-expression: ( s; s; expr ) */
             AstNode *blk = node(p, AST_BLOCK_EXPR, open);
-            Vec stmts = {0};
-            vec_push(&stmts, first);
+            Vec stmts = VEC_INIT;
+            vec_push(p, &stmts, first);
             while (accept(p, TOK_SEMI)) {
                 skip_newlines(p);
                 if (check(p, TOK_RPAREN)) break;   /* a trailing ';' is fine */
-                vec_push(&stmts, parse_statement(p));
+                vec_push(p, &stmts, parse_statement(p));
                 skip_newlines(p);
             }
             blk->as.list = vec_seal(p, &stmts);
@@ -440,13 +458,13 @@ static AstNode *parse_nud(Parser *p)
 /* ------------------------------------------------------------------ */
 static AstList parse_arglist(Parser *p, enum TokenKind close, const char *what)
 {
-    Vec args = {0};
+    Vec args = VEC_INIT;
     skip_newlines(p);
     if (!check(p, close)) {
-        vec_push(&args, parse_expr(p, 0));
+        vec_push(p, &args, parse_expr(p, 0));
         while (accept(p, TOK_COMMA)) {
             skip_newlines(p);
-            vec_push(&args, parse_expr(p, 0));
+            vec_push(p, &args, parse_expr(p, 0));
         }
     }
     skip_newlines(p);
@@ -466,12 +484,12 @@ static AstNode *parse_index_arg(Parser *p)
 
 static AstList parse_index_arglist(Parser *p)
 {
-    Vec args = {0};
+    Vec args = VEC_INIT;
     p->in_index++;                                /* enables 'end' within these args */
     skip_newlines(p);
     if (!check(p, TOK_RBRACK)) {
-        vec_push(&args, parse_index_arg(p));
-        while (accept(p, TOK_COMMA)) { skip_newlines(p); vec_push(&args, parse_index_arg(p)); }
+        vec_push(p, &args, parse_index_arg(p));
+        while (accept(p, TOK_COMMA)) { skip_newlines(p); vec_push(p, &args, parse_index_arg(p)); }
     }
     skip_newlines(p);
     expect(p, TOK_RBRACK, "']'");
@@ -602,13 +620,13 @@ static AstNode *parse_statement(Parser *p)
 static AstNode *parse_program(Parser *p)
 {
     AstNode *block = node(p, AST_BLOCK, p->cur);
-    Vec stmts = {0};
+    Vec stmts = VEC_INIT;
     while (accept(p, TOK_NEWLINE) || accept(p, TOK_SEMI)) { }
 
     while (!check(p, TOK_EOF)) {
         AstNode *s = parse_statement(p);
         if (check(p, TOK_SEMI)) s->silent = true;   /* ';' suppresses this statement's echo */
-        vec_push(&stmts, s);
+        vec_push(p, &stmts, s);
         if (check(p, TOK_EOF)) break;
         if (!check(p, TOK_NEWLINE) && !check(p, TOK_SEMI))
             parse_error(p, "expected newline or ';' after statement");
@@ -627,7 +645,15 @@ void parser_init(Parser *p, const char *src, Arena *arena)
 
 AstNode *parser_parse(Parser *p)
 {
-    if (setjmp(p->jmp)) return nullptr;   /* a parse_error unwinds to here */
+    if (setjmp(p->jmp)) {                 /* a parse_error unwinds to here */
+        for (uint32_t i = 0; i < p->scr_len; i++) free(p->scratch[i]);
+        free(p->scratch);
+        p->scratch = nullptr; p->scr_len = p->scr_cap = 0;
+        return nullptr;
+    }
     advance(p);                           /* prime the lookahead */
-    return parse_program(p);
+    AstNode *prog = parse_program(p);
+    free(p->scratch);                     /* all entries sealed on success */
+    p->scratch = nullptr; p->scr_len = p->scr_cap = 0;
+    return prog;
 }

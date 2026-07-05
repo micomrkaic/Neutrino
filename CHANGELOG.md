@@ -12,6 +12,19 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.0 hardening campaign.** ~33,000 fuzzed programs (grammar-aware and
+  byte-garbage) under ASan+UBSan plus 108 property-based linear-algebra
+  identity checks on random matrices. Found and fixed: signed-integer-overflow
+  UB in Int arithmetic and `ipow` (wraparound is now implemented in unsigned
+  arithmetic; `MAX .^ MAX` previously also effectively hung), uint32
+  truncation of range and constructor sizes that could reach a heap overflow
+  (`1:4294967306` allocated 10 slots and wrote billions — all ranges and
+  constructors now capped at 1e8 elements with clean errors), error-path
+  leaks in the elementwise family, `mrdivide`/`inv`/`mpow` on singular or
+  nonconformable inputs, indexed assignment (a latent setjmp-clobber: cleanup
+  handlers read register-cached pointers), and parser scratch vectors on every
+  parse error (now registered and freed on unwind). 18 regression goldens pin
+  the fixes; the golden suite additionally runs clean under UBSan.
 - **Examples in `help`.** `help(f)` now shows one or two usage examples with
   their actual output for every builtin (113 of them). Examples marked `%=` in
   the doc table are executed and compared by `tests/run_examples.sh` on every

@@ -1,0 +1,43 @@
+# Regression goldens from the v1.0 fuzzing campaign.
+# 1. Integer arithmetic wraps as defined behavior (was UB signed overflow;
+#    the old ipow also effectively hung on astronomical exponents).
+9223372036854775807 * 2
+=> -2
+9223372036854775807 + 1
+=> -9223372036854775808
+9223372036854775807 .^ 9223372036854775807
+=> 9223372036854775807
+2 ^ 64
+=> 0
+# 2. Ranges are capped and count-safe (was: uint32 truncation -> heap overflow risk)
+1 : 4294967306
+=> !range too large
+-9223372036854775807 : 9223372036854775807
+=> !range too large
+0.5 : 1e300
+=> !range too large
+1 : 0.5 : 3
+=> [1, 1.5, 2, 2.5, 3]
+# 3. Constructor dimensions are capped (was: uint32 truncation / calloc overflow)
+rand(1e10)
+=> !dimension 10000000000 too large
+zeros(100000, 100000)
+=> !result too large
+repmat([1, 2], 100000, 100000)
+=> !result too large
+diag(zeros(1, 50000))
+=> !result too large
+eye(200000000)
+=> !too large
+# 4. Error paths that leaked (elementwise family, mrdivide, inv, index assign)
+[1, 2] + {f0 = 1}
+=> !arithmetic on non-numbers
+[1, 2] / [1, 2, 3]
+=> !dimension
+inv([0, 0; 0, 0])
+=> !singular
+[0, 0; 0, 0] ^ -1
+=> !singular
+# 5. Deep recursion is bounded cleanly; heap frames allow honest depth
+let g = fn n -> if n == 0 then 0 else g(n - 1) end; g(100000)
+=> 0

@@ -72,7 +72,19 @@ static Cplx c_mul(Cplx a, Cplx b){ return (Cplx){ a.re*b.re - a.im*b.im, a.re*b.
 static Cplx c_div(Cplx a, Cplx b){ double d = b.re*b.re + b.im*b.im;
     return (Cplx){ (a.re*b.re + a.im*b.im)/d, (a.im*b.re - a.re*b.im)/d }; }
 
-static int64_t ipow(int64_t base, int64_t e){ int64_t r = 1; while (e-- > 0) r *= base; return r; }
+/* Wrapping integer power by squaring: O(log e) even for huge exponents, and
+ * all arithmetic in uint64 so the documented wraparound is defined behavior
+ * (the old loop was UB on overflow and effectively hung for astronomical e). */
+static int64_t ipow(int64_t base, int64_t e)
+{
+    uint64_t r = 1, b = (uint64_t)base;
+    while (e > 0) {
+        if (e & 1) r *= b;
+        b *= b;
+        e >>= 1;
+    }
+    return (int64_t)r;
+}
 
 /* ---- PRNG: xoshiro256** seeded by splitmix64 (deterministic, reseed via rng()) ---- */
 static uint64_t splitmix64(uint64_t *x)
@@ -140,9 +152,10 @@ static Value scalar_arith_k(Interp *I, Arith kind, Value a, Value b)
     case 0: {
         int64_t x = a.as.i, y = b.as.i;
         switch (kind) {
-        case AR_ADD: return val_int(x + y);
-        case AR_SUB: return val_int(x - y);
-        case AR_MUL: return val_int(x * y);
+        /* wraparound is documented; do it in uint64 so it is defined behavior */
+        case AR_ADD: return val_int((int64_t)((uint64_t)x + (uint64_t)y));
+        case AR_SUB: return val_int((int64_t)((uint64_t)x - (uint64_t)y));
+        case AR_MUL: return val_int((int64_t)((uint64_t)x * (uint64_t)y));
         case AR_POW: return val_int(ipow(x, y));
         default:     break;
         }
@@ -217,6 +230,8 @@ static EltType elt_max(EltType a, EltType b) { return a > b ? a : b; }   /* nume
 
 /* pack n temp scalar Values (owned) into a fresh rows×cols array; releases temps.
  * An all-Bool batch yields a logical array; bools never raise the numeric tower. */
+[[noreturn]] static void array_build_abort(Interp *I, Value *tmp, size_t done, jmp_buf saved);
+
 static Value pack_array(Value *tmp, size_t n, uint32_t rows, uint32_t cols)
 {
     EltType e = ELT_INT;
@@ -245,11 +260,16 @@ static Value elementwise(Interp *I, Arith kind, Value a, Value b)
 
     size_t n = (size_t)rows * cols;
     Value *tmp = n ? malloc(n * sizeof *tmp) : nullptr;
+    jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
+    volatile size_t done = 0;
+    if (setjmp(I->jmp)) array_build_abort(I, tmp, done, saved);   /* mixed-kind element raises */
     for (size_t k = 0; k < n; k++) {
         Value av = aa ? arr_get(as_arr(a), k) : a;
         Value bv = ba ? arr_get(as_arr(b), k) : b;
         tmp[k] = scalar_arith_k(I, kind, av, bv);
+        done = k + 1;
     }
+    memcpy(I->jmp, saved, sizeof(jmp_buf));
     Value r = pack_array(tmp, n, rows, cols);
     free(tmp);
     return r;
@@ -273,14 +293,18 @@ static Value elementwise_cmp(Interp *I, enum TokenKind op, Value a, Value b)
 {
     bool aa, ba; uint32_t rows, cols;
     ew_dims(I, a, b, &aa, &ba, &rows, &cols);
-    Value out = val_array(ELT_BOOL, rows, cols);
+    Value out = val_array(ELT_BOOL, rows, cols);    /* pre-setjmp: handler may release it */
     ArrObj *o = as_arr(out);
     size_t n = (size_t)rows * cols;
+    jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
+    if (setjmp(I->jmp)) { value_release(out);
+        memcpy(I->jmp, saved, sizeof(jmp_buf)); longjmp(I->jmp, 1); }
     for (size_t k = 0; k < n; k++) {
         Value av = aa ? arr_get(as_arr(a), k) : a;
         Value bv = ba ? arr_get(as_arr(b), k) : b;
         arr_set(o, k, scalar_cmp(I, op, av, bv));
     }
+    memcpy(I->jmp, saved, sizeof(jmp_buf));
     return out;
 }
 
@@ -450,9 +474,13 @@ static Value mldivide(Interp *I, Value A, Value B)
 /* B / A solves X A = B, i.e. X = (A' \ B')' with plain transposes. */
 static Value mrdivide(Interp *I, Value num, Value den)
 {
-    Value At = transpose(I, den, false);
+    Value At = transpose(I, den, false);   /* pre-setjmp: handler releases them */
     Value Bt = transpose(I, num, false);
-    Value Xt = mldivide(I, At, Bt);
+    jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
+    if (setjmp(I->jmp)) { value_release(At); value_release(Bt);
+        memcpy(I->jmp, saved, sizeof(jmp_buf)); longjmp(I->jmp, 1); }
+    Value Xt = mldivide(I, At, Bt);        /* may raise: shape mismatch, singular */
+    memcpy(I->jmp, saved, sizeof(jmp_buf));
     Value X  = transpose(I, Xt, false);
     value_release(At); value_release(Bt); value_release(Xt);
     return X;
@@ -468,6 +496,22 @@ static Value identity(uint32_t n)
 
 /* A^p for square A and integer p: exponentiation by squaring; p<0 inverts first
  * (A^-1 = A \ I), p==0 is the identity. */
+static Value identity(uint32_t n);
+static Value mldivide(Interp *I, Value A, Value B);
+
+/* A^-1 as A \ I with the identity released even when mldivide raises. */
+static Value inv_via_solve(Interp *I, Value A, uint32_t n)
+{
+    Value id = identity(n);
+    jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
+    if (setjmp(I->jmp)) { value_release(id);
+        memcpy(I->jmp, saved, sizeof(jmp_buf)); longjmp(I->jmp, 1); }
+    Value r = mldivide(I, A, id);
+    memcpy(I->jmp, saved, sizeof(jmp_buf));
+    value_release(id);
+    return r;
+}
+
 static Value mpow(Interp *I, Value base, Value e)
 {
     if (!is_array(base)) runtime_error(I, "matrix power: base must be a matrix");
@@ -480,7 +524,7 @@ static Value mpow(Interp *I, Value base, Value e)
     int64_t p = e.as.i;
 
     Value acc;
-    if (p < 0) { Value id = identity(n); acc = mldivide(I, base, id); value_release(id); p = -p; }
+    if (p < 0) { acc = inv_via_solve(I, base, n); p = -p; }
     else       acc = value_retain(base);
 
     Value result = identity(n);
@@ -647,7 +691,9 @@ Value do_index(Interp *I, Value target, Value *idx, uint32_t argc, uint8_t colon
         runtime_error(I, "value of type %s is not indexable", type_name(target.kind));
     ArrObj *a = as_arr(target);
 
-    int64_t *sel0 = nullptr, *sel1 = nullptr;
+    /* volatile: assigned after setjmp, read in the handler — without it -O2
+     * register-caches them and the handler frees stale values (found by LSan) */
+    int64_t *volatile sel0 = nullptr; int64_t *volatile sel1 = nullptr;
     jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
     if (setjmp(I->jmp)) { free(sel0); free(sel1);
         memcpy(I->jmp, saved, sizeof(jmp_buf)); longjmp(I->jmp, 1); }
@@ -728,7 +774,9 @@ Value do_index_set(Interp *I, Value target, Value *idx, uint32_t argc,
         runtime_error(I, "value of type %s is not indexable", type_name(target.kind));
     ArrObj *a = as_arr(target);
 
-    int64_t *sel0 = nullptr, *sel1 = nullptr;
+    /* volatile: assigned after setjmp, read in the handler — without it -O2
+     * register-caches them and the handler frees stale values (found by LSan) */
+    int64_t *volatile sel0 = nullptr; int64_t *volatile sel1 = nullptr;
     jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
     if (setjmp(I->jmp)) { free(sel0); free(sel1);
         memcpy(I->jmp, saved, sizeof(jmp_buf)); longjmp(I->jmp, 1); }
@@ -875,20 +923,31 @@ Value make_range(Interp *I, Value sv, Value ev, Value stv)   /* non-consuming; r
 
     bool all_int = sv.kind == VAL_INT && ev.kind == VAL_INT && stv.kind == VAL_INT;
     Value out;
+    const int64_t RANGE_MAX = 100000000;               /* 1e8 elements, ~800 MB */
     if (all_int) {
         int64_t s = sv.as.i, st = stv.as.i, e = ev.as.i;
         if (st == 0) runtime_error(I, "range step cannot be zero");
-        int64_t count = 0;
-        if (st > 0 && e >= s) count = (e - s) / st + 1;
-        else if (st < 0 && e <= s) count = (s - e) / (-st) + 1;
+        uint64_t count = 0;
+        /* span and count stay in uint64 throughout: extreme bounds overflow int64 */
+        if (st > 0 && e >= s)      count = ((uint64_t)e - (uint64_t)s) / (uint64_t)st + 1;
+        else if (st < 0 && e <= s) count = ((uint64_t)s - (uint64_t)e) / (uint64_t)-st + 1;
+        if (count > (uint64_t)RANGE_MAX)
+            runtime_error(I, "range too large: %llu elements (limit %lld)",
+                          (unsigned long long)count, (long long)RANGE_MAX);
         out = val_array(ELT_INT, 1, (uint32_t)count);
-        for (int64_t k = 0; k < count; k++) ((int64_t *)as_arr(out)->data)[k] = s + k * st;
+        for (uint64_t k = 0; k < count; k++)
+            ((int64_t *)as_arr(out)->data)[k] = (int64_t)((uint64_t)s + k * (uint64_t)st);
     } else {
         double s = as_double(sv), st = as_double(stv), e = as_double(ev);
         if (st == 0.0) runtime_error(I, "range step cannot be zero");
         int64_t count = 0;
         double span = (e - s) / st;
-        if (span >= 0) count = (int64_t)(span + 1e-9) + 1;
+        if (span >= 0) {                               /* NaN span -> empty range */
+            if (span > (double)RANGE_MAX)              /* check before the cast: double->int64 */
+                runtime_error(I, "range too large: about %.3g elements (limit %lld)",   /* out of range is UB */
+                              span, (long long)RANGE_MAX);
+            count = (int64_t)(span + 1e-9) + 1;
+        }
         out = val_array(ELT_FLOAT, 1, (uint32_t)count);
         for (int64_t k = 0; k < count; k++) ((double *)as_arr(out)->data)[k] = s + (double)k * st;
     }
@@ -1075,7 +1134,10 @@ static Value sc_min(Interp *I, Value a, Value b);   /* defined later */
 static Value sc_max(Interp *I, Value a, Value b);
 static Value numify(Value e);
 static bool  elt_nonzero(Value e);
+#define DIM_MAX 100000000LL                               /* 1e8 elements per array */
 static int64_t as_count(Interp *I, Value v, const char *name);
+static int64_t as_dim(Interp *I, Value v, const char *name);
+static void check_cells(Interp *I, int64_t r, int64_t c, const char *name);
 
 static Value fold_add(Interp *I, Value a, Value x) { return scalar_arith_k(I, AR_ADD, a, numify(x)); }
 static Value fold_mul(Interp *I, Value a, Value x) { return scalar_arith_k(I, AR_MUL, a, numify(x)); }
@@ -1227,6 +1289,8 @@ static Value fill_array(Interp *I, Value *args, double fill)
         runtime_error(I, "dimensions must be Int");
     int64_t r = args[0].as.i, c = args[1].as.i;
     if (r < 0 || c < 0) runtime_error(I, "dimensions must be non-negative");
+    if (r > DIM_MAX || c > DIM_MAX) runtime_error(I, "dimension too large (limit %lld)", (long long)DIM_MAX);
+    check_cells(I, r, c, "zeros/ones");
     Value out = val_array(ELT_FLOAT, (uint32_t)r, (uint32_t)c);
     size_t nn = (size_t)r * c;
     for (size_t k = 0; k < nn; k++) ((double *)as_arr(out)->data)[k] = fill;
@@ -2281,7 +2345,10 @@ static Value bi_eye(Interp *I, Value *args, uint32_t n)
 {
     (void)n;
     if (args[0].kind != VAL_INT || args[0].as.i < 0) runtime_error(I, "eye: size must be a non-negative Int");
-    return identity((uint32_t)args[0].as.i);
+    int64_t d = args[0].as.i;
+    if (d > DIM_MAX) runtime_error(I, "eye: size %lld too large (limit %lld)", (long long)d, (long long)DIM_MAX);
+    check_cells(I, d, d, "eye");
+    return identity((uint32_t)d);
 }
 
 static Value bi_diag(Interp *I, Value *args, uint32_t n)
@@ -2292,6 +2359,7 @@ static Value bi_diag(Interp *I, Value *args, uint32_t n)
     EltType et = a->elt == ELT_BOOL ? ELT_INT : a->elt;
     if (a->rows == 1 || a->cols == 1) {              /* vector -> diagonal matrix */
         uint32_t len = a->rows * a->cols;
+        check_cells(I, (int64_t)len, (int64_t)len, "diag");
         Value out = val_array(et, len, len);
         for (uint32_t k = 0; k < len; k++) arr_set(as_arr(out), (size_t)k * len + k, arr_get(a, k));
         return out;
@@ -2354,10 +2422,7 @@ static Value bi_inv(Interp *I, Value *args, uint32_t n)
     if (!is_array(args[0])) runtime_error(I, "inv: expected a square matrix");
     ArrObj *a = as_arr(args[0]);
     if (a->rows != a->cols) runtime_error(I, "inv: matrix must be square (got %ux%u)", a->rows, a->cols);
-    Value id = identity(a->rows);
-    Value r = mldivide(I, args[0], id);     /* A \ I */
-    value_release(id);
-    return r;
+    return inv_via_solve(I, args[0], a->rows);
 }
 
 static Value bi_dot(Interp *I, Value *args, uint32_t n)
@@ -2418,6 +2483,8 @@ static Value bi_linspace(Interp *I, Value *args, uint32_t n)
     if (!is_num(args[0]) || args[0].kind == VAL_COMPLEX || !is_num(args[1]) || args[1].kind == VAL_COMPLEX)
         runtime_error(I, "linspace: endpoints must be real numbers");
     if (args[2].kind != VAL_INT || args[2].as.i < 1) runtime_error(I, "linspace: count must be a positive Int");
+    if (args[2].as.i > DIM_MAX)
+        runtime_error(I, "linspace: count %lld too large (limit %lld)", (long long)args[2].as.i, (long long)DIM_MAX);
     double a = as_double(args[0]), b = as_double(args[1]);
     uint32_t cnt = (uint32_t)args[2].as.i;
     Value out = val_array(ELT_FLOAT, 1, cnt);
@@ -3807,8 +3874,28 @@ static bool elt_nonzero(Value e)
 static int64_t as_count(Interp *I, Value v, const char *name)
 {
     if (v.kind == VAL_INT) return v.as.i;
-    if (v.kind == VAL_FLOAT && v.as.f == (double)(int64_t)v.as.f) return (int64_t)v.as.f;
+    if (v.kind == VAL_FLOAT
+        && v.as.f >= -9.2e18 && v.as.f <= 9.2e18          /* the cast is UB out of int64 range */
+        && v.as.f == (double)(int64_t)v.as.f) return (int64_t)v.as.f;
     runtime_error(I, "%s: expected an integer count", name);
+}
+
+/* A single array dimension: integer, 0 <= d <= DIM_MAX. */
+static int64_t as_dim(Interp *I, Value v, const char *name)
+{
+    int64_t d = as_count(I, v, name);
+    if (d < 0) runtime_error(I, "%s: negative size", name);
+    if (d > DIM_MAX)
+        runtime_error(I, "%s: dimension %lld too large (limit %lld)", name, (long long)d, (long long)DIM_MAX);
+    return d;
+}
+
+/* Guard the r x c product before any allocation. */
+static void check_cells(Interp *I, int64_t r, int64_t c, const char *name)
+{
+    if ((uint64_t)r * (uint64_t)c > (uint64_t)DIM_MAX)
+        runtime_error(I, "%s: result too large (%lld x %lld, limit %lld elements)",
+                      name, (long long)r, (long long)c, (long long)DIM_MAX);
 }
 
 static Value bi_length(Interp *I, Value *args, uint32_t n)
@@ -3966,13 +4053,14 @@ static Value bi_diff(Interp *I, Value *args, uint32_t n)
 static Value bi_repmat(Interp *I, Value *args, uint32_t n)
 {
     Value v = args[0];
-    int64_t M = as_count(I, args[1], "repmat");
-    int64_t N = (n == 3) ? as_count(I, args[2], "repmat") : M;
+    int64_t M = as_dim(I, args[1], "repmat");
+    int64_t N = (n == 3) ? as_dim(I, args[2], "repmat") : M;
     if (M < 0 || N < 0) runtime_error(I, "repmat: negative tile count");
     bool arr = is_array(v);
     uint32_t R = arr ? as_arr(v)->rows : 1, C = arr ? as_arr(v)->cols : 1;
     EltType relt = arr ? as_arr(v)->elt : scalar_elt(I, v);
-    uint32_t OR = (uint32_t)(R * (uint32_t)M), OC = (uint32_t)(C * (uint32_t)N);
+    check_cells(I, (int64_t)R * M, (int64_t)C * N, "repmat");   /* also bounds each side */
+    uint32_t OR = (uint32_t)((int64_t)R * M), OC = (uint32_t)((int64_t)C * N);
     Value out = val_array(relt, OR, OC); ArrObj *o = as_arr(out);
     for (uint32_t i = 0; i < OR; i++)
         for (uint32_t j = 0; j < OC; j++)
@@ -4010,9 +4098,9 @@ static void rng_dims(Interp *I, Value *args, uint32_t n, uint32_t off,
 {
     uint32_t nd = n - off;
     if (nd == 0) { *rows = *cols = 1; return; }
-    int64_t r = as_count(I, args[off], name);
-    int64_t c = (nd >= 2) ? as_count(I, args[off + 1], name) : r;   /* one dim -> square */
-    if (r < 0 || c < 0) runtime_error(I, "%s: negative size", name);
+    int64_t r = as_dim(I, args[off], name);
+    int64_t c = (nd >= 2) ? as_dim(I, args[off + 1], name) : r;   /* one dim -> square */
+    check_cells(I, r, c, name);
     *rows = (uint32_t)r; *cols = (uint32_t)c;
 }
 
