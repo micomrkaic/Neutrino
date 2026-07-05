@@ -12,6 +12,11 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **Examples in `help`.** `help(f)` now shows one or two usage examples with
+  their actual output for every builtin (113 of them). Examples marked `%=` in
+  the doc table are executed and compared by `tests/run_examples.sh` on every
+  `make test` — the initial authoring pass had 11 wrong claimed outputs, all
+  caught by the verifier before shipping.
 - **Solvers: `fzero`, `fminbnd`, `integral`.** The first builtins that call
   back into the language — `call_value` re-enters the VM per evaluation, so
   the function argument can be a closure (capturing data: `fzero(npv, ...)`)

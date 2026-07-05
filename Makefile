@@ -70,6 +70,7 @@ test: vmtest $(BIN)
 	@bash tests/run_dis.sh
 	@bash tests/run_manual.sh
 	@bash tests/run_plot.sh
+	@bash tests/run_examples.sh
 
 # Same corpus, every input run under AddressSanitizer/UBSan; fails on any leak.
 test-asan: vmtest-asan

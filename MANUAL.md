@@ -64,13 +64,24 @@ apply to scripts — they are REPL features.
 
 | Command | Effect |
 |---|---|
-| `help` / `help(f)` | catalogue of all builtins / details on one |
+| `help` / `help(f)` | catalogue of all builtins / details plus usage examples for one |
 | `who` | your variables, with type and shape |
 | `format …` | number display: `format long`, `format short e`, `format(8)`, `format` to show |
 | `pretty on\|off` | aligned multi-line matrix display (default on in the REPL) |
 | `more on\|off` | page long output through `$PAGER` (default off) |
 | `!cmd` | run a shell command (`!ls`, `!git status`) |
 | `dis(f)` | disassemble a function's bytecode |
+
+Every builtin's help includes executable examples with their actual output —
+the examples are machine-verified against the interpreter, like this manual:
+
+```
+neutrino> help(median)
+  median(A) | median(A, dim)
+      median of all elements, or along dim
+      builtin, 1 to 2 arguments
+      e.g.  median([1, 2, 3, 4])              % 2.5
+```
 
 **Autocall.** A bare name that is a zero-argument builtin or closure is called:
 `who`, `help`, `rand` work without parentheses, and so does your own `let f =
