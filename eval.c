@@ -1,5 +1,6 @@
 /* eval.c — Neutrino tree-walking evaluator. */
 #define _XOPEN_SOURCE 700         /* open_memstream + jn/yn Bessel (superset of POSIX.1-2008) */
+#include <errno.h>
 #include <time.h>
 #include "eval.h"
 #include <stdlib.h>
@@ -1275,6 +1276,9 @@ static const BuiltinDoc builtin_docs[] = {
     { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" },
     { "dis",   "dis(f)",            "disassemble a function's bytecode (compiler/VM introspection)", "core" },
+    { "readcsv", "readcsv(file[, opts])", "numeric CSV -> Float matrix; empty cells are nan; opts: {delim, skip}", "io" },
+    { "writecsv","writecsv(file, A[, opts])", "matrix -> CSV, full precision (round-trips); opts: {delim}", "io" },
+    { "readtable","readtable(file[, opts])", "CSV with a header -> record of column vectors named from the header", "io" },
     { "plot",  "plot(y) | plot(x, y) | plot(x, Y, opts)", "line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange}", "plot" },
     { "hist",  "hist(y[, nbins][, opts])", "histogram via gnuplot; opts as in plot (yrange = [0, m] to anchor the axis)", "plot" },
     { "format","format / format(m)", "show or set number display: \"short\", \"long\", \"short e\", or a digit count", "core" },
@@ -1422,6 +1426,277 @@ static Value bi_dis(Interp *I, Value *args, uint32_t n)
     if (v.kind == VAL_BUILTIN) { fprintf(vout(), "<builtin %s: native code, no bytecode>\n", as_blt(v)->name); return val_null(); }
     if (v.kind != VAL_CLOSURE) runtime_error(I, "dis: expected a function, got %s", type_name(v.kind));
     chunk_disassemble(vout(), as_clo(v)->chunk, "fn");
+    return val_null();
+}
+
+/* ------------------------------------------------------------------ */
+/* data file I/O: readcsv / writecsv / readtable                       */
+/* ------------------------------------------------------------------ */
+
+static Value rec_field(RecObj *r, const char *name);   /* defined with plotting */
+
+static const char *want_str(Interp *I, Value v, const char *who)
+{
+    if (v.kind != VAL_STRING) runtime_error(I, "%s: expected a filename string, got %s", who, type_name(v.kind));
+    return as_str(v)->data;   /* StrObj data is NUL-terminated */
+}
+
+/* Split one CSV line in place; returns field count, fields[] point into line. */
+static uint32_t csv_split(char *line, char delim, char **fields, uint32_t max)
+{
+    uint32_t n = 0;
+    char *p = line;
+    fields[n++] = p;
+    for (; *p; p++)
+        if (*p == delim) {
+            *p = '\0';
+            if (n >= max) return n;
+            fields[n++] = p + 1;
+        }
+    return n;
+}
+
+/* Parse one cell: empty/whitespace -> nan; else full strtod or error. */
+static double csv_cell(Interp *I, const char *cell, size_t row, uint32_t col, const char *who)
+{
+    const char *p = cell;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p == '\0') return NAN;                       /* missing value */
+    char *end;
+    double v = strtod(p, &end);
+    while (*end == ' ' || *end == '\t') end++;
+    if (*end != '\0')
+        runtime_error(I, "%s: row %zu, column %u: '%s' is not numeric", who, row, col, cell);
+    return v;
+}
+
+typedef struct { char **lines; size_t n; char *buf; } CsvLines;
+
+/* Read the whole file into NUL-terminated lines, CRLF-tolerant, blank lines
+ * skipped. Caller frees lines[0] (one block) and lines. */
+static CsvLines csv_read_lines(Interp *I, const char *path, const char *who)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) runtime_error(I, "%s: cannot open '%s': %s", who, path, strerror(errno));
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    if (sz < 0) { fclose(f); runtime_error(I, "%s: cannot read '%s'", who, path); }
+    if (sz > (1L << 30)) { fclose(f); runtime_error(I, "%s: '%s' is larger than 1 GiB", who, path); }
+    rewind(f);
+    char *buf = malloc((size_t)sz + 1);
+    if (!buf) abort();
+    size_t got = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    buf[got] = '\0';
+    size_t cap = 256, n = 0;
+    char **lines = malloc(cap * sizeof *lines);
+    if (!lines) abort();
+    char *p = buf;
+    while (*p) {
+        char *nl = strchr(p, '\n');
+        char *endp = nl ? nl : p + strlen(p);
+        if (endp > p && endp[-1] == '\r') endp[-1] = '\0';
+        if (nl) *nl = '\0';
+        if (*p != '\0') {                              /* skip blank lines */
+            if (n == cap) { cap *= 2; lines = realloc(lines, cap * sizeof *lines); if (!lines) abort(); }
+            lines[n++] = p;
+        }
+        p = nl ? nl + 1 : endp;
+    }
+    if (n == 0) { free(buf); free(lines); runtime_error(I, "%s: '%s' is empty", who, path); }
+    return (CsvLines){ lines, n, buf };
+}
+
+static void csv_free(CsvLines *c) { free(c->buf); free(c->lines); }
+
+/* Shared option extraction: {delim = ";", skip = n}. */
+static void csv_opts(Interp *I, Value opts, char *delim, int64_t *skip, const char *who)
+{
+    *delim = ','; *skip = 0;
+    if (opts.kind == VAL_NULL) return;
+    if (opts.kind != VAL_RECORD) runtime_error(I, "%s: options must be a record", who);
+    RecObj *o = as_rec(opts);
+    Value v;
+    if ((v = rec_field(o, "delim")).kind != VAL_NULL) {
+        if (v.kind != VAL_STRING || as_str(v)->len != 1)
+            runtime_error(I, "%s: delim must be a single-character string", who);
+        *delim = as_str(v)->data[0];
+    }
+    if ((v = rec_field(o, "skip")).kind != VAL_NULL) {
+        if (v.kind != VAL_INT || v.as.i < 0) runtime_error(I, "%s: skip must be a non-negative integer", who);
+        *skip = v.as.i;
+    }
+}
+
+#define CSV_MAX_COLS 100000
+
+/* readcsv(file[, opts]) -> Float matrix; empty cells are nan. */
+static Value bi_readcsv(Interp *I, Value *args, uint32_t n)
+{
+    const char *path = want_str(I, args[0], "readcsv");
+    char delim; int64_t skip;
+    csv_opts(I, n >= 2 ? args[1] : val_null(), &delim, &skip, "readcsv");
+    CsvLines c = csv_read_lines(I, path, "readcsv");
+    static_assert(sizeof(Value) <= 32, "Value copied in setjmp handler");
+    volatile Value out_v = { 0 };                      /* volatile: written after setjmp */
+    jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
+    if (setjmp(I->jmp)) {
+        Value o; memcpy(&o, (const void *)&out_v, sizeof o);
+        if (o.kind != VAL_NULL) value_release(o);
+        csv_free(&c); memcpy(I->jmp, saved, sizeof(jmp_buf)); longjmp(I->jmp, 1);
+    }
+    if ((size_t)skip >= c.n) runtime_error(I, "readcsv: skip = %lld leaves no data", (long long)skip);
+    size_t first = (size_t)skip, rows = c.n - first;
+    static char *fields[CSV_MAX_COLS];
+    uint32_t cols = csv_split(c.lines[first], delim, fields, CSV_MAX_COLS);
+    if ((double)rows * cols > 1e8) runtime_error(I, "readcsv: '%s' is too large (%zu x %u)", path, rows, cols);
+    Value out = val_array(ELT_FLOAT, (uint32_t)rows, cols);
+    memcpy((void *)&out_v, &out, sizeof out);
+    double *od = (double *)as_arr(out)->data;
+    for (uint32_t j = 0; j < cols; j++) od[j] = csv_cell(I, fields[j], first + 1, j + 1, "readcsv");
+    for (size_t r = 1; r < rows; r++) {
+        uint32_t k = csv_split(c.lines[first + r], delim, fields, CSV_MAX_COLS);
+        if (k != cols)
+            runtime_error(I, "readcsv: row %zu has %u fields, expected %u", first + r + 1, k, cols);
+        for (uint32_t j = 0; j < cols; j++)
+            od[r * cols + j] = csv_cell(I, fields[j], first + r + 1, j + 1, "readcsv");
+    }
+    memcpy(I->jmp, saved, sizeof(jmp_buf));
+    csv_free(&c);
+    return out;
+}
+
+/* Sanitize a header cell into a record key: lowercase, [a-z0-9_], leading
+ * digit prefixed, empty -> cN. Returns strdup'd string. */
+static char *csv_key(const char *cell, uint32_t idx)
+{
+    while (*cell == ' ' || *cell == '\t' || *cell == '"') cell++;
+    size_t len = strlen(cell);
+    while (len && (cell[len-1] == ' ' || cell[len-1] == '\t' || cell[len-1] == '"')) len--;
+    char *k = malloc(len + 8);
+    if (!k) abort();
+    size_t w = 0;
+    for (size_t i = 0; i < len; i++) {
+        char ch = cell[i];
+        if (ch >= 'A' && ch <= 'Z') ch = (char)(ch - 'A' + 'a');
+        if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) k[w++] = ch;
+        else if (w && k[w-1] != '_') k[w++] = '_';
+    }
+    while (w && k[w-1] == '_') w--;
+    if (w == 0) { snprintf(k, len + 8, "c%u", idx + 1); return k; }
+    if (k[0] >= '0' && k[0] <= '9') { memmove(k + 1, k, w); k[0] = 'c'; w++; }
+    k[w] = '\0';
+    return k;
+}
+
+/* readtable(file[, opts]) -> record of column vectors, keys from the header. */
+static Value bi_readtable(Interp *I, Value *args, uint32_t n)
+{
+    const char *path = want_str(I, args[0], "readtable");
+    char delim; int64_t skip;
+    csv_opts(I, n >= 2 ? args[1] : val_null(), &delim, &skip, "readtable");
+    CsvLines c = csv_read_lines(I, path, "readtable");
+    /* volatile: these are written after setjmp and read in the handler —
+     * without it -O2 register-caches them and longjmp restores garbage */
+    char **volatile keys = nullptr;
+    volatile uint32_t cols = 0;
+    jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
+    if (setjmp(I->jmp)) {
+        char **k = keys;
+        if (k) { for (uint32_t j = 0; j < cols; j++) free(k[j]); free(k); }
+        csv_free(&c); memcpy(I->jmp, saved, sizeof(jmp_buf)); longjmp(I->jmp, 1);
+    }
+    if ((size_t)skip + 1 >= c.n + (c.n ? 0 : 1) && (size_t)skip + 1 > c.n)
+        runtime_error(I, "readtable: skip = %lld leaves no header", (long long)skip);
+    size_t hline = (size_t)skip;
+    if (hline + 1 > c.n) runtime_error(I, "readtable: no data rows after the header");
+    static char *fields[CSV_MAX_COLS];
+    cols = csv_split(c.lines[hline], delim, fields, CSV_MAX_COLS);
+    size_t rows = c.n - hline - 1;
+    if (rows == 0) runtime_error(I, "readtable: no data rows after the header");
+    if ((double)rows * cols > 1e8) runtime_error(I, "readtable: '%s' is too large", path);
+    keys = calloc(cols, sizeof *keys);
+    if (!keys) abort();
+    for (uint32_t j = 0; j < cols; j++) {
+        keys[j] = csv_key(fields[j], j);
+        for (uint32_t i = 0; i < j; i++)              /* dedupe: append _2, _3, ... */
+            if (strcmp(keys[i], keys[j]) == 0) {
+                char *nk = malloc(strlen(keys[j]) + 12);
+                if (!nk) abort();
+                snprintf(nk, strlen(keys[j]) + 12, "%s_%u", keys[j], j + 1);
+                free(keys[j]); keys[j] = nk;
+                break;
+            }
+    }
+    Value *colv = calloc(cols, sizeof *colv);
+    if (!colv) abort();
+    for (uint32_t j = 0; j < cols; j++) colv[j] = val_array(ELT_FLOAT, (uint32_t)rows, 1);
+    for (size_t r = 0; r < rows; r++) {
+        uint32_t k = csv_split(c.lines[hline + 1 + r], delim, fields, CSV_MAX_COLS);
+        if (k != cols) {
+            for (uint32_t j = 0; j < cols; j++) value_release(colv[j]);
+            free(colv);
+            runtime_error(I, "readtable: row %zu has %u fields, expected %u", hline + r + 2, k, cols);
+        }
+        for (uint32_t j = 0; j < cols; j++) {
+            const char *cell = fields[j];
+            const char *p = cell;
+            while (*p == ' ' || *p == '\t') p++;
+            double v;
+            if (*p == '\0') v = NAN;
+            else {
+                char *end;
+                v = strtod(p, &end);
+                while (*end == ' ' || *end == '\t') end++;
+                if (*end != '\0') {
+                    for (uint32_t jj = 0; jj < cols; jj++) value_release(colv[jj]);
+                    free(colv);
+                    runtime_error(I, "readtable: column '%s', row %zu: '%s' is not numeric "
+                                     "(string columns need first-class strings — not yet in the language)",
+                                  keys[j], hline + r + 2, cell);
+                }
+            }
+            ((double *)as_arr(colv[j])->data)[r] = v;
+        }
+    }
+    memcpy(I->jmp, saved, sizeof(jmp_buf));
+    Value rec = val_record(cols);
+    RecObj *o = as_rec(rec);
+    o->owns_keys = true;
+    for (uint32_t j = 0; j < cols; j++) {
+        o->keys[j] = keys[j];
+        o->keylens[j] = (uint32_t)strlen(keys[j]);
+        o->vals[j] = colv[j];
+    }
+    free(keys); free(colv);
+    csv_free(&c);
+    return rec;
+}
+
+/* writecsv(file, A[, opts]) -> null; full-precision %.17g, Int stays integral. */
+static Value bi_writecsv(Interp *I, Value *args, uint32_t n)
+{
+    const char *path = want_str(I, args[0], "writecsv");
+    Value av = args[1];
+    char delim; int64_t skip;
+    csv_opts(I, n >= 3 ? args[2] : val_null(), &delim, &skip, "writecsv");
+    if (!is_array(av) && !is_num(av)) runtime_error(I, "writecsv: expected a matrix, got %s", type_name(av.kind));
+    if (is_num(av)) runtime_error(I, "writecsv: expected a matrix (wrap a scalar as [x])");
+    ArrObj *a = as_arr(av);
+    if (a->elt == ELT_COMPLEX) runtime_error(I, "writecsv: complex matrices are not CSV-representable");
+    FILE *f = fopen(path, "wb");
+    if (!f) runtime_error(I, "writecsv: cannot open '%s': %s", path, strerror(errno));
+    for (uint32_t r = 0; r < a->rows; r++) {
+        for (uint32_t col = 0; col < a->cols; col++) {
+            if (col) fputc(delim, f);
+            Value e = arr_get(a, (size_t)r * a->cols + col);
+            if (e.kind == VAL_INT)       fprintf(f, "%lld", (long long)e.as.i);
+            else if (e.kind == VAL_BOOL) fprintf(f, "%d", e.as.b ? 1 : 0);
+            else                         fprintf(f, "%.17g", e.as.f);
+        }
+        fputc('\n', f);
+    }
+    if (fclose(f) != 0) runtime_error(I, "writecsv: write to '%s' failed: %s", path, strerror(errno));
     return val_null();
 }
 
@@ -3746,6 +4021,9 @@ EnvObj *globals_new(void)
     def_builtin(e, "help",  bi_help,  0, 1);
     def_builtin(e, "system",bi_system,1, 1);
     def_builtin(e, "dis",   bi_dis,   1, 1);
+    def_builtin(e, "readcsv",  bi_readcsv,  1, 2);
+    def_builtin(e, "writecsv", bi_writecsv, 2, 3);
+    def_builtin(e, "readtable",bi_readtable,1, 2);
     def_builtin(e, "plot",  bi_plot,  1, 3);
     def_builtin(e, "hist",  bi_hist,  1, 3);
     def_builtin(e, "format",bi_format,0, 1);

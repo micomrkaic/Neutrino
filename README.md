@@ -558,6 +558,8 @@ cov(X[, w]) | cov(x, y[, w])                        covariance matrix of columns
 corr(X) | corr(x, y)                                Pearson correlation matrix / scalar
 unique(A)                                           sorted distinct elements
 tic  toc()                                          wall-clock timing (monotonic)
+readcsv(f[, opts])  writecsv(f, A[, opts])          numeric CSV in/out (full-precision round trip)
+readtable(f[, opts])                                CSV with header -> record of named column vectors
 any(mask) all(mask)   logical reductions
 isnan(x) isinf(x) isfinite(x)   elementwise FP predicates -> logical
 

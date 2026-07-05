@@ -46,6 +46,7 @@ typedef struct {
     const char **keys;   /* non-owning: point into source */
     uint32_t    *keylens;
     Value       *vals;   /* owned refs */
+    bool         owns_keys;  /* readtable: keys are strdup'd, freed with the record */
 } RecObj;
 
 typedef struct EnvObj EnvObj;

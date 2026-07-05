@@ -12,6 +12,15 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **Data file I/O.** `readcsv(file[, opts])` reads numeric CSV into a Float
+  matrix (empty cells become `nan`; CRLF tolerated; `{delim, skip}` options);
+  `writecsv(file, A[, opts])` writes at full precision (`%.17g` — values
+  round-trip bit-exactly, Int columns stay integral). `readtable(file)` reads a
+  header-bearing CSV into a **record of column vectors** with keys sanitized
+  from the header (duplicates deduped) — a mini data frame using only existing
+  language machinery: `d.cpi[d.year >= 2021]` just works. String columns are
+  rejected by name until strings are first-class. Records can now own their
+  keys (`owns_keys`), enabling dynamically-named fields.
 - **`tic` / `toc()` and `unique(A)`.** Monotonic wall-clock timing, and sorted
   distinct elements (vectors keep orientation; matrices flatten to a row; NaNs
   compare unequal to themselves so all are kept, sorted last — the sort

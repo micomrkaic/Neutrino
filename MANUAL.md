@@ -23,10 +23,11 @@ instructions see the [README](README.md); for the honest list of sharp edges see
 11. [Special functions and statistics](#11-special-functions-and-statistics)
 12. [Random numbers](#12-random-numbers)
 13. [Plotting](#13-plotting)
-14. [Output and formatting](#14-output-and-formatting)
-15. [Scripts and tools](#15-scripts-and-tools)
-16. [Builtin reference](#16-builtin-reference)
-17. [Grammar summary](#17-grammar-summary)
+14. [Data files](#14-data-files)
+15. [Output and formatting](#15-output-and-formatting)
+16. [Scripts and tools](#16-scripts-and-tools)
+17. [Builtin reference](#17-builtin-reference)
+18. [Grammar summary](#18-grammar-summary)
 
 ---
 
@@ -437,7 +438,41 @@ NEUTRINO_PLOT_TERM="pngcairo size 800,500" NEUTRINO_PLOT_OUT=fig.png \
 terminal, which is occasionally exactly what you want.) Complex data is
 rejected — plot `real(z)`, `imag(z)`, or `abs(z)` explicitly.
 
-## 14. Output and formatting
+## 14. Data files
+
+`readcsv(file)` reads a numeric CSV into a Float matrix; `writecsv(file, A)`
+writes one at full precision, so values **round-trip bit-exactly**. Empty
+cells become `nan` (missing data), Windows line endings are tolerated, and
+`{delim = ";", skip = n}` options handle other separators and preamble lines.
+Ragged rows and non-numeric cells are errors that name the row and column.
+
+`readtable(file)` reads a CSV whose first line is a header and returns a
+**record of column vectors**, keys sanitized from the column names
+(`"GDP Growth (%)"` becomes `gdp_growth`; duplicates get `_2`, `_3`, ...).
+This is Neutrino's data frame — named columns plus the existing mask
+machinery:
+
+```
+neutrino> writecsv("/tmp/m.csv", [1, 2; 3, 4]); readcsv("/tmp/m.csv")
+[ 1  2
+  3  4 ]
+```
+
+```
+neutrino> let d = readtable("tests/data/macro.csv")
+neutrino> mean(d.gdp_growth)
+1.93333
+neutrino> d.cpi[d.year >= 2021]
+[  nan
+     8 ]
+```
+
+For a headerless file use `readcsv` — `readtable` will take the first line as
+a header regardless of its content. A column containing text (country names,
+tickers) is rejected with an error naming the column: representing it needs
+first-class strings, which the language does not yet have.
+
+## 15. Output and formatting
 
 `format` controls how numbers print. Explicitly chosen formats keep trailing
 zeros for consistent width; the startup default is terse:
@@ -463,7 +498,7 @@ Strings print without quotes in `print`; the REPL echo shows them quoted (the
 echo is a representation, `print` is output). `pretty on|off` toggles the
 aligned matrix display; `more on` pages long output.
 
-## 15. Scripts and tools
+## 16. Scripts and tools
 
 `neutrino file.nu` runs a script (top level is a statement sequence; `#`/`%`
 comments). The binary also exposes the compiler pipeline:
@@ -489,7 +524,7 @@ line and echoes each result, so `printf 'sum(1:100)\n' | ./vmtest` prints
 (`make test`) and its ASan twin (`make test-asan`) are how changes prove
 themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 
-## 16. Builtin reference
+## 17. Builtin reference
 
 *Generated from the interpreter's own documentation table (the same data
 `help` shows), so it cannot drift from the implementation.*
@@ -509,6 +544,14 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `numel(x)` | number of elements (rows*cols) |
 | `tic` | start the wall-clock timer (monotonic) |
 | `toc` | seconds elapsed since tic |
+
+### Data files
+
+| Signature | Description |
+|---|---|
+| `readcsv(file[, opts])` | numeric CSV -> Float matrix; empty cells are nan; opts: {delim, skip} |
+| `writecsv(file, A[, opts])` | matrix -> CSV, full precision (round-trips); opts: {delim} |
+| `readtable(file[, opts])` | CSV with a header -> record of column vectors named from the header |
 
 ### Plotting
 
@@ -661,7 +704,7 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 |---|---|
 | `map(f, A)` | apply f to each element of A, returning an array of results |
 
-## 17. Grammar summary
+## 18. Grammar summary
 
 Reserved words: `let in fn if then else end true false null for while do break
 continue return`.

@@ -1,0 +1,35 @@
+# Data file I/O. Round-trip goldens write to mktemp-safe /tmp paths.
+writecsv("/tmp/nu_io1.csv", [1.5, -2.25e-10; 3, 0.1]); readcsv("/tmp/nu_io1.csv") == [1.5, -2.25e-10; 3, 0.1]
+=> [true, true; true, true]
+writecsv("/tmp/nu_io2.csv", [1, -2; 3, 4]); readcsv("/tmp/nu_io2.csv")
+=> [1, -2; 3, 4]
+writecsv("/tmp/nu_io3.csv", [1, 2; 3, 4], {delim = ";"}); readcsv("/tmp/nu_io3.csv", {delim = ";"})
+=> [1, 2; 3, 4]
+# readtable: header-named columns, sanitized keys, dedupe, missing cell -> nan
+let d = readtable("tests/data/macro.csv"); d.year
+=> [2020; 2021; 2022]
+let d = readtable("tests/data/macro.csv"); d.gdp_growth
+=> [-2.2; 5.9; 2.1]
+let d = readtable("tests/data/macro.csv"); d.cpi
+=> [1.2; nan; 8]
+let d = readtable("tests/data/macro.csv"); d.year_4
+=> [1; 2; 3]
+let d = readtable("tests/data/macro.csv"); d.cpi[d.year >= 2021]
+=> [nan; 8]
+readcsv("tests/data/macro.csv", {skip = 1})
+=> [2020, -2.2, 1.2, 1; 2021, 5.9, nan, 2; 2022, 2.1, 8, 3]
+# errors
+readcsv("/nonexistent_nu.csv")
+=> !cannot open
+readcsv(42)
+=> !expected a filename string
+writecsv("/tmp/nu_io4.csv", [1i, 2])
+=> !not CSV-representable
+readtable("/tmp/nu_io2.csv", {delim = "??"})
+=> !single-character
+readcsv("tests/data/bad.csv")
+=> !'abc' is not numeric
+readcsv("tests/data/ragged.csv")
+=> !has 1 fields, expected 2
+readtable("tests/data/bad.csv")
+=> !string columns need first-class strings

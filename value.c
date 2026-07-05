@@ -112,6 +112,8 @@ static void obj_free(Obj *o)
     case VAL_RECORD: {
         RecObj *r = (RecObj *)o;
         for (uint32_t i = 0; i < r->count; i++) value_release(r->vals[i]);
+        if (r->owns_keys)
+            for (uint32_t i = 0; i < r->count; i++) free((char *)r->keys[i]);
         free(r->keys); free(r->keylens); free(r->vals);
         break;
     }
