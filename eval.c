@@ -1,6 +1,7 @@
 /* eval.c — Neutrino tree-walking evaluator. */
 #define _XOPEN_SOURCE 700         /* open_memstream + jn/yn Bessel (superset of POSIX.1-2008) */
 #include <errno.h>
+#include <float.h>
 #include <time.h>
 #include "eval.h"
 #include <stdlib.h>
@@ -1276,6 +1277,9 @@ static const BuiltinDoc builtin_docs[] = {
     { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" },
     { "dis",   "dis(f)",            "disassemble a function's bytecode (compiler/VM introspection)", "core" },
+    { "fzero",   "fzero(f, a, b)",      "root of f in [a, b] (Brent; f(a), f(b) must differ in sign)", "solve" },
+    { "fminbnd", "fminbnd(f, a, b)",    "minimum of f on [a, b] (Brent) -> {x, fx}", "solve" },
+    { "integral","integral(f, a, b[, tol])", "definite integral (adaptive Simpson, finite limits; default tol 1e-10)", "solve" },
     { "readcsv", "readcsv(file[, opts])", "numeric CSV -> Float matrix; empty cells are nan; opts: {delim, skip}", "io" },
     { "writecsv","writecsv(file, A[, opts])", "matrix -> CSV, full precision (round-trips); opts: {delim}", "io" },
     { "readtable","readtable(file[, opts])", "CSV with a header -> record of column vectors named from the header", "io" },
@@ -1427,6 +1431,159 @@ static Value bi_dis(Interp *I, Value *args, uint32_t n)
     if (v.kind != VAL_CLOSURE) runtime_error(I, "dis: expected a function, got %s", type_name(v.kind));
     chunk_disassemble(vout(), as_clo(v)->chunk, "fn");
     return val_null();
+}
+
+/* ------------------------------------------------------------------ */
+/* solvers: fzero, fminbnd, integral (call back into the language)     */
+/* ------------------------------------------------------------------ */
+
+Value call_value(Interp *I, Value callee, Value *args, uint32_t n);
+static double want_real(Interp *I, Value v, const char *who);   /* defined in the special-functions section */
+static Value record2(const char *k1, Value v1, const char *k2, Value v2);
+
+/* Evaluate a user function at x; require a real scalar back. */
+static double call_f1(Interp *I, Value f, double x, const char *who)
+{
+    Value arg = val_float(x);
+    Value r = call_value(I, f, &arg, 1);
+    if (r.kind == VAL_INT)   return (double)r.as.i;
+    if (r.kind == VAL_FLOAT) return r.as.f;
+    ValueKind k = r.kind;
+    value_release(r);
+    runtime_error(I, "%s: f(x) must return a real scalar, got %s", who, type_name(k));
+}
+
+static void want_callable(Interp *I, Value f, const char *who)
+{
+    if (f.kind != VAL_CLOSURE && f.kind != VAL_BUILTIN)
+        runtime_error(I, "%s: expected a function, got %s", who, type_name(f.kind));
+}
+
+/* Brent's zeroin: root of f in [a, b], f(a) and f(b) of opposite sign. */
+static Value bi_fzero(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    Value f = args[0];
+    want_callable(I, f, "fzero");
+    double a = want_real(I, args[1], "fzero"), b = want_real(I, args[2], "fzero");
+    if (!(a < b)) runtime_error(I, "fzero: needs a < b");
+    double fa = call_f1(I, f, a, "fzero"), fb = call_f1(I, f, b, "fzero");
+    if (fa == 0.0) return val_float(a);
+    if (fb == 0.0) return val_float(b);
+    if ((fa > 0) == (fb > 0))
+        runtime_error(I, "fzero: f(a) and f(b) must have opposite signs (f(%g) = %g, f(%g) = %g)", a, fa, b, fb);
+    double c = a, fc = fa, d = b - a, e = d;
+    for (int iter = 0; iter < 200; iter++) {
+        if (fabs(fc) < fabs(fb)) { a = b; b = c; c = a; fa = fb; fb = fc; fc = fa; }
+        double tol = 2.0 * DBL_EPSILON * fabs(b) + 1e-14;
+        double m = 0.5 * (c - b);
+        if (fabs(m) <= tol || fb == 0.0) return val_float(b);
+        if (fabs(e) < tol || fabs(fa) <= fabs(fb)) { d = m; e = m; }
+        else {
+            double p, q, r_, s_ = fb / fa;
+            if (a == c) { p = 2.0 * m * s_; q = 1.0 - s_; }
+            else {
+                q = fa / fc; r_ = fb / fc;
+                p = s_ * (2.0 * m * q * (q - r_) - (b - a) * (r_ - 1.0));
+                q = (q - 1.0) * (r_ - 1.0) * (s_ - 1.0);
+            }
+            if (p > 0) q = -q; else p = -p;
+            if (2.0 * p < 3.0 * m * q - fabs(tol * q) && p < fabs(0.5 * e * q)) { e = d; d = p / q; }
+            else { d = m; e = m; }
+        }
+        a = b; fa = fb;
+        b += (fabs(d) > tol) ? d : (m > 0 ? tol : -tol);
+        fb = call_f1(I, f, b, "fzero");
+        if ((fb > 0) == (fc > 0)) { c = a; fc = fa; d = b - a; e = d; }
+    }
+    runtime_error(I, "fzero: did not converge in 200 iterations");
+}
+
+/* Brent's localmin: minimum of f on [a, b]; returns {x, fx}. */
+static Value bi_fminbnd(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    Value f = args[0];
+    want_callable(I, f, "fminbnd");
+    double a = want_real(I, args[1], "fminbnd"), b = want_real(I, args[2], "fminbnd");
+    if (!(a < b)) runtime_error(I, "fminbnd: needs a < b");
+    const double gold = 0.5 * (3.0 - sqrt(5.0));
+    double x = a + gold * (b - a), w = x, v = x;
+    double fx = call_f1(I, f, x, "fminbnd"), fw = fx, fv = fx;
+    double d = 0.0, e = 0.0;
+    for (int iter = 0; iter < 500; iter++) {
+        double m = 0.5 * (a + b);
+        double tol = sqrt(DBL_EPSILON) * fabs(x) + 1e-12, t2 = 2.0 * tol;
+        if (fabs(x - m) <= t2 - 0.5 * (b - a))
+            return record2("x", val_float(x), "fx", val_float(fx));
+        double p = 0, q = 0, r_ = 0;
+        if (fabs(e) > tol) {                          /* try parabolic */
+            r_ = (x - w) * (fx - fv);
+            q = (x - v) * (fx - fw);
+            p = (x - v) * q - (x - w) * r_;
+            q = 2.0 * (q - r_);
+            if (q > 0) p = -p; else q = -q;
+            r_ = e; e = d;
+        }
+        if (fabs(p) < fabs(0.5 * q * r_) && p > q * (a - x) && p < q * (b - x)) {
+            d = p / q;
+            double u = x + d;
+            if (u - a < t2 || b - u < t2) d = (x < m) ? tol : -tol;
+        } else {
+            e = (x < m) ? b - x : a - x;
+            d = gold * e;
+        }
+        double u = (fabs(d) >= tol) ? x + d : x + ((d > 0) ? tol : -tol);
+        double fu = call_f1(I, f, u, "fminbnd");
+        if (fu <= fx) {
+            if (u < x) b = x; else a = x;
+            v = w; fv = fw; w = x; fw = fx; x = u; fx = fu;
+        } else {
+            if (u < x) a = u; else b = u;
+            if (fu <= fw || w == x)           { v = w; fv = fw; w = u; fw = fu; }
+            else if (fu <= fv || v == x || v == w) { v = u; fv = fu; }
+        }
+    }
+    runtime_error(I, "fminbnd: did not converge in 500 iterations");
+}
+
+/* Adaptive Simpson with Richardson error estimate (|S2 - S1| / 15). */
+static double simpson_rec(Interp *I, Value f, double a, double fa2, double m, double fm,
+                          double b, double fb2, double whole, double tol, int depth)
+{
+    if (depth > 60)
+        runtime_error(I, "integral: failed to converge (singular or wildly oscillatory integrand?)");
+    double lm = 0.5 * (a + m), rm = 0.5 * (m + b);
+    double flm = call_f1(I, f, lm, "integral"), frm = call_f1(I, f, rm, "integral");
+    double left  = (m - a) / 6.0 * (fa2 + 4.0 * flm + fm);
+    double right = (b - m) / 6.0 * (fm + 4.0 * frm + fb2);
+    double delta = left + right - whole;
+    if (fabs(delta) <= 15.0 * tol)
+        return left + right + delta / 15.0;
+    return simpson_rec(I, f, a, fa2, lm, flm, m, fm, left,  0.5 * tol, depth + 1)
+         + simpson_rec(I, f, m, fm, rm, frm, b, fb2, right, 0.5 * tol, depth + 1);
+}
+
+/* integral(f, a, b[, tol]) — finite limits; default abstol 1e-10. */
+static Value bi_integral(Interp *I, Value *args, uint32_t n)
+{
+    Value f = args[0];
+    want_callable(I, f, "integral");
+    double a = want_real(I, args[1], "integral"), b = want_real(I, args[2], "integral");
+    if (isinf(a) || isinf(b) || isnan(a) || isnan(b))
+        runtime_error(I, "integral: limits must be finite (transform an infinite domain first)");
+    double tol = 1e-10;
+    if (n >= 4) {
+        tol = want_real(I, args[3], "integral");
+        if (!(tol > 0)) runtime_error(I, "integral: tol must be positive");
+    }
+    if (a == b) return val_float(0.0);
+    double sgn = 1.0;
+    if (a > b) { double t = a; a = b; b = t; sgn = -1.0; }
+    double fa2 = call_f1(I, f, a, "integral"), fb2 = call_f1(I, f, b, "integral");
+    double m = 0.5 * (a + b), fm = call_f1(I, f, m, "integral");
+    double whole = (b - a) / 6.0 * (fa2 + 4.0 * fm + fb2);
+    return val_float(sgn * simpson_rec(I, f, a, fa2, m, fm, b, fb2, whole, tol, 0));
 }
 
 /* ------------------------------------------------------------------ */
@@ -4053,6 +4210,9 @@ EnvObj *globals_new(void)
     def_builtin(e, "help",  bi_help,  0, 1);
     def_builtin(e, "system",bi_system,1, 1);
     def_builtin(e, "dis",   bi_dis,   1, 1);
+    def_builtin(e, "fzero",    bi_fzero,    3, 3);
+    def_builtin(e, "fminbnd",  bi_fminbnd,  3, 3);
+    def_builtin(e, "integral", bi_integral, 3, 4);
     def_builtin(e, "readcsv",  bi_readcsv,  1, 2);
     def_builtin(e, "writecsv", bi_writecsv, 2, 3);
     def_builtin(e, "readtable",bi_readtable,1, 2);

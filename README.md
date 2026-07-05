@@ -560,6 +560,8 @@ unique(A)                                           sorted distinct elements
 tic  toc()                                          wall-clock timing (monotonic)
 readcsv(f[, opts])  writecsv(f, A[, opts])          numeric CSV in/out (full-precision round trip)
 readtable(f[, opts])                                CSV with header -> record of named column vectors
+fzero(f, a, b)  fminbnd(f, a, b)                    Brent root / minimum ({x, fx}) of a function
+integral(f, a, b[, tol])                            adaptive definite integral
 any(mask) all(mask)   logical reductions
 isnan(x) isinf(x) isfinite(x)   elementwise FP predicates -> logical
 

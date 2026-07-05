@@ -12,6 +12,13 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **Solvers: `fzero`, `fminbnd`, `integral`.** The first builtins that call
+  back into the language — `call_value` re-enters the VM per evaluation, so
+  the function argument can be a closure (capturing data: `fzero(npv, ...)`)
+  or a builtin (`fzero(cos, 1, 2)`). Brent's zeroin and localmin; adaptive
+  Simpson with Richardson error estimate. All three are allocation-free, so an
+  error raised inside `f` propagates cleanly (ASan-verified). Cross-checked
+  against SciPy's brentq / fminbound / quad.
 - **Legend labels in plots.** `plot` and `hist` options accept `label` (single
   series) and `label1..labelN` (per series); unlabeled series keep the
   `series k` default. Validated as strings before gnuplot is launched.

@@ -378,6 +378,26 @@ Student-t and F CDFs fall out of it. `erf`/`erfc`, `beta`/`lbeta`,
 complete the set. All are real-domain, elementwise over arrays, and validated
 against SciPy.
 
+### Root finding, minimization, integration
+
+These three take a **function argument** — a closure or builtin — and call it
+repeatedly. `fzero(f, a, b)` finds a root by Brent's method (`f(a)` and `f(b)`
+must differ in sign); `fminbnd(f, a, b)` minimizes on an interval and returns
+`{x, fx}`; `integral(f, a, b[, tol])` integrates adaptively (Simpson with
+Richardson estimate; finite limits; default tolerance 1e-10). Closures capture
+data, so parameterized problems read naturally — a bond's yield to maturity:
+
+```
+neutrino> let cf = [100, 100, 100, 1100]
+neutrino> let npv = fn r -> sum(cf ./ ((1 + r) .^ (1:4))) - 1000
+neutrino> format(6); fzero(npv, 0.01, 0.3)
+0.100000
+```
+
+A divergent or wildly oscillatory integrand fails with an error rather than a
+wrong answer; infinite limits are rejected — substitute to a finite domain
+first.
+
 ## 12. Random numbers
 
 The generator is xoshiro256** seeded through splitmix64, and it is
@@ -551,6 +571,14 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `numel(x)` | number of elements (rows*cols) |
 | `tic` | start the wall-clock timer (monotonic) |
 | `toc` | seconds elapsed since tic |
+
+### Solvers
+
+| Signature | Description |
+|---|---|
+| `fzero(f, a, b)` | root of f in [a, b] (Brent; f(a), f(b) must differ in sign) |
+| `fminbnd(f, a, b)` | minimum of f on [a, b] (Brent) -> {x, fx} |
+| `integral(f, a, b[, tol])` | definite integral (adaptive Simpson, finite limits; default tol 1e-10) |
 
 ### Data files
 

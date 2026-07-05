@@ -1,0 +1,44 @@
+# Solvers: fzero, fminbnd, integral. Cross-checked against SciPy.
+abs(fzero(cos, 1, 2) - 2 * atan(1)) < 1e-12
+=> true
+format(8); fzero(fn x -> x^3 - 2*x - 5, 2, 3)
+=> 2.0945515
+fzero(fn x -> x - 1, 1, 2)
+=> 1
+# builtins are callable; closures capture data
+abs(fzero(sin, 3, 4) - 4 * atan(1)) < 1e-12
+=> true
+let cf = [100, 100, 100, 1100]; format(8); fzero(fn r -> sum(cf ./ ((1 + r) .^ (1:4))) - 1000, 0.01, 0.3)
+=> 0.10000000
+# fminbnd returns {x, fx}
+let m = fminbnd(fn x -> (x - 2)^2 + 1, 0, 5); (abs(m.x - 2) < 1e-8) && (abs(m.fx - 1) < 1e-12)
+=> true
+format(8); fminbnd(fn x -> x * sin(x), 0, 6).x
+=> 4.9131804
+# integral: polynomial exact-ish, symmetry, orientation, degenerate
+abs(integral(fn x -> x^2, 0, 1) - 1/3) < 1e-12
+=> true
+abs(integral(fn x -> exp(-x^2), -8, 8) - sqrt(4 * atan(1))) < 1e-10
+=> true
+abs(integral(sin, 0, 4 * atan(1)) - 2) < 1e-10
+=> true
+integral(fn x -> 1, 5, 5)
+=> 0
+integral(fn x -> x, 1, 0)
+=> -0.5
+# additivity: int_0^2 = int_0^1 + int_1^2
+abs(integral(exp, 0, 2) - (integral(exp, 0, 1) + integral(exp, 1, 2))) < 1e-10
+=> true
+# errors
+fzero(fn x -> x^2 + 1, -1, 1)
+=> !opposite signs
+fzero(sin, 42, 1)
+=> !needs a < b
+integral(fn x -> 1 / x, 0, 1)
+=> !failed to converge
+fminbnd(7, 0, 1)
+=> !expected a function
+fzero(fn x -> [1, 2], 0, 1)
+=> !must return a real scalar
+integral(fn x -> x, 0, 1, -1)
+=> !tol must be positive
