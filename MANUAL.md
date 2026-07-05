@@ -403,8 +403,15 @@ neutrino> plot(x, map(sin, x), {title = "sin(x)", xlabel = "x", grid = true})
 ```
 
 Recognised options: `title`, `xlabel`, `ylabel`, `style` (strings); `logx`,
-`logy`, `grid` (booleans); and `xrange`, `yrange` (`[lo, hi]` vectors) to fix
-an axis instead of letting gnuplot choose. `hist(y)` draws a histogram
+`logy`, `grid` (booleans); `xrange`, `yrange` (`[lo, hi]` vectors) to fix an
+axis instead of letting gnuplot choose; and legend labels — `label` for a
+single series, `label1`, `label2`, ... for several (unlabeled series keep the
+`series k` default):
+
+```
+neutrino> let t = (linspace(0, 6.28, 100))';
+neutrino> plot(t, [map(sin, t), map(cos, t)], {label1 = "sin", label2 = "cos"})
+``` `hist(y)` draws a histogram
 (`hist(y, nbins)` to choose the bin count; the default follows Sturges' rule),
 and accepts the same trailing options record:
 
@@ -557,8 +564,8 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 
 | Signature | Description |
 |---|---|
-| `plot(y) | plot(x, y) | plot(x, Y, opts)` | line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange} |
-| `hist(y[, nbins][, opts])` | histogram via gnuplot; opts as in plot (yrange = [0, m] to anchor the axis) |
+| `plot(y) | plot(x, y) | plot(x, Y, opts)` | line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange, label, label1..labelN} |
+| `hist(y[, nbins][, opts])` | histogram via gnuplot; opts as in plot (yrange to anchor the axis, label for the legend) |
 
 ### Array construction
 

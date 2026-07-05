@@ -85,3 +85,8 @@ plot([1, 2, 3], {yrange = 7})
 => !yrange must be a 2-element vector
 hist(rand(1, 100), {xrange = [3, 3]})
 => !xrange needs lo < hi
+# legend label validation (fires before gnuplot is invoked)
+plot([1, 2, 3], {label = 7})
+=> !label must be a string
+plot([1, 2], [3, 4], {label2 = [1]})
+=> !label2 must be a string

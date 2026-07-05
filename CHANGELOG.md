@@ -12,6 +12,9 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **Legend labels in plots.** `plot` and `hist` options accept `label` (single
+  series) and `label1..labelN` (per series); unlabeled series keep the
+  `series k` default. Validated as strings before gnuplot is launched.
 - **Data file I/O.** `readcsv(file[, opts])` reads numeric CSV into a Float
   matrix (empty cells become `nan`; CRLF tolerated; `{delim, skip}` options);
   `writecsv(file, A[, opts])` writes at full precision (`%.17g` — values

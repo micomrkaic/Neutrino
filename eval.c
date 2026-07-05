@@ -1279,8 +1279,8 @@ static const BuiltinDoc builtin_docs[] = {
     { "readcsv", "readcsv(file[, opts])", "numeric CSV -> Float matrix; empty cells are nan; opts: {delim, skip}", "io" },
     { "writecsv","writecsv(file, A[, opts])", "matrix -> CSV, full precision (round-trips); opts: {delim}", "io" },
     { "readtable","readtable(file[, opts])", "CSV with a header -> record of column vectors named from the header", "io" },
-    { "plot",  "plot(y) | plot(x, y) | plot(x, Y, opts)", "line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange}", "plot" },
-    { "hist",  "hist(y[, nbins][, opts])", "histogram via gnuplot; opts as in plot (yrange = [0, m] to anchor the axis)", "plot" },
+    { "plot",  "plot(y) | plot(x, y) | plot(x, Y, opts)", "line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange, label, label1..labelN}", "plot" },
+    { "hist",  "hist(y[, nbins][, opts])", "histogram via gnuplot; opts as in plot (yrange to anchor the axis, label for the legend)", "plot" },
     { "format","format / format(m)", "show or set number display: \"short\", \"long\", \"short e\", or a digit count", "core" },
     { "size",  "size(x)",           "[rows, cols] of x (a scalar is 1x1)", "core" },
     { "length","length(x)",         "longest dimension of x (0 if empty)", "core" },
@@ -1784,6 +1784,31 @@ static void gp_check_opts(Interp *I, Value opts, const char *who)
     Value v;
     if ((v = rec_field(o, "xrange")).kind != VAL_NULL) gp_check_range(I, v, "x", who);
     if ((v = rec_field(o, "yrange")).kind != VAL_NULL) gp_check_range(I, v, "y", who);
+    for (uint32_t i = 0; i < o->count; i++) {          /* label / label1..labelN */
+        const char *k = o->keys[i];
+        uint32_t kl = o->keylens[i];
+        if (kl >= 5 && memcmp(k, "label", 5) == 0) {
+            bool numeric_tail = true;
+            for (uint32_t j = 5; j < kl; j++)
+                if (k[j] < '0' || k[j] > '9') { numeric_tail = false; break; }
+            if (numeric_tail && o->vals[i].kind != VAL_STRING)
+                runtime_error(I, "%s: %.*s must be a string", who, (int)kl, k);
+        }
+    }
+}
+
+/* Legend label for series k (1-based): labelK, else label (k == 1), else null. */
+static Value gp_label(RecObj *o, uint32_t k)
+{
+    char key[16];
+    snprintf(key, sizeof key, "label%u", k);
+    Value v = rec_field(o, key);
+    if (v.kind == VAL_STRING) return v;
+    if (k == 1) {
+        v = rec_field(o, "label");
+        if (v.kind == VAL_STRING) return v;
+    }
+    return val_null();
 }
 
 /* Shared options record for plot/hist: title, xlabel, ylabel (strings);
@@ -1842,7 +1867,10 @@ static Value bi_plot(Interp *I, Value *args, uint32_t n)
     fputs("plot ", g);
     for (uint32_t s = 0; s < nser; s++) {
         if (s) fputs(", ", g);
-        fprintf(g, "'-' using 1:2 with %.*s title \"series %u\"", (int)style_len, style, s + 1);
+        Value lv = (opts.kind == VAL_RECORD) ? gp_label(as_rec(opts), s + 1) : val_null();
+        fprintf(g, "'-' using 1:2 with %.*s title ", (int)style_len, style);
+        if (lv.kind == VAL_STRING) gp_qstr(g, as_str(lv)->data, as_str(lv)->len);
+        else fprintf(g, "\"series %u\"", s + 1);
     }
     fputc('\n', g);
     for (uint32_t s = 0; s < nser; s++) {         /* one inline data block per series */
@@ -1887,7 +1915,11 @@ static Value bi_hist(Interp *I, Value *args, uint32_t n)
     FILE *g = gp_open(I);
     gp_opts(I, g, opts);
     fprintf(g, "set boxwidth %.17g\nset style fill solid 0.6\n", w * 0.95);
-    fputs("plot '-' using 1:2 with boxes title \"hist\"\n", g);
+    Value hlv = (opts.kind == VAL_RECORD) ? gp_label(as_rec(opts), 1) : val_null();
+    fputs("plot '-' using 1:2 with boxes title ", g);
+    if (hlv.kind == VAL_STRING) gp_qstr(g, as_str(hlv)->data, as_str(hlv)->len);
+    else fputs("\"hist\"", g);
+    fputc('\n', g);
     for (int64_t b = 0; b < nb; b++)
         fprintf(g, "%.17g %llu\n", lo + (b + 0.5) * w, (unsigned long long)cnt[b]);
     fputs("e\n", g);
