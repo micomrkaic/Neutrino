@@ -59,8 +59,10 @@ vmtest: $(VM_SRCS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(VM_SRCS) -lm -o $@
 
 # ASan/UBSan build of the VM driver, for leak-checking the error path.
+# -O1 matters: setjmp-clobber bugs (handlers reading register-cached locals)
+# only manifest when the optimizer register-allocates — at -O0 they hide.
 vmtest-asan: $(VM_SRCS)
-	$(CC) -std=$(STD) -Wall -Wextra -g -fsanitize=address,undefined -fno-omit-frame-pointer \
+	$(CC) -std=$(STD) -Wall -Wextra -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
 	   $(VM_SRCS) -lm -o $@
 
 # Regression suite: golden-output tests in tests/*.test (see tests/run.sh),
