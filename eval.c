@@ -1,5 +1,6 @@
 /* eval.c — Neutrino tree-walking evaluator. */
 #define _XOPEN_SOURCE 700         /* open_memstream + jn/yn Bessel (superset of POSIX.1-2008) */
+#include <time.h>
 #include "eval.h"
 #include <stdlib.h>
 #include <string.h>
@@ -1291,6 +1292,9 @@ static const BuiltinDoc builtin_docs[] = {
     /* reductions ------------------------------------------------------ */
     { "sum",   "sum(A) | sum(A, dim)", "sum of all elements, or along dim (1 = columns, 2 = rows)", "reduce" },
     { "prod",  "prod(A) | prod(A, dim)","product of all elements, or along dim", "reduce" },
+    { "tic",   "tic",               "start the wall-clock timer (monotonic)", "core" },
+    { "toc",   "toc",               "seconds elapsed since tic", "core" },
+    { "unique","unique(A)",         "sorted distinct elements; vectors keep orientation, matrices flatten to a row", "array" },
     { "cov",   "cov(X[, w]) | cov(x, y[, w])", "covariance matrix of X's columns (rows = observations), or scalar cov of two vectors; w as in var", "reduce" },
     { "corr",  "corr(X) | corr(x, y)", "Pearson correlation matrix of X's columns, or scalar correlation of two vectors", "reduce" },
     { "var",   "var(A) | var(A, w) | var(A, w, dim)", "variance; w = 0 divides by N-1 (default), w = 1 by N", "reduce" },
@@ -2899,6 +2903,104 @@ static Value bi_max(Interp *I, Value *args, uint32_t n)
     return best;
 }
 /* ------------------------------------------------------------------ */
+/* tic / toc                                                           */
+/* ------------------------------------------------------------------ */
+
+static double g_tic_when;
+static bool   g_tic_set;
+
+static double mono_now(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+}
+static Value bi_tic(Interp *I, Value *args, uint32_t n)
+{
+    (void)I; (void)args; (void)n;
+    g_tic_when = mono_now();
+    g_tic_set = true;
+    return val_null();
+}
+static Value bi_toc(Interp *I, Value *args, uint32_t n)
+{
+    (void)args; (void)n;
+    if (!g_tic_set) runtime_error(I, "toc: no timer started (call tic first)");
+    return val_float(mono_now() - g_tic_when);
+}
+
+/* ------------------------------------------------------------------ */
+/* unique                                                              */
+/* ------------------------------------------------------------------ */
+
+static int dbl_cmp(const void *a, const void *b)
+{
+    double x = *(const double *)a, y = *(const double *)b;
+    if (isnan(x)) return isnan(y) ? 0 : 1;      /* NaNs sort last (total order: */
+    if (isnan(y)) return -1;                    /* qsort needs transitivity)    */
+    return (x > y) - (x < y);
+}
+
+static int i64_cmp(const void *a, const void *b)
+{
+    int64_t x = *(const int64_t *)a, y = *(const int64_t *)b;
+    return (x > y) - (x < y);
+}
+
+/* unique(A): sorted distinct elements. A vector keeps its orientation; a
+ * matrix flattens to a row vector. NaNs compare unequal to everything,
+ * themselves included, so they are all kept (Octave-compatible). */
+static Value bi_unique(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    Value v = args[0];
+    if (is_num(v) || v.kind == VAL_BOOL) return v;      /* scalar: already unique */
+    if (!is_array(v)) runtime_error(I, "unique: expected numeric data, got %s", type_name(v.kind));
+    ArrObj *a = as_arr(v);
+    if (a->elt == ELT_COMPLEX) runtime_error(I, "unique: complex data has no ordering");
+    size_t nn = (size_t)a->rows * a->cols;
+    if (nn == 0) return val_array(a->elt, 0, 0);
+    bool col = (a->cols == 1 && a->rows > 1);           /* column vector keeps shape */
+
+    if (a->elt == ELT_INT) {
+        int64_t *buf = malloc(nn * sizeof *buf);
+        if (!buf) abort();
+        memcpy(buf, a->data, nn * sizeof *buf);
+        qsort(buf, nn, sizeof *buf, i64_cmp);
+        size_t k = 0;
+        for (size_t i = 0; i < nn; i++)
+            if (i == 0 || buf[i] != buf[k-1]) buf[k++] = buf[i];
+        Value out = val_array(ELT_INT, col ? (uint32_t)k : 1, col ? 1 : (uint32_t)k);
+        memcpy(as_arr(out)->data, buf, k * sizeof *buf);
+        free(buf);
+        return out;
+    }
+    if (a->elt == ELT_BOOL) {
+        bool seen_f = false, seen_t = false;
+        const uint8_t *bd = (const uint8_t *)a->data;
+        for (size_t i = 0; i < nn; i++) { if (bd[i]) seen_t = true; else seen_f = true; }
+        uint32_t k = (uint32_t)seen_f + (uint32_t)seen_t;
+        Value out = val_array(ELT_BOOL, col ? k : 1, col ? 1 : k);
+        uint8_t *od = (uint8_t *)as_arr(out)->data;
+        uint32_t w = 0;
+        if (seen_f) od[w++] = 0;
+        if (seen_t) od[w++] = 1;
+        return out;
+    }
+    double *buf = malloc(nn * sizeof *buf);
+    if (!buf) abort();
+    memcpy(buf, a->data, nn * sizeof *buf);
+    qsort(buf, nn, sizeof *buf, dbl_cmp);
+    size_t k = 0;
+    for (size_t i = 0; i < nn; i++)
+        if (i == 0 || !(buf[i] == buf[k-1])) buf[k++] = buf[i];   /* NaN != NaN: kept */
+    Value out = val_array(ELT_FLOAT, col ? (uint32_t)k : 1, col ? 1 : (uint32_t)k);
+    memcpy(as_arr(out)->data, buf, k * sizeof *buf);
+    free(buf);
+    return out;
+}
+
+/* ------------------------------------------------------------------ */
 /* descriptive statistics: var, std, median, quantile                  */
 /* ------------------------------------------------------------------ */
 
@@ -2913,12 +3015,6 @@ static double stat_elt(Interp *I, Value e, const char *who)
 }
 
 typedef double (*StatKernel)(Interp *, double *, size_t, double);
-
-static int dbl_cmp(const void *a, const void *b)
-{
-    double x = *(const double *)a, y = *(const double *)b;
-    return (x > y) - (x < y);
-}
 
 /* Two-pass variance. w = 0: sample (N-1, default); w = 1: population (N). */
 static double st_var(Interp *I, double *buf, size_t n, double w)
@@ -3617,6 +3713,9 @@ EnvObj *globals_new(void)
     def_builtin(e, "rem",     bi_rem,     2, 2);
     def_builtin(e, "min",     bi_min,     1, 3);
     def_builtin(e, "max",     bi_max,     1, 3);
+    def_builtin(e, "tic",     bi_tic,     0, 0);
+    def_builtin(e, "toc",     bi_toc,     0, 0);
+    def_builtin(e, "unique",  bi_unique,  1, 1);
     def_builtin(e, "cov",     bi_cov,     1, 3);
     def_builtin(e, "corr",    bi_corr,    1, 2);
     def_builtin(e, "var",     bi_var,     1, 3);

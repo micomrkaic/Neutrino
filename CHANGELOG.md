@@ -12,6 +12,11 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **`tic` / `toc()` and `unique(A)`.** Monotonic wall-clock timing, and sorted
+  distinct elements (vectors keep orientation; matrices flatten to a row; NaNs
+  compare unequal to themselves so all are kept, sorted last — the sort
+  comparator is now a total order, which also makes NaN placement in `sort`,
+  `median`, and `quantile` deterministic across platforms).
 - **`cov` and `corr`.** Covariance and Pearson correlation: matrix form
   (columns = variables, rows = observations) returns the p x p matrix; two
   vectors return the scalar. `cov` shares `var`'s `w` normalization. Constant

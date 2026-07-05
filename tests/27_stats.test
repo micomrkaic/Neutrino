@@ -91,3 +91,27 @@ corr(5)
 => !expected numeric data
 cov([1, 2; 3, 4], 2)
 => !normalization must be 0
+# tic/toc and unique
+tic; let junk = sum(1:1000); (toc() >= 0) && (toc() < 60)
+=> true
+toc
+=> !no timer started
+unique([3, 1, 2, 3, 1])
+=> [1, 2, 3]
+unique([3; 1; 3])
+=> [1; 3]
+unique([1, 2; 2, 1])
+=> [1, 2]
+unique([1.5, 1.5, 2.5])
+=> [1.5, 2.5]
+unique([false, true, false])
+=> [false, true]
+unique(7)
+=> 7
+unique([])
+=> []
+# NaN != NaN: kept, sorted last (deterministic total order)
+unique([0/0, 1, 0/0])
+=> [1, nan, nan]
+unique([1i, 2])
+=> !no ordering

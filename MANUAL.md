@@ -284,7 +284,8 @@ neutrino> v[[1, 4]]        # gather
 `A[1, 2] = 9`, `v[v < 0] = 0`, `A[2, :] = [7, 8, 9]`. The target must be a
 plain name and indices must be in range (no auto-growing).
 
-**Logical arrays** come from comparisons and drive masking and counting:
+`unique(A)` returns the sorted distinct elements — vectors keep their
+orientation, matrices flatten to a row. **Logical arrays** come from comparisons and drive masking and counting:
 `sum(A > 2)` counts, `any`/`all` test, `find(mask)` gives 1-based positions,
 `where(mask, a, b)` selects elementwise.
 
@@ -473,6 +474,15 @@ comments). The binary also exposes the compiler pipeline:
 | `neutrino --ast file.nu` | the parse tree |
 | `neutrino --dis file.nu` | the compiled bytecode, statement by statement |
 
+`tic` starts a monotonic wall-clock timer and `toc()` returns the elapsed
+seconds — bare `toc` as a statement echoes it, but in an expression position
+write `toc()` (a bare name is a value reference, as with any function):
+
+```
+neutrino> tic; let A = randn(100, 100); let B = A * A; toc() < 60
+true
+```
+
 `vmtest` is the headless driver used by the test suite: it reads stdin line by
 line and echoes each result, so `printf 'sum(1:100)\n' | ./vmtest` prints
 `5050`. `dis(f)` disassembles from inside the language. The golden suite
@@ -497,6 +507,8 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `size(x)` | [rows, cols] of x (a scalar is 1x1) |
 | `length(x)` | longest dimension of x (0 if empty) |
 | `numel(x)` | number of elements (rows*cols) |
+| `tic` | start the wall-clock timer (monotonic) |
+| `toc` | seconds elapsed since tic |
 
 ### Plotting
 
@@ -539,6 +551,7 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 
 | Signature | Description |
 |---|---|
+| `unique(A)` | sorted distinct elements; vectors keep orientation, matrices flatten to a row |
 | `sort(A)` | ascending sort: a vector as a whole, a matrix by column |
 | `find(mask)` | 1-based positions of nonzero/true elements (row-major) |
 | `where(mask) | where(mask, a, b)` | indices of true, or pick a where true and b where false |

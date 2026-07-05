@@ -556,6 +556,8 @@ median(A) | median(A, dim)                          median overall or along dim
 quantile(x, p)                                      quantiles, linear interpolation (p scalar or vector)
 cov(X[, w]) | cov(x, y[, w])                        covariance matrix of columns / scalar pair cov
 corr(X) | corr(x, y)                                Pearson correlation matrix / scalar
+unique(A)                                           sorted distinct elements
+tic  toc()                                          wall-clock timing (monotonic)
 any(mask) all(mask)   logical reductions
 isnan(x) isinf(x) isfinite(x)   elementwise FP predicates -> logical
 
