@@ -18,6 +18,8 @@
 #include "arena.h"
 #include "ast.h"
 #include "value.h"
+#include <time.h>
+#include "version.h"
 #include "eval.h"
 #include "vm.h"
 
@@ -221,6 +223,10 @@ static void print_banner(bool color)
         fputs("   \033[38;2;70;96;140m▪\033[0m \033[38;2;70;96;140m▪\033[0m \033[38;2;70;96;140m▪\033[0m      \033[38;2;32;139;255m| |\\  |  __/ |_| | |_| |  | | | | | (_) |\033[0m\n", stdout);
         fputs(" \033[38;2;32;139;255m╰─╴\033[0m   \033[38;2;32;139;255m╶─╯\033[0m    \033[38;2;32;139;255m|_| \\_|\\___|\\__,_|\\__|_|  |_|_| |_|\\___/ \033[0m\n", stdout);
         fputs("              \033[38;2;120;132;150ma small functional array language\033[0m\n", stdout);
+        char now[32]; time_t t = time(NULL);
+        strftime(now, sizeof now, "%Y-%m-%d %H:%M:%S", localtime(&t));
+        printf("              \033[38;2;120;132;150mv%s · built %s · session %s\033[0m\n",
+               NEUTRINO_VERSION, NEUTRINO_BUILT, now);
     } else {
         fputs(" ╭─╴   ╶─╮     _   _            _        _             \n", stdout);
         fputs("   ▪ ▪ ▪      | \\ | | ___ _   _| |_ _ __(_)_ __   ___  \n", stdout);
@@ -228,6 +234,9 @@ static void print_banner(bool color)
         fputs("   ▪ ▪ ▪      | |\\  |  __/ |_| | |_| |  | | | | | (_) |\n", stdout);
         fputs(" ╰─╴   ╶─╯    |_| \\_|\\___|\\__,_|\\__|_|  |_|_| |_|\\___/ \n", stdout);
         fputs("              a small functional array language\n", stdout);
+        char now[32]; time_t t = time(NULL);
+        strftime(now, sizeof now, "%Y-%m-%d %H:%M:%S", localtime(&t));
+        printf("              v%s · built %s · session %s\n", NEUTRINO_VERSION, NEUTRINO_BUILT, now);
     }
 }
 

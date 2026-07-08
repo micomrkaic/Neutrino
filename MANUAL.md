@@ -41,6 +41,8 @@ make            # ./neutrino, the REPL
 make test       # golden suite + codegen goldens
 ```
 
+The banner shows the version, when the binary was built, and when the
+session started. `neutrino --version` prints the same from the command line.
 Start the REPL and type an expression; its value echoes back:
 
 ```
@@ -66,6 +68,8 @@ apply to scripts — they are REPL features.
 |---|---|
 | `help` / `help(f)` | catalogue of all builtins / details plus usage examples for one |
 | `who` | your variables, with type and shape |
+| `clear()` / `clear("a", ...)` | remove all user variables / the named ones (builtins are safe) |
+| `mem` | workspace size and peak process memory |
 | `format …` | number display: `format long`, `format short e`, `format(8)`, `format` to show |
 | `pretty on\|off` | aligned multi-line matrix display (default on in the REPL) |
 | `more on\|off` | page long output through `$PAGER` (default off) |
@@ -580,6 +584,8 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `size(x)` | [rows, cols] of x (a scalar is 1x1) |
 | `length(x)` | longest dimension of x (0 if empty) |
 | `numel(x)` | number of elements (rows*cols) |
+| `clear() | clear("a", ...)` | remove all user variables, or the named ones (builtins are untouchable) |
+| `mem` | print workspace size (variables) and peak process memory |
 | `tic` | start the wall-clock timer (monotonic) |
 | `toc` | seconds elapsed since tic |
 

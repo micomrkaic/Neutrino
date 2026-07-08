@@ -2,6 +2,7 @@
 #define _XOPEN_SOURCE 700         /* open_memstream + jn/yn Bessel (superset of POSIX.1-2008) */
 #include <errno.h>
 #include <float.h>
+#include <sys/resource.h>
 #include <time.h>
 #include "eval.h"
 #include <stdlib.h>
@@ -1364,6 +1365,8 @@ static const BuiltinDoc builtin_docs[] = {
     /* reductions ------------------------------------------------------ */
     { "sum",   "sum(A) | sum(A, dim)", "sum of all elements, or along dim (1 = columns, 2 = rows)", "reduce" , "sum([1, 2, 3])                    %= 6\nsum([1, 2; 3, 4], 1)              %= [4, 6]" },
     { "prod",  "prod(A) | prod(A, dim)","product of all elements, or along dim", "reduce" , "prod([1, 2, 3, 4])                %= 24" },
+    { "clear", "clear() | clear(\"a\", ...)", "remove all user variables, or the named ones (builtins are untouchable)", "core" , "let junk = 42; clear(\"junk\")   % junk is gone\nclear                             % bare: everything user-defined" },
+    { "mem",   "mem",               "print workspace size (variables) and peak process memory", "core" , "mem                               % e.g.  workspace: 3 variables, 2.1 MB" },
     { "tic",   "tic",               "start the wall-clock timer (monotonic)", "core" , "tic                               % starts the timer" },
     { "toc",   "toc",               "seconds elapsed since tic", "core" , "tic; let s = sum(1:1000000); toc() < 60   %= true" },
     { "unique","unique(A)",         "sorted distinct elements; vectors keep orientation, matrices flatten to a row", "array" , "unique([3, 1, 2, 3, 1])           %= [1, 2, 3]" },
@@ -2201,6 +2204,105 @@ static Value bi_who(Interp *I, Value *args, uint32_t n)
             shown++;
         }
     if (!shown) fputs("(no variables defined)\n", vout());
+    return val_null();
+}
+
+/* clear() removes all user variables; clear("a", "b") removes those named.
+ * Builtin bindings are invisible to clear, exactly as they are to who. */
+static Value bi_clear(Interp *I, Value *args, uint32_t n)
+{
+    EnvObj *g = I->globals;
+    if (!g) return val_null();
+    if (n == 0) {                                       /* clear everything user-defined */
+        uint32_t w = 0;
+        for (uint32_t i = 0; i < g->count; i++) {
+            if (g->vals[i].kind == VAL_BUILTIN) {       /* keep builtins, compact in place */
+                g->names[w] = g->names[i]; g->namelens[w] = g->namelens[i];
+                g->vals[w] = g->vals[i]; w++;
+            } else value_release(g->vals[i]);
+        }
+        g->count = w;
+        return val_null();
+    }
+    for (uint32_t a = 0; a < n; a++) {
+        if (args[a].kind != VAL_STRING)
+            runtime_error(I, "clear: expected variable name strings, e.g. clear(\"a\")");
+        StrObj *s = as_str(args[a]);
+        bool found = false;
+        for (uint32_t i = 0; i < g->count; i++) {
+            if (g->vals[i].kind == VAL_BUILTIN) continue;
+            if (g->namelens[i] == s->len && memcmp(g->names[i], s->data, s->len) == 0) {
+                value_release(g->vals[i]);
+                g->names[i] = g->names[g->count - 1];   /* swap-remove */
+                g->namelens[i] = g->namelens[g->count - 1];
+                g->vals[i] = g->vals[g->count - 1];
+                g->count--;
+                found = true;
+                break;
+            }
+        }
+        if (!found) runtime_error(I, "clear: no such variable '%.*s'", (int)s->len, s->data);
+    }
+    return val_null();
+}
+
+/* Payload bytes of a value (arrays, strings, records, closures; scalars 0).
+ * Values are trees (no mutation of fields), so plain recursion is safe. */
+static size_t value_bytes(Value v)
+{
+    switch (v.kind) {
+    case VAL_ARRAY: {
+        ArrObj *a = as_arr(v);
+        size_t elt = a->elt == ELT_COMPLEX ? 16 : a->elt == ELT_BOOL ? 1 : 8;
+        return sizeof *a + (size_t)a->rows * a->cols * elt;
+    }
+    case VAL_STRING: return sizeof(StrObj) + as_str(v)->len;
+    case VAL_RECORD: {
+        RecObj *r = as_rec(v);
+        size_t b = sizeof *r;
+        for (uint32_t i = 0; i < r->count; i++) b += value_bytes(r->vals[i]);
+        return b;
+    }
+    case VAL_CLOSURE: {
+        CloObj *c = (CloObj *)v.as.obj;
+        size_t b = sizeof *c;
+        for (uint32_t i = 0; i < c->nupvalues; i++) b += value_bytes(c->upvalues[i]);
+        return b;
+    }
+    default: return 0;
+    }
+}
+
+static void fmt_bytes(FILE *out, double b)
+{
+    if (b >= 1024.0 * 1024.0 * 1024.0) fprintf(out, "%.1f GB", b / (1024.0 * 1024.0 * 1024.0));
+    else if (b >= 1024.0 * 1024.0)     fprintf(out, "%.1f MB", b / (1024.0 * 1024.0));
+    else if (b >= 1024.0)              fprintf(out, "%.1f KB", b / 1024.0);
+    else                               fprintf(out, "%.0f B", b);
+}
+
+static Value bi_mem(Interp *I, Value *args, uint32_t n)
+{
+    (void)args; (void)n;
+    EnvObj *g = I->globals;
+    size_t ws = 0; uint32_t nvars = 0;
+    if (g)
+        for (uint32_t i = 0; i < g->count; i++)
+            if (g->vals[i].kind != VAL_BUILTIN) { ws += value_bytes(g->vals[i]); nvars++; }
+    fprintf(vout(), "  workspace: %u variable%s, ", nvars, nvars == 1 ? "" : "s");
+    fmt_bytes(vout(), (double)ws);
+    fputc('\n', vout());
+    struct rusage ru;
+    if (getrusage(RUSAGE_SELF, &ru) == 0) {
+#ifdef __APPLE__
+        double rss = (double)ru.ru_maxrss;              /* bytes on macOS */
+#else
+        double rss = (double)ru.ru_maxrss * 1024.0;     /* kilobytes on Linux */
+#endif
+        fputs("  process:   peak ", vout());
+        fmt_bytes(vout(), rss);
+        fputs(" resident\n", vout());
+    }
     return val_null();
 }
 
@@ -4281,6 +4383,8 @@ EnvObj *globals_new(void)
     def_builtin(e, "rem",     bi_rem,     2, 2);
     def_builtin(e, "min",     bi_min,     1, 3);
     def_builtin(e, "max",     bi_max,     1, 3);
+    def_builtin(e, "clear",   bi_clear,   0, UINT32_MAX);
+    def_builtin(e, "mem",     bi_mem,     0, 0);
     def_builtin(e, "tic",     bi_tic,     0, 0);
     def_builtin(e, "toc",     bi_toc,     0, 0);
     def_builtin(e, "unique",  bi_unique,  1, 1);

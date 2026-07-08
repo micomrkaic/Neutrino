@@ -2,6 +2,7 @@
  *   neutrino [--tokens | --ast | --dis] [file.nu]
  * Default mode evaluates. With no file, runs a built-in sample. */
 #include <signal.h>
+#include "version.h"
 #include "lexer.h"
 #include "parser.h"
 #include "arena.h"
@@ -75,7 +76,11 @@ int main(int argc, char **argv)
     const char *path = nullptr;
     bool want_sample = false;
     for (int i = 1; i < argc; i++) {
-        if      (strcmp(argv[i], "--tokens") == 0) mode = M_TOKENS;
+        if      (strcmp(argv[i], "--version") == 0) {
+            printf("neutrino %s (built %s)\n", NEUTRINO_VERSION, NEUTRINO_BUILT);
+            return 0;
+        }
+        else if (strcmp(argv[i], "--tokens") == 0) mode = M_TOKENS;
         else if (strcmp(argv[i], "--ast")    == 0) mode = M_AST;
         else if (strcmp(argv[i], "--dis")    == 0) mode = M_DIS;
         else if (strcmp(argv[i], "--sample") == 0) want_sample = true;

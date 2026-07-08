@@ -12,6 +12,11 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **REPL quality of life.** `clear()` / `clear("a", ...)` removes user
+  variables (builtin bindings are untouchable — `clear("sum")` refuses);
+  `mem` prints workspace size (payload bytes of all variables) and peak
+  process memory; the splash banner shows version, build timestamp, and
+  session start; `neutrino --version` prints the same.
 - **v1.0 hardening campaign.** ~33,000 fuzzed programs (grammar-aware and
   byte-garbage) under ASan+UBSan plus 108 property-based linear-algebra
   identity checks on random matrices. Found and fixed: signed-integer-overflow

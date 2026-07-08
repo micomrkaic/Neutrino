@@ -1,0 +1,15 @@
+# clear / mem quality-of-life
+let a = 1; clear("a"); a
+=> !undefined name 'a'
+let a = 1; let b = 2; clear(); who
+=> (no variables defined)
+let a = 1; clear("a"); let a = 7; a
+=> 7
+clear("nosuch")
+=> !no such variable 'nosuch'
+clear(5)
+=> !expected variable name strings
+clear("sum")
+=> !no such variable 'sum'
+let sum2 = 9; clear("sum2"); sum([1, 2, 3])
+=> 6
