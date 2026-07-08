@@ -40,6 +40,21 @@ void nu_init(void)
 {
     interp_init(&I);
     globals = globals_new();
+    value_set_multiline(true);    /* aligned multi-line matrices, as the native REPL defaults */
+}
+
+/* REPL-level commands (handled in repl.c natively, which the wasm build
+ * bypasses). Skip leading blanks; return the argument tail, or nullptr if the
+ * line is not this command. Mirrors repl.c's match_command. */
+static const char *wasm_command(const char *line, const char *word)
+{
+    while (*line == ' ' || *line == '\t') line++;
+    size_t wl = strlen(word);
+    if (strncmp(line, word, wl) != 0) return NULL;
+    const char *after = line + wl;
+    if (*after != '\0' && *after != ' ' && *after != '\t') return NULL;
+    while (*after == ' ' || *after == '\t') after++;
+    return after;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -50,6 +65,17 @@ const char *nu_eval(const char *line)
     FILE *cap = open_memstream(&g_buf, &cap_len);
     if (!cap) return "internal: out of memory\n";
     value_set_out(cap);
+
+    const char *arg;
+    if ((arg = wasm_command(line ? line : "", "pretty"))) {   /* REPL command, not a builtin */
+        if (!strcmp(arg, "on") || !strcmp(arg, "1"))       value_set_multiline(true);
+        else if (!strcmp(arg, "off") || !strcmp(arg, "0")) value_set_multiline(false);
+        else if (*arg == '\0') fprintf(cap, "pretty is %s\n", value_multiline() ? "on" : "off");
+        else fprintf(cap, "usage: pretty on | off\n");
+        fclose(cap);
+        value_set_out(NULL);
+        return g_buf ? g_buf : "";
+    }
 
     char *src = strdup(line ? line : "");
     Arena *a = arena_new();
