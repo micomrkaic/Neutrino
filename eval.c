@@ -1950,10 +1950,122 @@ static void gp_qstr(FILE *g, const char *s, uint32_t len)
     fputc('"', g);
 }
 
+/* ------------------------------------------------------------------ */
+/* ASCII plotting: used when there is no gnuplot subprocess (always in  */
+/* the browser; on native when NEUTRINO_PLOT_TERM=ascii, or as a        */
+/* fallback when gnuplot cannot be started). Renders into vout().       */
+
+static Value gp_label(RecObj *o, uint32_t k);
+
+static bool plot_is_ascii(void)
+{
+#ifdef __EMSCRIPTEN__
+    return true;                                  /* no subprocesses in the browser */
+#else
+    const char *t = getenv("NEUTRINO_PLOT_TERM");
+    return t && strcmp(t, "ascii") == 0;
+#endif
+}
+
+/* Optional string field for titles/labels; returns nullptr if absent. */
+static const char *ascii_optstr(Value opts, const char *key, uint32_t *len)
+{
+    if (opts.kind != VAL_RECORD) return nullptr;
+    Value v = rec_field(as_rec(opts), key);
+    if (v.kind != VAL_STRING) return nullptr;
+    *len = as_str(v)->len;
+    return as_str(v)->data;
+}
+
+#define ASCII_W 64
+#define ASCII_H 18
+
+/* Line/scatter plot. get(series, k) yields the k-th y of a series. */
+static void ascii_plot_render(Interp *I, ArrObj *X, ArrObj *Y, bool yvec,
+                              uint32_t npts, uint32_t nser, Value opts)
+{
+    FILE *o = vout();
+    double ymin = HUGE_VAL, ymax = -HUGE_VAL, xmin = HUGE_VAL, xmax = -HUGE_VAL;
+    for (uint32_t s = 0; s < nser; s++)
+        for (uint32_t k = 0; k < npts; k++) {
+            double x = X ? as_double(arr_get(X, k)) : (double)(k + 1);
+            double y = yvec ? as_double(arr_get(Y, k))
+                            : as_double(arr_get(Y, (size_t)k * Y->cols + s));
+            if (isfinite(y)) { if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+            if (isfinite(x)) { if (x < xmin) xmin = x; if (x > xmax) xmax = x; }
+        }
+    if (!isfinite(ymin) || !isfinite(ymax)) runtime_error(I, "plot: no finite data to plot");
+    if (ymax == ymin) { ymax += 0.5; ymin -= 0.5; }
+    if (xmax == xmin) { xmax += 0.5; xmin -= 0.5; }
+
+    uint32_t tlen;
+    const char *title = ascii_optstr(opts, "title", &tlen);
+    if (title) fprintf(o, "  %.*s\n", (int)tlen, title);
+
+    static const char marks[] = "*+x#o@%&";        /* per-series glyphs */
+    char grid[ASCII_H][ASCII_W];
+    for (uint32_t r = 0; r < ASCII_H; r++)
+        for (uint32_t c = 0; c < ASCII_W; c++) grid[r][c] = ' ';
+
+    for (uint32_t s = 0; s < nser; s++) {
+        char m = marks[s % (sizeof marks - 1)];
+        for (uint32_t k = 0; k < npts; k++) {
+            double x = X ? as_double(arr_get(X, k)) : (double)(k + 1);
+            double y = yvec ? as_double(arr_get(Y, k))
+                            : as_double(arr_get(Y, (size_t)k * Y->cols + s));
+            if (!isfinite(x) || !isfinite(y)) continue;
+            uint32_t cx = (uint32_t)((x - xmin) / (xmax - xmin) * (ASCII_W - 1) + 0.5);
+            uint32_t cy = (uint32_t)((y - ymin) / (ymax - ymin) * (ASCII_H - 1) + 0.5);
+            if (cx >= ASCII_W) cx = ASCII_W - 1;
+            if (cy >= ASCII_H) cy = ASCII_H - 1;
+            grid[ASCII_H - 1 - cy][cx] = m;         /* row 0 is the top (ymax) */
+        }
+    }
+
+    for (uint32_t r = 0; r < ASCII_H; r++) {
+        double yv = ymax - (double)r / (ASCII_H - 1) * (ymax - ymin);
+        fprintf(o, "%9.3g |", yv);                  /* y-axis tick + labels */
+        for (uint32_t c = 0; c < ASCII_W; c++) fputc(grid[r][c], o);
+        fputc('\n', o);
+    }
+    fputs("          +", o);
+    for (uint32_t c = 0; c < ASCII_W; c++) fputc('-', o);
+    fputc('\n', o);
+    fprintf(o, "           %-*.4g%*.4g\n", ASCII_W / 2, xmin, ASCII_W / 2, xmax);
+
+    if (nser > 1) {                                 /* legend for multi-series */
+        for (uint32_t s = 0; s < nser; s++) {
+            Value lv = gp_label(as_rec(opts), s + 1);
+            fprintf(o, "  %c series %u", marks[s % (sizeof marks - 1)], s + 1);
+            if (lv.kind == VAL_STRING) fprintf(o, " (%.*s)", (int)as_str(lv)->len, as_str(lv)->data);
+            fputc('\n', o);
+        }
+    }
+}
+
+/* Horizontal-bar histogram from precomputed bin counts. */
+static void ascii_hist_render(FILE *o, double lo, double w, int64_t nb,
+                              const uint64_t *cnt, Value opts)
+{
+    uint32_t tlen;
+    const char *title = ascii_optstr(opts, "title", &tlen);
+    if (title) fprintf(o, "  %.*s\n", (int)tlen, title);
+    uint64_t cmax = 1;
+    for (int64_t b = 0; b < nb; b++) if (cnt[b] > cmax) cmax = cnt[b];
+    const uint32_t BARW = 44;
+    for (int64_t b = 0; b < nb; b++) {
+        double centre = lo + (b + 0.5) * w;
+        uint32_t len = (uint32_t)((double)cnt[b] / (double)cmax * BARW + 0.5);
+        fprintf(o, "%9.3g |", centre);
+        for (uint32_t i = 0; i < len; i++) fputc('#', o);
+        fprintf(o, " %llu\n", (unsigned long long)cnt[b]);
+    }
+}
+
 static FILE *gp_open(Interp *I)
 {
     FILE *g = popen("gnuplot -persist 2>/dev/null", "w");
-    if (!g) runtime_error(I, "plot: could not start gnuplot");
+    if (!g) runtime_error(I, "plot: could not start gnuplot (set NEUTRINO_PLOT_TERM=ascii for a text plot)");
     const char *term = getenv("NEUTRINO_PLOT_TERM");
     if (term && *term) {
         fprintf(g, "set terminal %s\n", term);
@@ -2086,6 +2198,7 @@ static Value bi_plot(Interp *I, Value *args, uint32_t n)
     }
 
     gp_check_opts(I, opts, "plot");
+    if (plot_is_ascii()) { ascii_plot_render(I, X, Y, yvec, npts, nser, opts); return val_null(); }
     FILE *g = gp_open(I);
     gp_opts(I, g, opts);
     fputs("plot ", g);
@@ -2136,9 +2249,8 @@ static Value bi_hist(Interp *I, Value *args, uint32_t n)
         if (b >= nb) b = nb - 1;
         cnt[b]++;
     }
+    if (plot_is_ascii()) { ascii_hist_render(vout(), lo, w, nb, cnt, opts); free(cnt); return val_null(); }
     FILE *g = gp_open(I);
-    gp_opts(I, g, opts);
-    fprintf(g, "set boxwidth %.17g\nset style fill solid 0.6\n", w * 0.95);
     Value hlv = (opts.kind == VAL_RECORD) ? gp_label(as_rec(opts), 1) : val_null();
     fputs("plot '-' using 1:2 with boxes title ", g);
     if (hlv.kind == VAL_STRING) gp_qstr(g, as_str(hlv)->data, as_str(hlv)->len);

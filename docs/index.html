@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neutrino — a small functional array language</title>
+<meta name="description" content="Neutrino, a small functional array language, running in your browser via WebAssembly.">
+<style>
+  :root {
+    --blue: #208bff;
+    --purple: #6a5bff;
+    --cyan: #00c2d6;
+    --grey: #788496;
+    --bg: #0b0e14;
+    --bg2: #11151f;
+    --fg: #c9d4e3;
+    --dim: #66738a;
+    --err: #ff6b6b;
+    --ok: #4ec9a8;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  body { display: flex; flex-direction: column; }
+  header {
+    padding: 14px 20px;
+    border-bottom: 1px solid #1c2230;
+    display: flex; align-items: center; gap: 14px;
+    background: linear-gradient(180deg, #0d111a, var(--bg));
+  }
+  .logo {
+    font-weight: 700; font-size: 17px; letter-spacing: 0.5px;
+    background: linear-gradient(90deg, var(--blue), var(--cyan));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .tagline { color: var(--dim); font-size: 12.5px; }
+  header .spacer { flex: 1; }
+  header a {
+    color: var(--dim); text-decoration: none; font-size: 12.5px;
+    padding: 4px 10px; border: 1px solid #232a3a; border-radius: 6px;
+    transition: all .15s;
+  }
+  header a:hover { color: var(--cyan); border-color: var(--cyan); }
+  #term {
+    flex: 1; overflow-y: auto; padding: 16px 20px 4px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  #term .echo { color: var(--fg); }
+  #term .out { color: var(--fg); }
+  #term .err { color: var(--err); }
+  #term .prompt { color: var(--cyan); }
+  #term .dim { color: var(--dim); }
+  .inputline { display: flex; align-items: baseline; padding: 2px 20px 16px; }
+  .inputline .prompt { color: var(--cyan); flex: none; margin-right: 8px; }
+  #input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--fg); font-family: inherit; font-size: inherit; line-height: 1.5;
+    caret-color: var(--cyan);
+  }
+  .banner-logo { color: var(--blue); }
+  .banner-dot1 { color: var(--purple); }
+  .banner-dot2 { color: var(--cyan); }
+  .banner-dim { color: var(--grey); }
+  .chip {
+    display: inline-block; padding: 1px 7px; margin: 0 2px;
+    border: 1px solid #232a3a; border-radius: 5px; color: var(--dim);
+    cursor: pointer; font-size: 12px; transition: all .12s;
+  }
+  .chip:hover { color: var(--cyan); border-color: var(--cyan); }
+  footer { color: var(--dim); font-size: 11.5px; padding: 8px 20px; border-top: 1px solid #1c2230; }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: #1c2230; border-radius: 5px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">Neutrino</span>
+  <span class="tagline">a small functional array language · in your browser</span>
+  <span class="spacer"></span>
+  <a href="https://github.com/micomrkaic/Neutrino" target="_blank" rel="noopener">GitHub</a>
+</header>
+
+<div id="term"><span class="dim">booting WebAssembly…</span>
+</div>
+
+<div class="inputline" id="inputline" style="display:none">
+  <span class="prompt">neutrino&gt;</span><input id="input" autocomplete="off" autocapitalize="off" spellcheck="false" autofocus>
+</div>
+
+<footer>
+  Try: <span class="chip" data-cmd="2 + 3 * 4">2 + 3 * 4</span>
+  <span class="chip" data-cmd="let A = [1, 2; 3, 4]; inv(A)">inv(A)</span>
+  <span class="chip" data-cmd="eig([2, 1; 1, 2]).values">eig</span>
+  <span class="chip" data-cmd="fzero(cos, 1, 2)">fzero</span>
+  <span class="chip" data-cmd="integral(fn x -> x^2, 0, 1)">integral</span>
+  <span class="chip" data-cmd="help(svd)">help(svd)</span>
+  <span class="chip" data-cmd="plot(1:20, map(fn x -> sin(x/3), 1:20), {title = &quot;sine&quot;})">plot</span>
+  <span class="chip" data-cmd="hist(randn(1, 2000), 15)">hist</span>
+  <span class="chip" data-cmd="who">who</span>
+  &nbsp;·&nbsp; up/down for history &nbsp;·&nbsp; single-line entries (use <span class="dim">;</span> to sequence)
+</footer>
+
+<script src="neutrino.js"></script>
+<script>
+(function () {
+  var term = document.getElementById('term');
+  var inputline = document.getElementById('inputline');
+  var input = document.getElementById('input');
+  var history = [];
+  var histpos = 0;
+  var evalLine = null;
+
+  function el(cls, text) {
+    var s = document.createElement('span');
+    if (cls) s.className = cls;
+    s.textContent = text;
+    return s;
+  }
+  function writeRaw(node) { term.appendChild(node); scroll(); }
+  function writeLine(cls, text) {
+    var d = document.createElement('div');
+    d.appendChild(el(cls, text));
+    term.appendChild(d); scroll();
+  }
+  function scroll() { term.scrollTop = term.scrollHeight; }
+
+  // Colour interpreter output: lines starting with "  error"/"  parse error" are errors.
+  function writeResult(text) {
+    if (!text) return;
+    var lines = text.split('\n');
+    // trailing empty element from final newline
+    if (lines.length && lines[lines.length - 1] === '') lines.pop();
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      var cls = /^\s*(error|parse error)\b/.test(l) ? 'err' : 'out';
+      var d = document.createElement('div');
+      d.appendChild(el(cls, l));
+      term.appendChild(d);
+    }
+    scroll();
+  }
+
+  function banner() {
+    var art = [
+      [' \u256d\u2500\u2574   \u2576\u2500\u256e     ', 'banner-logo', ' _   _            _        _             ', 'banner-logo'],
+      ['   \u25aa \u25aa \u25aa      ', 'banner-dim',  '| \\ | | ___ _   _| |_ _ __(_)_ __   ___  ', 'banner-logo'],
+      [' \u00b7 \u25aa \u25c9 \u25aa \u00b7    ', 'mix',       '|  \\| |/ _ \\ | | | __| \'__| | \'_ \\ / _ \\ ', 'banner-logo'],
+      ['   \u25aa \u25aa \u25aa      ', 'banner-dim',  '| |\\  |  __/ |_| | |_| |  | | | | | (_) |', 'banner-logo'],
+      [' \u2570\u2500\u2574   \u2576\u2500\u256f     ', 'banner-logo', '|_| \\_|\\___|\\__,_|\\__|_|  |_|_| |_|\\___/ ', 'banner-logo']
+    ];
+    for (var i = 0; i < art.length; i++) {
+      var d = document.createElement('div');
+      var left = art[i][0];
+      if (art[i][1] === 'mix') {
+        d.appendChild(el('banner-dot1', ' \u00b7 '));
+        d.appendChild(el('banner-dim', '\u25aa '));
+        d.appendChild(el('banner-dot2', '\u25c9'));
+        d.appendChild(el('banner-dim', ' \u25aa'));
+        d.appendChild(el('banner-dot1', ' \u00b7    '));
+      } else {
+        d.appendChild(el(art[i][1], left));
+      }
+      d.appendChild(el(art[i][3], art[i][2]));
+      term.appendChild(d);
+    }
+    writeLine('banner-dim', '              a small functional array language');
+    scroll();
+  }
+
+  Neutrino().then(function (M) {
+    evalLine = function (s) {
+      var n = M.lengthBytesUTF8(s) + 1;
+      var p = M._malloc(n);
+      M.stringToUTF8(s, p, n);
+      var r = M.UTF8ToString(M._nu_eval(p));
+      M._free(p);
+      return r;
+    };
+    M._nu_init();
+    var ver = M.UTF8ToString(M._nu_version());
+    term.innerHTML = '';
+    banner();
+    writeLine('banner-dim', '              ' + ver);
+    writeLine('dim', '');
+    writeLine('dim', 'Type an expression and press Enter. help lists the builtins;');
+    writeLine('dim', 'help(name) shows one with examples. plot and hist draw as ASCII here.');
+    writeLine('dim', '');
+    inputline.style.display = 'flex';
+    input.focus();
+  }).catch(function (e) {
+    writeLine('err', 'Failed to start Neutrino: ' + e.message);
+  });
+
+  function run(line) {
+    // echo the entered line with a prompt
+    var d = document.createElement('div');
+    d.appendChild(el('prompt', 'neutrino> '));
+    d.appendChild(el('echo', line));
+    term.appendChild(d);
+    if (line.trim()) {
+      history.push(line);
+      histpos = history.length;
+      try {
+        writeResult(evalLine(line));
+      } catch (e) {
+        writeLine('err', '  internal error: ' + e.message);
+      }
+    }
+    scroll();
+  }
+
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      var line = input.value;
+      input.value = '';
+      run(line);
+    } else if (e.key === 'ArrowUp') {
+      if (histpos > 0) { histpos--; input.value = history[histpos]; moveCaretEnd(); }
+      e.preventDefault();
+    } else if (e.key === 'ArrowDown') {
+      if (histpos < history.length - 1) { histpos++; input.value = history[histpos]; }
+      else { histpos = history.length; input.value = ''; }
+      e.preventDefault();
+    } else if (e.key === 'l' && e.ctrlKey) {
+      // ctrl-L clears the screen, keeps the session
+      var kids = term.querySelectorAll('div');
+      for (var i = 0; i < kids.length; i++) kids[i].remove();
+      e.preventDefault();
+    }
+  });
+  function moveCaretEnd() {
+    setTimeout(function () { input.selectionStart = input.selectionEnd = input.value.length; }, 0);
+  }
+
+  // clicking anywhere focuses the input; chips run their command
+  document.addEventListener('click', function (e) {
+    if (e.target.classList.contains('chip')) {
+      input.value = e.target.getAttribute('data-cmd');
+      run(input.value); input.value = ''; input.focus();
+      return;
+    }
+    if (window.getSelection().toString() === '') input.focus();
+  });
+})();
+</script>
+</body>
+</html>
