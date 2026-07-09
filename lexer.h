@@ -69,6 +69,7 @@ typedef struct {
     uint32_t       line;       /* 1-based */
     enum TokenKind prev;       /* last emitted kind — drives '  disambiguation */
     const char    *error;      /* diagnostic for the most recent TOK_ERROR */
+    int            depth;      /* open ( [ { nesting: newlines inside are whitespace */
 } Lexer;
 
 void  lexer_init(Lexer *lx, const char *src);

@@ -330,6 +330,43 @@ int repl_run(void)
                 free(line);
                 continue;
             }
+            if ((arg = match_command(q, "manual"))) {
+                /* Page MANUAL.md: look in the current directory, then next to
+                 * the binary's directory (set NEUTRINO_MANUAL to override). */
+                const char *cand[3]; int nc = 0;
+                const char *envp = getenv("NEUTRINO_MANUAL");
+                if (envp && *envp) cand[nc++] = envp;
+                cand[nc++] = "MANUAL.md";
+                cand[nc++] = "/usr/local/share/neutrino/MANUAL.md";
+                const char *found = nullptr;
+                for (int ci = 0; ci < nc; ci++) {
+                    FILE *tf = fopen(cand[ci], "rb");
+                    if (tf) { fclose(tf); found = cand[ci]; break; }
+                }
+                if (!found) {
+                    fputs("manual: MANUAL.md not found (run from the repo root, "
+                          "or set NEUTRINO_MANUAL=/path/to/MANUAL.md)\n", stderr);
+                } else {
+                    const char *pager = getenv("PAGER");
+                    if (!pager || !*pager) pager = "less";
+                    char cmd[1200];
+                    snprintf(cmd, sizeof cmd, "%s '%s'", pager, found);
+                    if (system(cmd) != 0) {           /* no pager? print it */
+                        FILE *mf = fopen(found, "rb");
+                        if (mf) {
+                            char buf[4096]; size_t got;
+                            while ((got = fread(buf, 1, sizeof buf, mf)) > 0)
+                                fwrite(buf, 1, got, stdout);
+                            fclose(mf);
+                        }
+                    }
+                }
+#ifdef HAVE_READLINE
+                add_history(line);
+#endif
+                free(line);
+                continue;
+            }
             if ((arg = match_command(q, "pretty"))) {
                 if (!strcmp(arg, "on") || !strcmp(arg, "1"))       value_set_multiline(true);
                 else if (!strcmp(arg, "off") || !strcmp(arg, "0")) value_set_multiline(false);

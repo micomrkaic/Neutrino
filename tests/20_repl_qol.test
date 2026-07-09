@@ -97,3 +97,12 @@ fields({yr = 1, cpi = 2})'
 => ["yr", "cpi"]
 fields(42)
 => !expected a record
+# error / assert: user-raised errors
+error("boom with value {}", 42)
+=> !boom with value 42
+assert(1 < 2); "fine"
+=> "fine"
+assert(1 > 2, "nope: {}", 7)
+=> !nope: 7
+assert(3)
+=> !condition must be a Bool

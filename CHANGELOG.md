@@ -12,6 +12,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.4.0: `error`/`assert`, multi-line expressions, and release tooling.**
+  Packages now validate inputs like builtins do: `error(tmpl, ...)` raises
+  with fmt-style templating and `assert(cond, tmpl, ...)` is its guard form —
+  `dist.nu` quantiles now say "p must be in (0,1)" instead of crashing.
+  Newlines are plain whitespace inside any open bracket (DESIGN_NOTES entry 8,
+  resolved): expressions, matrices, and records span lines in files, and the
+  REPL reads continuation lines automatically; matrix rows still take an
+  explicit `;`. The `help` tour now lists the strings, solvers, data-files,
+  and plotting categories it was missing; a new `manual` REPL command pages
+  MANUAL.md ($PAGER, with a plain-print fallback); and `deploy.sh` releases a
+  tarball to GitHub tagged with the version baked into version.h.
 - **Strings, phase 3 (v1.3.0): cashing the cheques.** `readtable` now loads
   non-numeric CSV columns as string arrays — the original motivating wound,
   healed (two-pass column classification; empty cells stay `nan` in numeric

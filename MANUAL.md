@@ -495,6 +495,19 @@ neutrino> body(cube)
 fn x -> x^3
 ```
 
+Expressions may span lines wherever a `(`, `[`, or `{` is open — newlines
+there are plain whitespace (matrix rows still take an explicit `;`). At the
+top level a newline ends the statement, and the REPL reads continuation
+lines automatically while a bracket is open.
+
+Packages validate their inputs with `error` and `assert`:
+
+```
+neutrino> let f = fn x -> (assert(x > 0, "f needs x > 0, got {}", x); sqrt(x))
+neutrino> f(-4)
+error: f needs x > 0, got -4
+```
+
 Packages can `load` other packages (nesting is capped, so circular loads
 error cleanly). Closures capture by value, so packages are libraries of
 functions rather than stateful modules. Errors inside a loaded file are
@@ -665,6 +678,8 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 |---|---|
 | `print(...) | print(tmpl, ...)` | print values; template fills {} in order; {:[-][w][.p][f|e|g]} formats a hole ({{ }} literal) |
 | `fields(r)` | the record's field names, as a string column |
+| `error(msg) | error(tmpl, ...)` | raise a runtime error (fmt-style template) |
+| `assert(cond) | assert(cond, tmpl, ...)` | error unless cond is true |
 | `who` | list the variables you have defined (name, type, shape) |
 | `help / help(f)` | help lists every builtin; help(f) describes one |
 | `system(cmd)` | run a shell command string; return its exit status |

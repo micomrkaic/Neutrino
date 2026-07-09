@@ -211,12 +211,15 @@ Token lexer_next(Lexer *lx)
     if (c == '\0')
         return tok(lx, TOK_EOF, start, line, col);
 
-    /* newline: consume the run (newlines + intervening trivia) and emit one */
+    /* newline: consume the run (newlines + intervening trivia). Inside any
+     * open bracket the newline is just whitespace — expressions may span
+     * lines there (matrix rows still need ';'). At top level, emit one. */
     if (c == '\n') {
         do {
             lx->cur++; lx->line++; lx->line_start = lx->cur;
             skip_trivia(lx);
         } while (*lx->cur == '\n');
+        if (lx->depth > 0) return lexer_next(lx);
         return tok(lx, TOK_NEWLINE, start, line, col);
     }
 
@@ -231,12 +234,12 @@ Token lexer_next(Lexer *lx)
 
     lx->cur++;   /* consume first char of an operator/punct token */
     switch (c) {
-    case '(': return tok(lx, TOK_LPAREN, start, line, col);
-    case ')': return tok(lx, TOK_RPAREN, start, line, col);
-    case '[': return tok(lx, TOK_LBRACK, start, line, col);
-    case ']': return tok(lx, TOK_RBRACK, start, line, col);
-    case '{': return tok(lx, TOK_LBRACE, start, line, col);
-    case '}': return tok(lx, TOK_RBRACE, start, line, col);
+    case '(': lx->depth++; return tok(lx, TOK_LPAREN, start, line, col);
+    case ')': if (lx->depth > 0) lx->depth--; return tok(lx, TOK_RPAREN, start, line, col);
+    case '[': lx->depth++; return tok(lx, TOK_LBRACK, start, line, col);
+    case ']': if (lx->depth > 0) lx->depth--; return tok(lx, TOK_RBRACK, start, line, col);
+    case '{': lx->depth++; return tok(lx, TOK_LBRACE, start, line, col);
+    case '}': if (lx->depth > 0) lx->depth--; return tok(lx, TOK_RBRACE, start, line, col);
     case ',': return tok(lx, TOK_COMMA,  start, line, col);
     case ';': return tok(lx, TOK_SEMI,   start, line, col);
     case ':': return tok(lx, TOK_COLON,  start, line, col);

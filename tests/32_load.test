@@ -25,3 +25,6 @@ load(42)
 # load returns null: silent on success
 load("tests/data/mathlib.nu"); "ok"
 => "ok"
+# multi-line expressions in files (newline is whitespace inside brackets)
+load("tests/data/multiline.nu"); total
+=> 20

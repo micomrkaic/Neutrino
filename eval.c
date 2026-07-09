@@ -1400,6 +1400,8 @@ static const BuiltinDoc builtin_docs[] = {
     { "num",       "num(s)",             "parse a string as a number (Int if exact, else Float)", "string" , "num(\"42\") + num(\"2.5\")         %= 44.5" },
     { "fmt",       "fmt(tmpl, ...)",     "print's template, returned as a string instead of printed", "string" , "fmt(\"x = {:.2f}\", 3.14159)      %= \"x = 3.14\"" },
     { "fields","fields(r)",         "the record's field names, as a string column", "core" , "fields({yr = 1, cpi = 2})'        %= [\"yr\", \"cpi\"]" },
+    { "error",  "error(msg) | error(tmpl, ...)", "raise a runtime error (fmt-style template)", "core" , "error(\"p must be in (0,1), got {}\", 1.5)   % raises that message" },
+    { "assert", "assert(cond) | assert(cond, tmpl, ...)", "error unless cond is true", "core" , "assert(2 > 1)                     % passes silently" },
     { "strsplit","strsplit(s, sep)", "split a string on a separator, giving a string row vector", "string" , "strsplit(\"a-b-c\", \"-\")          %= [\"a\", \"b\", \"c\"]" },
     { "strjoin", "strjoin(a, sep)",  "join a string array with a separator", "string" , "strjoin([\"x\", \"y\", \"z\"], \", \")  %= \"x, y, z\"" },
     { "who",   "who",               "list the variables you have defined (name, type, shape)", "core" , "who                               % lists your variables with type and shape" },
@@ -2818,6 +2820,28 @@ static Value bi_fmt(Interp *I, Value *args, uint32_t n)
     return rs;
 }
 
+/* error(msg) / error(tmpl, ...): raise a runtime error from Neutrino code.
+ * Uses fmt's templating, so packages validate like builtins do. */
+static Value bi_error(Interp *I, Value *args, uint32_t n)
+{
+    Value m = bi_fmt(I, args, n);
+    char buf[240];
+    StrObj *sv = as_str(m);
+    snprintf(buf, sizeof buf, "%.*s", (int)sv->len, sv->data);
+    value_release(m);
+    runtime_error(I, "%s", buf);
+}
+
+/* assert(cond) / assert(cond, tmpl, ...): error unless cond is true. */
+static Value bi_assert(Interp *I, Value *args, uint32_t n)
+{
+    if (args[0].kind != VAL_BOOL)
+        runtime_error(I, "assert: the condition must be a Bool, got %s", type_name(args[0].kind));
+    if (args[0].as.b) return val_null();
+    if (n > 1) return bi_error(I, args + 1, n - 1);
+    runtime_error(I, "assertion failed");
+}
+
 static Value bi_strsplit(Interp *I, Value *args, uint32_t n)
 {
     (void)n;
@@ -3048,9 +3072,10 @@ static Value bi_help(Interp *I, Value *args, uint32_t n)
     /* help() — grouped catalogue of builtins, then a language cheat-sheet */
     static const struct { const char *cat, *label; } groups[] = {
         { "core",    "core" },        { "make",    "constructors" }, { "reduce",  "reductions" },
-        { "array",   "arrays" },      { "math",    "math" },         { "trig",    "trigonometry" },
-        { "complex", "complex" },     { "linalg",  "linear algebra" },{ "random",  "random" },
-        { "test",    "predicates" },  { "hof",     "higher-order" },
+        { "array",   "arrays" },      { "string",  "strings" },      { "math",    "math" },
+        { "trig",    "trigonometry" },{ "complex", "complex" },      { "linalg",  "linear algebra" },
+        { "solve",   "solvers" },     { "io",      "data files" },   { "plot",    "plotting" },
+        { "random",  "random" },      { "test",    "predicates" },   { "hof",     "higher-order" },
     };
     fputs("Neutrino builtins  —  help(name) for detail, e.g. help(svd)\n\n", vout());
     for (size_t gi = 0; gi < sizeof groups / sizeof *groups; gi++) {
@@ -3074,6 +3099,7 @@ static Value bi_help(Interp *I, Value *args, uint32_t n)
     fputs("  # comment    trailing ; hides a line's result\n", vout());
     fputs("  format short|long|\"short e\"   number display     more on|off   paging (REPL)\n", vout());
     fputs("  pretty on|off   aligned multi-line matrices (REPL)\n", vout());
+    fputs("  manual          page the full MANUAL.md (REPL)\n", vout());
     fputs("  !cmd   run a shell command (REPL)       system(\"cmd\")   run one, get its exit code\n", vout());
     return val_null();
 }
@@ -5160,6 +5186,8 @@ EnvObj *globals_new(void)
     def_builtin(e, "str",        bi_str,        1, 1);
     def_builtin(e, "num",        bi_num,        1, 1);
     def_builtin(e, "fmt",        bi_fmt,        1, UINT32_MAX);
+    def_builtin(e, "error",     bi_error,    1, UINT32_MAX);
+    def_builtin(e, "assert",    bi_assert,   1, UINT32_MAX);
     def_builtin(e, "strsplit",  bi_strsplit, 2, 2);
     def_builtin(e, "strjoin",   bi_strjoin,  2, 2);
     def_builtin(e, "fields", bi_fields, 1, 1);

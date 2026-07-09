@@ -188,7 +188,7 @@ is remembered.
 
 ---
 
-## 8. Newline-tolerant expressions inside brackets  *(triggered — first real friction)*
+## 8. Newline-tolerant expressions inside brackets  *(RESOLVED in v1.4.0)*
 
 Writing `packages/dist.nu`, the natural formatting
 
@@ -205,6 +205,12 @@ DESIGN_NOTES trigger actually fired by a real transcript — the package file
 itself is the evidence. Effort: lexer/parser newline handling, small; the
 care point is matrix literals, where a newline inside `[ ]` could plausibly
 mean a row separator (Octave) — decide explicitly and document.
+
+**Resolution (v1.4.0):** newlines are plain whitespace inside any open
+`(`/`[`/`{` — one rule, no special cases; matrix rows always take an
+explicit `;`. Implemented as a bracket-depth counter in the lexer; the
+REPL's existing unterminated-input heuristic then gives multi-line entry
+for free. `dist.nu` reformatted as the proof.
 
 ---
 
