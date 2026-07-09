@@ -1,0 +1,65 @@
+# Strings phase 1: scalar operations, byte semantics
+"neu" + "trino"
+=> "neutrino"
+"a" == "a"
+=> true
+"a" != "b"
+=> true
+"apple" < "banana"
+=> true
+"ab" < "abc"
+=> true
+"b" >= "a"
+=> true
+let s = "neutrino"; s[1] + s[4:8]
+=> "ntrino"
+let s = "neutrino"; s[end - 3 : end]
+=> "rino"
+let s = "abc"; s[[3, 2, 1]]
+=> "cba"
+length("neutrino")
+=> 8
+length("")
+=> 0
+upper("neutrino")
+=> "NEUTRINO"
+lower("Hi There")
+=> "hi there"
+trim("  x  ")
+=> "x"
+contains("neutrino", "trin")
+=> true
+contains("neutrino", "xyz")
+=> false
+startswith("neutrino", "neu")
+=> true
+endswith("data.csv", ".csv")
+=> true
+strrep("a-b-c", "-", "+")
+=> "a+b+c"
+strrep("aaaa", "aa", "b")
+=> "bb"
+str(1.5) + str(true)
+=> "1.5true"
+num("42") + num("2.5")
+=> 44.5
+num("  -3e2 ")
+=> -300
+fmt("x = {:.2f}, n = {}", 3.14159, 7)
+=> "x = 3.14, n = 7"
+# strictness held: no implicit conversion, ever
+"a" + 1
+=> !arithmetic on non-numbers
+"a" < 5
+=> !comparison on non-numbers
+"a" * "b"
+=> !supports only + (concatenation)
+num("hello")
+=> !not a number
+"abc"[9]
+=> !out of bounds
+upper(5)
+=> !expected a string
+# strings roundtrip through save (existing machinery)
+let greet = "hi \"you\""; save("/tmp/nu_s1.nu"); clear(); load("/tmp/nu_s1.nu"); greet + "!"
+=> "hi "you"!"

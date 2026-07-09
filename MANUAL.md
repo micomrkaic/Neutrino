@@ -110,7 +110,7 @@ Neutrino has nine value kinds. The scalar kinds:
 | `Float` | `3.14`, `1e-9`, `2.5e3` | IEEE double |
 | `Bool` | `true`, `false` | distinct from numbers: `1 == true` is an error |
 | `Complex` | `2i`, `1 + 3i`, `2.5i` | double re/im pair |
-| `String` | `"hello"` | **inert**: strings display, print, and pass around, but have no operations — no concatenation, comparison, or indexing (yet) |
+| `String` | `"hello"` | byte strings: `+` concatenates, comparisons are lexicographic, `s[i]`/`s[a:b]` index bytes (see the Strings section) |
 | `Null` | `null` | the "no value" value; a suppressed or valueless statement yields it |
 
 And the compound kinds: `Array` (the 2-D numeric matrix — every array is
@@ -413,6 +413,35 @@ A divergent or wildly oscillatory integrand fails with an error rather than a
 wrong answer; infinite limits are rejected — substitute to a finite domain
 first.
 
+### Strings
+
+Strings are byte sequences (UTF-8 passes through but is not interpreted;
+`length` and indexing count bytes). `+` concatenates; `==`, `!=`, `<` and
+friends compare lexicographically, shorter prefixes first; indexing uses the
+same machinery as arrays, so ranges, `end`, and even permutations work:
+
+```
+neutrino> let s = "neutrino"
+neutrino> s[1:3] + "!" + s[end]
+"neu!o"
+neutrino> "apple" < "banana"
+true
+```
+
+The library: `upper`, `lower`, `trim`, `contains(s, sub)`,
+`startswith(s, p)`, `endswith(s, p)`, `strrep(s, old, new)`. Two bridges:
+`str(x)` gives any value's display text as a string, `num(s)` parses a
+string as a number (Int if exact, else Float). And `fmt(tmpl, ...)` is
+`print`'s template engine returning a string instead of printing:
+
+```
+neutrino> fmt("run {} done in {:.2f}s", 3, 1.234)
+"run 3 done in 1.23s"
+```
+
+String-and-number arithmetic is still an error — there is no implicit
+conversion in either direction; use `str` and `num` to cross the bridge.
+
 ### Packages: `load`
 
 `load("file.nu")` runs a file in the current session; its `let` bindings
@@ -609,6 +638,7 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | Signature | Description |
 |---|---|
 | `print(...) | print(tmpl, ...)` | print values; template fills {} in order; {:[-][w][.p][f|e|g]} formats a hole ({{ }} literal) |
+| `fields(r)` | list a record's field names with type and shape |
 | `who` | list the variables you have defined (name, type, shape) |
 | `help / help(f)` | help lists every builtin; help(f) describes one |
 | `system(cmd)` | run a shell command string; return its exit status |
@@ -624,6 +654,21 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `mem` | print workspace size (variables) and peak process memory |
 | `tic` | start the wall-clock timer (monotonic) |
 | `toc` | seconds elapsed since tic |
+
+### Strings
+
+| Signature | Description |
+|---|---|
+| `upper(s)` | uppercase (ASCII bytes) |
+| `lower(s)` | lowercase (ASCII bytes) |
+| `trim(s)` | strip leading and trailing whitespace |
+| `contains(s, sub)` | true if sub occurs in s |
+| `startswith(s, p)` | true if s begins with p |
+| `endswith(s, p)` | true if s ends with p |
+| `strrep(s, old, new)` | replace every occurrence of old with new |
+| `str(x)` | the display text of any value, as a string |
+| `num(s)` | parse a string as a number (Int if exact, else Float) |
+| `fmt(tmpl, ...)` | print's template, returned as a string instead of printed |
 
 ### Solvers
 

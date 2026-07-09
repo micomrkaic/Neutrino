@@ -90,3 +90,8 @@ plot([1, 2, 3], {label = 7})
 => !label must be a string
 plot([1, 2], [3, 4], {label2 = [1]})
 => !label2 must be a string
+# fields(r): record introspection, who-style
+fields({a = 5})
+=>   a            int        = 5
+fields(42)
+=> !expected a record

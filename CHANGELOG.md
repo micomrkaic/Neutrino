@@ -12,6 +12,23 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **Strings, phase 1 (v1.1.0).** Scalar strings are no longer inert: `+`
+  concatenates, comparisons are lexicographic byte-wise (shorter prefixes
+  first), and indexing reuses the array machinery — `s[i]`, `s[a:b]`,
+  `s[end]`, masks and permutations all work. Library: `upper`, `lower`,
+  `trim`, `contains`, `startswith`, `endswith`, `strrep`, plus the bridges
+  `str(x)` (display text of any value) and `num(s)` (Int if exact, else
+  Float), and `fmt(tmpl, ...)` — print's template engine returning a string.
+  Byte semantics throughout (UTF-8 passes through, is not interpreted); the
+  strictness doctrine holds: string-number arithmetic is still an error, no
+  implicit conversion in either direction. ASan-clean; 5,000 string-grammar
+  fuzz programs, zero hits. Phase 2 (string arrays) and phase 3 (readtable
+  string columns, composable fields) to follow.
+- **`fields(r)`** lists a record's field names with type and shape,
+  who-style — column names of a `readtable` frame, functions of a package
+  module, parts of a decomposition — without printing the data. (The natural
+  composable form would return an array of name strings; impossible while
+  strings are inert — another entry in the strings-first ledger.)
 - **First package: `packages/dist.nu`.** Probability distributions — pdf,
   cdf, quantile, and sampling for normal, Student t, chi-squared, F,
   exponential, and uniform — written in Neutrino itself on the special-function

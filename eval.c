@@ -138,6 +138,18 @@ static Arith arith_of(enum TokenKind op)
 
 static Value scalar_arith_k(Interp *I, Arith kind, Value a, Value b)
 {
+    if (a.kind == VAL_STRING && b.kind == VAL_STRING) {
+        if (kind != AR_ADD)
+            runtime_error(I, "string arithmetic supports only + (concatenation)");
+        StrObj *x = as_str(a), *y = as_str(b);
+        char *buf = malloc((size_t)x->len + y->len);
+        if (!buf) runtime_error(I, "out of memory");
+        memcpy(buf, x->data, x->len);
+        memcpy(buf + x->len, y->data, y->len);
+        Value r = val_string(buf, x->len + y->len);
+        free(buf);
+        return r;
+    }
     if (!is_num(a) || !is_num(b))
         runtime_error(I, "arithmetic on non-numbers (%s, %s)", type_name(a.kind), type_name(b.kind));
 
@@ -192,6 +204,18 @@ static Value scalar_arith_k(Interp *I, Arith kind, Value a, Value b)
 
 static Value scalar_cmp(Interp *I, enum TokenKind op, Value a, Value b)
 {
+    if (a.kind == VAL_STRING && b.kind == VAL_STRING) {
+        StrObj *x = as_str(a), *y = as_str(b);
+        uint32_t m = x->len < y->len ? x->len : y->len;
+        int c = memcmp(x->data, y->data, m);
+        if (c == 0) c = (x->len > y->len) - (x->len < y->len);   /* prefix: shorter sorts first */
+        switch (op) {
+        case TOK_EQ: return val_bool(c == 0); case TOK_NE: return val_bool(c != 0);
+        case TOK_LT: return val_bool(c <  0); case TOK_LE: return val_bool(c <= 0);
+        case TOK_GT: return val_bool(c >  0); case TOK_GE: return val_bool(c >= 0);
+        default: break;
+        }
+    }
     if (!is_num(a) || !is_num(b))
         runtime_error(I, "comparison on non-numbers (%s, %s)", type_name(a.kind), type_name(b.kind));
 
@@ -689,6 +713,21 @@ static int64_t scalar_ix(Interp *I, Value v, int64_t dim, const char *what)
 
 Value do_index(Interp *I, Value target, Value *idx, uint32_t argc, uint8_t colonmask)
 {
+    if (target.kind == VAL_STRING) {                       /* byte indexing, array semantics */
+        StrObj *sv = as_str(target);
+        if (argc != 1)
+            runtime_error(I, "strings take one index (s[i] or s[a:b])");
+        if (colonmask & 1) return value_retain(target);    /* s[:] is the whole string */
+        size_t count = 0; bool scalar_ix = false;
+        int64_t *sel = resolve_index_dim(I, idx[0], false, (int64_t)sv->len, &count, &scalar_ix, "string");
+        char *buf = malloc(count ? count : 1);
+        if (!buf) { free(sel); runtime_error(I, "out of memory"); }
+        for (size_t k = 0; k < count; k++) buf[k] = sv->data[sel[k]];
+        free(sel);
+        Value r = val_string(buf, (uint32_t)count);
+        free(buf);
+        return r;
+    }
     if (!is_array(target))
         runtime_error(I, "value of type %s is not indexable", type_name(target.kind));
     ArrObj *a = as_arr(target);
@@ -1339,6 +1378,17 @@ typedef struct { const char *name, *sig, *desc, *cat, *ex; } BuiltinDoc;
 static const BuiltinDoc builtin_docs[] = {
     /* core ------------------------------------------------------------ */
     { "print", "print(...) | print(tmpl, ...)", "print values; template fills {} in order; {:[-][w][.p][f|e|g]} formats a hole ({{ }} literal)", "core" , "print(\"x = {}, root = {:.3f}\", 5, sqrt(2))   % x = 5, root = 1.414" },
+    { "upper",     "upper(s)",           "uppercase (ASCII bytes)", "string" , "upper(\"neutrino\")               %= \"NEUTRINO\"" },
+    { "lower",     "lower(s)",           "lowercase (ASCII bytes)", "string" , "lower(\"Hi There\")               %= \"hi there\"" },
+    { "trim",      "trim(s)",            "strip leading and trailing whitespace", "string" , "trim(\"  x  \")                   %= \"x\"" },
+    { "contains",  "contains(s, sub)",   "true if sub occurs in s", "string" , "contains(\"neutrino\", \"trin\")   %= true" },
+    { "startswith","startswith(s, p)",   "true if s begins with p", "string" , "startswith(\"neutrino\", \"neu\")  %= true" },
+    { "endswith",  "endswith(s, p)",     "true if s ends with p", "string" , "endswith(\"data.csv\", \".csv\")   %= true" },
+    { "strrep",    "strrep(s, old, new)","replace every occurrence of old with new", "string" , "strrep(\"a-b-c\", \"-\", \"+\")     %= \"a+b+c\"" },
+    { "str",       "str(x)",             "the display text of any value, as a string", "string" , "str(1.5) + str(true)             %= \"1.5true\"" },
+    { "num",       "num(s)",             "parse a string as a number (Int if exact, else Float)", "string" , "num(\"42\") + num(\"2.5\")         %= 44.5" },
+    { "fmt",       "fmt(tmpl, ...)",     "print's template, returned as a string instead of printed", "string" , "fmt(\"x = {:.2f}\", 3.14159)      %= \"x = 3.14\"" },
+    { "fields","fields(r)",         "list a record's field names with type and shape", "core" , "let d = {yr = [2020, 2021], cpi = [1.2, 5.9]}; fields(d)   % yr, cpi with shapes" },
     { "who",   "who",               "list the variables you have defined (name, type, shape)", "core" , "who                               % lists your variables with type and shape" },
     { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" , "help(sum)                         % details and examples for one builtin" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" , "system(\"date\")                    % run a shell command, returns its exit status" },
@@ -2536,6 +2586,183 @@ static void who_describe(FILE *out, Value v)        /* compact type + shape/valu
     case VAL_BUILTIN: fprintf(out, "builtin"); break;
     default:          fputs(type_name(v.kind), out); break;
     }
+}
+
+/* ------------------------------------------------------------------ */
+/* string builtins (Phase 1: scalar strings; byte semantics)           */
+/* ------------------------------------------------------------------ */
+
+static StrObj *want_strobj(Interp *I, Value v, const char *who)
+{
+    if (v.kind != VAL_STRING) runtime_error(I, "%s: expected a string, got %s", who, type_name(v.kind));
+    return as_str(v);
+}
+
+static Value bi_upper(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    StrObj *s = want_strobj(I, args[0], "upper");
+    char *b = malloc(s->len ? s->len : 1);
+    if (!b) runtime_error(I, "out of memory");
+    for (uint32_t i = 0; i < s->len; i++)
+        b[i] = (s->data[i] >= 'a' && s->data[i] <= 'z') ? s->data[i] - 32 : s->data[i];
+    Value r = val_string(b, s->len); free(b); return r;
+}
+
+static Value bi_lower(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    StrObj *s = want_strobj(I, args[0], "lower");
+    char *b = malloc(s->len ? s->len : 1);
+    if (!b) runtime_error(I, "out of memory");
+    for (uint32_t i = 0; i < s->len; i++)
+        b[i] = (s->data[i] >= 'A' && s->data[i] <= 'Z') ? s->data[i] + 32 : s->data[i];
+    Value r = val_string(b, s->len); free(b); return r;
+}
+
+static bool str_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+
+static Value bi_trim(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    StrObj *s = want_strobj(I, args[0], "trim");
+    uint32_t a = 0, b = s->len;
+    while (a < b && str_isspace(s->data[a])) a++;
+    while (b > a && str_isspace(s->data[b - 1])) b--;
+    return val_string(s->data + a, b - a);
+}
+
+/* naive substring search (memmem is not portable) */
+static int64_t str_find(const char *hay, uint32_t hn, const char *nee, uint32_t nn)
+{
+    if (nn == 0 || nn > hn) return -1;
+    for (uint32_t i = 0; i + nn <= hn; i++)
+        if (memcmp(hay + i, nee, nn) == 0) return (int64_t)i;
+    return -1;
+}
+
+static Value bi_contains(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    StrObj *s = want_strobj(I, args[0], "contains"), *sub = want_strobj(I, args[1], "contains");
+    return val_bool(str_find(s->data, s->len, sub->data, sub->len) >= 0);
+}
+
+static Value bi_startswith(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    StrObj *s = want_strobj(I, args[0], "startswith"), *p = want_strobj(I, args[1], "startswith");
+    return val_bool(p->len <= s->len && memcmp(s->data, p->data, p->len) == 0);
+}
+
+static Value bi_endswith(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    StrObj *s = want_strobj(I, args[0], "endswith"), *p = want_strobj(I, args[1], "endswith");
+    return val_bool(p->len <= s->len && memcmp(s->data + s->len - p->len, p->data, p->len) == 0);
+}
+
+static Value bi_strrep(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    StrObj *s = want_strobj(I, args[0], "strrep"), *from = want_strobj(I, args[1], "strrep"),
+           *to = want_strobj(I, args[2], "strrep");
+    if (from->len == 0) runtime_error(I, "strrep: the pattern to replace cannot be empty");
+    char *buf = nullptr; size_t blen = 0;
+    FILE *ms = open_memstream(&buf, &blen);
+    if (!ms) runtime_error(I, "out of memory");
+    uint32_t i = 0;
+    while (i < s->len) {
+        if (i + from->len <= s->len && memcmp(s->data + i, from->data, from->len) == 0) {
+            fwrite(to->data, 1, to->len, ms);
+            i += from->len;
+        } else fputc(s->data[i++], ms);
+    }
+    fclose(ms);
+    Value r = val_string(buf, (uint32_t)blen);
+    free(buf);
+    return r;
+}
+
+/* str(x): the display text of any value, as a string. */
+static Value bi_str(Interp *I, Value *args, uint32_t n)
+{
+    (void)I; (void)n;
+    if (args[0].kind == VAL_STRING) return value_retain(args[0]);
+    char *buf = nullptr; size_t blen = 0;
+    FILE *ms = open_memstream(&buf, &blen);
+    if (!ms) runtime_error(I, "out of memory");
+    value_print(ms, args[0]);
+    fclose(ms);
+    Value r = val_string(buf, (uint32_t)blen);
+    free(buf);
+    return r;
+}
+
+/* num(s): parse a string as Int (preferred) or Float; whole string must parse. */
+static Value bi_num(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    StrObj *s = want_strobj(I, args[0], "num");
+    char tmp[64];
+    uint32_t a = 0, b = s->len;
+    while (a < b && str_isspace(s->data[a])) a++;
+    while (b > a && str_isspace(s->data[b - 1])) b--;
+    if (b - a == 0 || b - a >= sizeof tmp)
+        runtime_error(I, "num: not a number: \"%.*s\"", (int)s->len, s->data);
+    memcpy(tmp, s->data + a, b - a); tmp[b - a] = '\0';
+    char *endp;
+    errno = 0;
+    long long iv = strtoll(tmp, &endp, 10);
+    if (*endp == '\0' && errno == 0) return val_int((int64_t)iv);
+    errno = 0;
+    double dv = strtod(tmp, &endp);
+    if (*endp == '\0' && errno == 0) return val_float(dv);
+    runtime_error(I, "num: not a number: \"%.*s\"", (int)s->len, s->data);
+}
+
+/* fmt(template, ...): print's template engine, captured into a string. */
+static Value bi_print(Interp *I, Value *args, uint32_t n);
+
+static Value bi_fmt(Interp *I, Value *args, uint32_t n)
+{
+    char *buf = nullptr; size_t blen = 0;
+    FILE *prev = vout();
+    FILE *ms = open_memstream(&buf, &blen);
+    if (!ms) runtime_error(I, "out of memory");
+    value_set_out(ms);
+    jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
+    if (setjmp(I->jmp)) {                       /* bad template: restore out, free, re-raise */
+        value_set_out(prev);
+        fclose(ms); free(buf);
+        memcpy(I->jmp, saved, sizeof(jmp_buf)); longjmp(I->jmp, 1);
+    }
+    Value r = bi_print(I, args, n);
+    memcpy(I->jmp, saved, sizeof(jmp_buf));
+    value_release(r);
+    value_set_out(prev);
+    fclose(ms);
+    uint32_t out_len = (uint32_t)blen;
+    if (out_len && buf[out_len - 1] == '\n') out_len--;   /* drop print's newline */
+    Value rs = val_string(buf, out_len);
+    free(buf);
+    return rs;
+}
+
+/* fields(r): list a record's field names with type and shape, like who. */
+static Value bi_fields(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    if (args[0].kind != VAL_RECORD)
+        runtime_error(I, "fields: expected a record, got %s", type_name(args[0].kind));
+    RecObj *r = as_rec(args[0]);
+    for (uint32_t i = 0; i < r->count; i++) {
+        fprintf(vout(), "  %-12.*s ", (int)r->keylens[i], r->keys[i]);
+        who_describe(vout(), r->vals[i]);
+        fputc('\n', vout());
+    }
+    if (r->count == 0) fputs("(no fields)\n", vout());
+    return val_null();
 }
 
 static Value bi_who(Interp *I, Value *args, uint32_t n)
@@ -4351,6 +4578,7 @@ static void check_cells(Interp *I, int64_t r, int64_t c, const char *name)
 static Value bi_length(Interp *I, Value *args, uint32_t n)
 {
     (void)I; (void)n;
+    if (args[0].kind == VAL_STRING) return val_int(as_str(args[0])->len);
     if (!is_array(args[0])) return val_int(1);
     ArrObj *a = as_arr(args[0]);
     if ((size_t)a->rows * a->cols == 0) return val_int(0);
@@ -4765,6 +4993,17 @@ EnvObj *globals_new(void)
     def_builtin(e, "isnan",    bi_isnan,    1, 1);
     def_builtin(e, "isinf",    bi_isinf,    1, 1);
     def_builtin(e, "isfinite", bi_isfinite, 1, 1);
+    def_builtin(e, "upper",      bi_upper,      1, 1);
+    def_builtin(e, "lower",      bi_lower,      1, 1);
+    def_builtin(e, "trim",       bi_trim,       1, 1);
+    def_builtin(e, "contains",   bi_contains,   2, 2);
+    def_builtin(e, "startswith", bi_startswith, 2, 2);
+    def_builtin(e, "endswith",   bi_endswith,   2, 2);
+    def_builtin(e, "strrep",     bi_strrep,     3, 3);
+    def_builtin(e, "str",        bi_str,        1, 1);
+    def_builtin(e, "num",        bi_num,        1, 1);
+    def_builtin(e, "fmt",        bi_fmt,        1, UINT32_MAX);
+    def_builtin(e, "fields", bi_fields, 1, 1);
     def_builtin(e, "who",   bi_who,   0, 0);
     def_builtin(e, "help",  bi_help,  0, 1);
     def_builtin(e, "system",bi_system,1, 1);

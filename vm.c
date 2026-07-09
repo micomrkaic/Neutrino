@@ -435,6 +435,8 @@ static Value vm_run(Interp *I, Chunk *ch, Value closure, Value *args, uint32_t a
                 ArrObj *ta = as_arr(tgt);
                 if (argc == 1) { d0 = d1 = (int64_t)ta->rows * ta->cols; }
                 else           { d0 = ta->rows; d1 = ta->cols; }
+            } else if (tgt.kind == VAL_STRING) {
+                d0 = d1 = (int64_t)((StrObj *)tgt.as.obj)->len;   /* s[end] */
             }
             if (st->end_sp == st->end_cap) {
                 st->end_cap = st->end_cap ? st->end_cap * 2 : 8;
