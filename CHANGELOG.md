@@ -12,6 +12,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.5.0: workspace filters and completion.** `who` takes selectors —
+  `who("records")`, `who("functions")`, `who("vars")`, plus `"sorted"` for
+  alphabetical order, combinable (`who("functions", "sorted")`); bare `who`
+  is unchanged. Tab completion in the REPL now covers file paths: inside a
+  double-quoted string, TAB completes filenames (`load("packages/di<TAB>`
+  finishes the path and the closing quote), while outside quotes it completes
+  builtins, your variables, and keywords as before — a pty-driven smoke test
+  guards both modes in `make test`. If completion previously did nothing for
+  builtins, your installed binary predates the completion wiring; this
+  release includes it.
 - **v1.4.0: `error`/`assert`, multi-line expressions, and release tooling.**
   Packages now validate inputs like builtins do: `error(tmpl, ...)` raises
   with fmt-style templating and `assert(cond, tmpl, ...)` is its guard form —

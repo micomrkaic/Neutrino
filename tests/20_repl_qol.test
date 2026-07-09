@@ -106,3 +106,10 @@ assert(1 > 2, "nope: {}", 7)
 => !nope: 7
 assert(3)
 => !condition must be a Bool
+# who: filters and sorting (single-match cases keep goldens one-line)
+let f = fn x -> x; let a = 1; who("functions")
+=>   f            function   (1 param)
+let r = {q = 1}; let a = 1; who("records")
+=>   r            record     (1 field)
+who("nope")
+=> !unknown selector

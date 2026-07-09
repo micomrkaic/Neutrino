@@ -67,11 +67,13 @@ apply to scripts — they are REPL features.
 | Command | Effect |
 |---|---|
 | `help` / `help(f)` | catalogue of all builtins / details plus usage examples for one |
-| `who` | your variables, with type and shape |
+| `who` | your variables, with type and shape; `who("records")`, `who("functions")`, `who("vars")`, add `"sorted"` |
 | `clear()` / `clear("a", ...)` | remove all user variables / the named ones (builtins are safe) |
 | `mem` | workspace size and peak process memory |
 | `format …` | number display: `format long`, `format short e`, `format(8)`, `format` to show |
 | `pretty on\|off` | aligned multi-line matrix display (default on in the REPL) |
+| `manual` | page the full manual in your `$PAGER` |
+| `TAB` | complete builtins, your names, and keywords; inside a `"quoted string"` it completes file paths |
 | `more on\|off` | page long output through `$PAGER` (default off) |
 | `!cmd` | run a shell command (`!ls`, `!git status`) |
 | `dis(f)` | disassemble a function's bytecode |
@@ -680,7 +682,7 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `fields(r)` | the record's field names, as a string column |
 | `error(msg) | error(tmpl, ...)` | raise a runtime error (fmt-style template) |
 | `assert(cond) | assert(cond, tmpl, ...)` | error unless cond is true |
-| `who` | list the variables you have defined (name, type, shape) |
+| `who | who("functions", "sorted")` | list the workspace; filter by "records"/"functions"/"vars", add "sorted" for name order |
 | `help / help(f)` | help lists every builtin; help(f) describes one |
 | `system(cmd)` | run a shell command string; return its exit status |
 | `dis(f)` | disassemble a function's bytecode (compiler/VM introspection) |

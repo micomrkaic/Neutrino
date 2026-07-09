@@ -1404,7 +1404,7 @@ static const BuiltinDoc builtin_docs[] = {
     { "assert", "assert(cond) | assert(cond, tmpl, ...)", "error unless cond is true", "core" , "assert(2 > 1)                     % passes silently" },
     { "strsplit","strsplit(s, sep)", "split a string on a separator, giving a string row vector", "string" , "strsplit(\"a-b-c\", \"-\")          %= [\"a\", \"b\", \"c\"]" },
     { "strjoin", "strjoin(a, sep)",  "join a string array with a separator", "string" , "strjoin([\"x\", \"y\", \"z\"], \", \")  %= \"x, y, z\"" },
-    { "who",   "who",               "list the variables you have defined (name, type, shape)", "core" , "who                               % lists your variables with type and shape" },
+    { "who",   "who | who(\"functions\", \"sorted\")", "list the workspace; filter by \"records\"/\"functions\"/\"vars\", add \"sorted\" for name order", "core" , "who(\"functions\")                  % only your fn bindings\nwho(\"sorted\")                     % everything, alphabetical" },
     { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" , "help(sum)                         % details and examples for one builtin" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" , "system(\"date\")                    % run a shell command, returns its exit status" },
     { "dis",   "dis(f)",            "disassemble a function's bytecode (compiler/VM introspection)", "core" , "dis(fn x -> x + 1)                % prints the compiled bytecode" },
@@ -2905,20 +2905,57 @@ static Value bi_fields(Interp *I, Value *args, uint32_t n)
     return out;
 }
 
+/* name comparator over global slots, for who("sorted") */
+static EnvObj *g_who_env;
+static int who_name_cmp(const void *x, const void *y)
+{
+    uint32_t a = *(const uint32_t *)x, b = *(const uint32_t *)y;
+    uint32_t la = g_who_env->namelens[a], lb = g_who_env->namelens[b];
+    uint32_t m = la < lb ? la : lb;
+    int c = memcmp(g_who_env->names[a], g_who_env->names[b], m);
+    return c ? c : (la > lb) - (la < lb);
+}
+
+/* who | who("records"|"functions"|"vars") | who(..., "sorted") — list the
+ * workspace, optionally filtered by kind and sorted by name. */
 static Value bi_who(Interp *I, Value *args, uint32_t n)
 {
-    (void)args; (void)n;
+    enum { W_ALL, W_REC, W_FN, W_VAR } kind = W_ALL;
+    bool sorted = false;
+    for (uint32_t i = 0; i < n; i++) {
+        StrObj *sv = want_strobj(I, args[i], "who");
+        if      (sv->len == 7  && !memcmp(sv->data, "records",   7))  kind = W_REC;
+        else if (sv->len == 9  && !memcmp(sv->data, "functions", 9))  kind = W_FN;
+        else if (sv->len == 4  && !memcmp(sv->data, "vars",      4))  kind = W_VAR;
+        else if (sv->len == 6  && !memcmp(sv->data, "sorted",    6))  sorted = true;
+        else runtime_error(I, "who: unknown selector \"%.*s\" "
+                              "(try \"records\", \"functions\", \"vars\", \"sorted\")",
+                           (int)sv->len, sv->data);
+    }
     EnvObj *g = I->globals;
-    uint32_t shown = 0;
-    if (g)
+    uint32_t *sel = nullptr, nsel = 0;
+    if (g) {
+        sel = malloc(g->count * sizeof *sel);
+        if (!sel) runtime_error(I, "out of memory");
         for (uint32_t i = 0; i < g->count; i++) {
-            if (g->vals[i].kind == VAL_BUILTIN) continue;        /* user bindings only */
+            ValueKind k = g->vals[i].kind;
+            if (k == VAL_BUILTIN) continue;                      /* user bindings only */
+            bool take = kind == W_ALL
+                     || (kind == W_REC && k == VAL_RECORD)
+                     || (kind == W_FN  && k == VAL_CLOSURE)
+                     || (kind == W_VAR && k != VAL_RECORD && k != VAL_CLOSURE);
+            if (take) sel[nsel++] = i;
+        }
+        if (sorted && nsel > 1) { g_who_env = g; qsort(sel, nsel, sizeof *sel, who_name_cmp); }
+        for (uint32_t j = 0; j < nsel; j++) {
+            uint32_t i = sel[j];
             fprintf(vout(), "  %-12.*s ", (int)g->namelens[i], g->names[i]);
             who_describe(vout(), g->vals[i]);
             fputc('\n', vout());
-            shown++;
         }
-    if (!shown) fputs("(no variables defined)\n", vout());
+        free(sel);
+    }
+    if (!nsel) fputs(kind == W_ALL ? "(no variables defined)\n" : "(none match)\n", vout());
     return val_null();
 }
 
@@ -5191,7 +5228,7 @@ EnvObj *globals_new(void)
     def_builtin(e, "strsplit",  bi_strsplit, 2, 2);
     def_builtin(e, "strjoin",   bi_strjoin,  2, 2);
     def_builtin(e, "fields", bi_fields, 1, 1);
-    def_builtin(e, "who",   bi_who,   0, 0);
+    def_builtin(e, "who",   bi_who,   0, 2);
     def_builtin(e, "help",  bi_help,  0, 1);
     def_builtin(e, "system",bi_system,1, 1);
     def_builtin(e, "dis",   bi_dis,   1, 1);

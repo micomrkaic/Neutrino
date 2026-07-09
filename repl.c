@@ -100,9 +100,18 @@ static char *name_generator(const char *text, int state)
 
 static char **repl_completion(const char *text, int start, int end)
 {
-    (void)start; (void)end;
-    rl_attempted_completion_over = 1;          /* no filename fallback */
+    (void)end;
+    rl_attempted_completion_over = 1;          /* we decide; no implicit fallback */
     rl_completion_append_character = '\0';     /* don't append a space (call-friendly) */
+    /* Inside a double-quoted string — an odd number of unescaped '"' before
+     * the word — complete file names, so load("tests/da<TAB> works. */
+    int quotes = 0;
+    for (int i = 0; i < start; i++) {
+        if (rl_line_buffer[i] == '\\') { i++; continue; }
+        if (rl_line_buffer[i] == '"') quotes++;
+    }
+    if (quotes % 2 == 1)
+        return rl_completion_matches(text, rl_filename_completion_function);
     return rl_completion_matches(text, name_generator);
 }
 #endif /* HAVE_READLINE */
