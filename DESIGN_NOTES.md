@@ -188,5 +188,25 @@ is remembered.
 
 ---
 
+## 8. Newline-tolerant expressions inside brackets  *(triggered — first real friction)*
+
+Writing `packages/dist.nu`, the natural formatting
+
+```
+let dist_t_pdf = fn x, v ->
+  exp(lgamma((v + 1) / 2) - ...)
+```
+
+was a parse error: a newline terminates the statement even inside an open
+`(`/`[`/`{`. The standard cure is to suppress statement termination while any
+bracket is open (what Python, Julia, and Lua all do). Workaround today:
+one statement per line (lines are unbounded). This entry records the first
+DESIGN_NOTES trigger actually fired by a real transcript — the package file
+itself is the evidence. Effort: lexer/parser newline handling, small; the
+care point is matrix literals, where a newline inside `[ ]` could plausibly
+mean a row separator (Octave) — decide explicitly and document.
+
+---
+
 *Policy reminder: the trigger for any of these is a real transcript of real
 friction, brought to a design discussion — not this file's existence.*

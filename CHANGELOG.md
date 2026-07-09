@@ -12,6 +12,14 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **First package: `packages/dist.nu`.** Probability distributions — pdf,
+  cdf, quantile, and sampling for normal, Student t, chi-squared, F,
+  exponential, and uniform — written in Neutrino itself on the special-function
+  builtins; quantiles with no closed form use recursive bracket expansion plus
+  `fzero`. Every value cross-checked against SciPy (16 goldens, plus identity
+  checks: quantile inverts CDF, t symmetry, pdf integrates to CDF). Writing it
+  fired the first DESIGN_NOTES trigger: multi-line expressions inside brackets
+  (recorded there as entry 8).
 - **Workspace save/restore and function introspection (v1.0.3).**
   `save("ws.nu")` serializes every variable and function as reloadable
   Neutrino source (restore with `load`); serialization is atomic — built in
