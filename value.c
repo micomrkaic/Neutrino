@@ -87,6 +87,7 @@ void  value_set_out(FILE *f) { g_out = f; }
 size_t elt_size(EltType e)
 {
     switch (e) {
+    case ELT_STRING:  return sizeof(StrObj *);
     case ELT_INT:     return sizeof(int64_t);
     case ELT_FLOAT:   return sizeof(double);
     case ELT_COMPLEX: return sizeof(Cplx);
@@ -106,9 +107,17 @@ static void obj_free(Obj *o)
     case VAL_STRING:
         free(((StrObj *)o)->data);
         break;
-    case VAL_ARRAY:
-        free(((ArrObj *)o)->data);
+    case VAL_ARRAY: {
+        ArrObj *a = (ArrObj *)o;
+        if (a->elt == ELT_STRING) {
+            StrObj **cells = (StrObj **)a->data;
+            size_t n = (size_t)a->rows * a->cols;
+            for (size_t k = 0; k < n; k++)
+                if (cells[k]) value_release((Value){ .kind = VAL_STRING, .as.obj = &cells[k]->obj });
+        }
+        free(a->data);
         break;
+    }
     case VAL_RECORD: {
         RecObj *r = (RecObj *)o;
         for (uint32_t i = 0; i < r->count; i++) value_release(r->vals[i]);
@@ -209,9 +218,23 @@ Value val_builtin(const char *name, BuiltinFn fn, uint32_t min_arity, uint32_t m
 /* ------------------------------------------------------------------ */
 /* array element access                                                */
 /* ------------------------------------------------------------------ */
+/* Immortal empty string: arr_get of a never-written ELT_STRING cell returns
+ * this borrowed singleton (cells are calloc'd null until arr_set). */
+static StrObj *empty_str_singleton(void)
+{
+    static StrObj s; static char nul[1] = "";
+    if (s.obj.rc == 0) { s.obj.kind = VAL_STRING; s.obj.rc = 1u << 30; s.len = 0; s.data = nul; }
+    return &s;
+}
+
 Value arr_get(const ArrObj *a, size_t k)
 {
     switch (a->elt) {
+    case ELT_STRING: {
+        StrObj *p = ((StrObj **)a->data)[k];
+        if (!p) p = empty_str_singleton();
+        return (Value){ .kind = VAL_STRING, .as.obj = &p->obj };   /* borrowed */
+    }
     case ELT_INT:     return val_int(((const int64_t *)a->data)[k]);
     case ELT_FLOAT:   return val_float(((const double *)a->data)[k]);
     case ELT_COMPLEX: { Cplx c = ((const Cplx *)a->data)[k]; return val_complex(c.re, c.im); }
@@ -223,6 +246,14 @@ Value arr_get(const ArrObj *a, size_t k)
 void arr_set(ArrObj *a, size_t k, Value v)
 {
     switch (a->elt) {
+    case ELT_STRING: {
+        StrObj **cell = &((StrObj **)a->data)[k];
+        StrObj *incoming = (v.kind == VAL_STRING) ? as_str(v) : nullptr;
+        if (incoming) value_retain(v);                 /* retain before release: self-assign safe */
+        if (*cell) value_release((Value){ .kind = VAL_STRING, .as.obj = &(*cell)->obj });
+        *cell = incoming;
+        break;
+    }
     case ELT_INT:
         ((int64_t *)a->data)[k] = (v.kind == VAL_INT) ? v.as.i : (int64_t)v.as.f;
         break;
@@ -343,6 +374,7 @@ static void print_scalar(FILE *out, Value v)
     case VAL_INT:     fprintf(out, "%lld", (long long)v.as.i); break;
     case VAL_FLOAT:   fmt_double(out, v.as.f); break;
     case VAL_COMPLEX: print_complex(out, v.as.z.re, v.as.z.im); break;
+    case VAL_STRING:  fprintf(out, "\"%.*s\"", (int)((StrObj *)v.as.obj)->len, ((StrObj *)v.as.obj)->data); break;
     default:          break;
     }
 }
@@ -369,6 +401,7 @@ static void scalar_str(char *buf, size_t cap, Value v)
 {
     switch (v.kind) {
     case VAL_NULL:  snprintf(buf, cap, "null"); break;
+    case VAL_STRING: snprintf(buf, cap, "\"%.*s\"", (int)((StrObj *)v.as.obj)->len, ((StrObj *)v.as.obj)->data); break;
     case VAL_BOOL:  snprintf(buf, cap, "%s", v.as.b ? "true" : "false"); break;
     case VAL_INT:   snprintf(buf, cap, "%lld", (long long)v.as.i); break;
     case VAL_FLOAT: fmt_double_str(buf, cap, v.as.f); break;

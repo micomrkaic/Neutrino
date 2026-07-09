@@ -31,5 +31,6 @@ readcsv("tests/data/bad.csv")
 => !'abc' is not numeric
 readcsv("tests/data/ragged.csv")
 => !has 1 fields, expected 2
+# string columns load as string arrays (they used to be a hard error)
 readtable("tests/data/bad.csv")
-=> !string columns need first-class strings
+=> {c1 = [3], c2 = ["abc"]}

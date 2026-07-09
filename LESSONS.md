@@ -172,3 +172,15 @@ re-teaching these.
 
 And mind the second-system effect. This file is its antidote: the ambition
 is written down, so it does not have to be built.
+
+
+## Postscript (v1.3.0): the strings ledger, closed
+
+The founding regret was repaid in three phased releases — scalar operations
+(1.1.0), string arrays with refcounted elements (1.2.0), and the payoff
+(1.3.0): `readtable` string columns, quote-aware CSV, `strsplit`/`strjoin`,
+composable `fields`. The retrofit worked *because* of the other founding
+decisions: the strictness doctrine meant every operation already had a
+tested refusal to replace with a behavior, and the golden suite plus
+sanitizer-and-fuzz discipline caught a use-after-free, a double-free, and
+two silent-garbage paths before any shipped. strings ledger: closed.

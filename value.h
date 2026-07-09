@@ -20,7 +20,7 @@ typedef enum : uint8_t {
 } ValueKind;
 
 /* array element type — the numeric tower plus a logical (Bool) element */
-typedef enum : uint8_t { ELT_INT, ELT_FLOAT, ELT_COMPLEX, ELT_BOOL } EltType;
+typedef enum : uint8_t { ELT_INT, ELT_FLOAT, ELT_COMPLEX, ELT_BOOL, ELT_STRING } EltType;
 
 typedef struct Obj Obj;
 

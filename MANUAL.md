@@ -439,6 +439,32 @@ neutrino> fmt("run {} done in {:.2f}s", 3, 1.234)
 "run 3 done in 1.23s"
 ```
 
+Strings also form **arrays**: `["a", "bb"; "c", "dd"]` is a 2x2 String
+matrix (mixing strings with numbers in one matrix is an error). Indexing,
+slicing, `end`, transpose, `reshape`, `sort`, and `unique` all work, and
+elementwise operations do what a data-frame user hopes:
+
+```
+neutrino> let names = ["si", "at", "de", "si"]
+neutrino> names == "si"
+[true, false, false, true]
+neutrino> names[names == "si"]
+["si", "si"]
+neutrino> ["pre_", "un_"] + "fix"
+["pre_fix", "un_fix"]
+```
+
+Numeric reductions (`min`, `max`, `sum`, `norm`, …) refuse string arrays
+rather than computing nonsense, and assignment cannot mix kinds: a String
+cell never silently becomes a number, nor the reverse.
+
+`strsplit(s, sep)` and `strjoin(a, sep)` convert between strings and string
+arrays; `fields(r)` returns a record's field names as a string column;
+`readtable` loads non-numeric CSV columns as string arrays (quoted cells,
+RFC-4180 style, are handled); `writecsv` writes string matrices with proper
+quoting; and plots take `{labels = ["low", "high"]}` for multi-series
+legends alongside the older `label1`, `label2`, … form.
+
 String-and-number arithmetic is still an error — there is no implicit
 conversion in either direction; use `str` and `num` to cross the bridge.
 
@@ -638,7 +664,7 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | Signature | Description |
 |---|---|
 | `print(...) | print(tmpl, ...)` | print values; template fills {} in order; {:[-][w][.p][f|e|g]} formats a hole ({{ }} literal) |
-| `fields(r)` | list a record's field names with type and shape |
+| `fields(r)` | the record's field names, as a string column |
 | `who` | list the variables you have defined (name, type, shape) |
 | `help / help(f)` | help lists every builtin; help(f) describes one |
 | `system(cmd)` | run a shell command string; return its exit status |
@@ -669,6 +695,8 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `str(x)` | the display text of any value, as a string |
 | `num(s)` | parse a string as a number (Int if exact, else Float) |
 | `fmt(tmpl, ...)` | print's template, returned as a string instead of printed |
+| `strsplit(s, sep)` | split a string on a separator, giving a string row vector |
+| `strjoin(a, sep)` | join a string array with a separator |
 
 ### Solvers
 

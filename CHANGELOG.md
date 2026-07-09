@@ -12,6 +12,30 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **Strings, phase 3 (v1.3.0): cashing the cheques.** `readtable` now loads
+  non-numeric CSV columns as string arrays — the original motivating wound,
+  healed (two-pass column classification; empty cells stay `nan` in numeric
+  columns and `""` in string columns). CSV reading is quote-aware
+  (RFC-4180-lite: delimiters inside quoted cells, doubled quotes) and
+  `writecsv` writes string matrices with matching quoting, so string data
+  round-trips. `strsplit`/`strjoin` convert between strings and string
+  arrays; `fields(r)` now *returns* the field names as a composable string
+  column (behavior change from the print-only form); plots accept
+  `{labels = ["low", "high"]}` for legends. The strings ledger is closed.
+- **Strings, phase 2 (v1.2.0): string arrays.** A new array element type
+  whose cells are refcounted strings. Literals (`["a", "b"; "c", "d"]`,
+  homogeneous — mixing with numbers errors), indexing/slicing/`end`/masks/
+  permutations, transpose, `reshape`, `sort` and `unique` (lexicographic),
+  and elementwise operations: `names == "si"` gives a Bool mask,
+  `names[names == "si"]` filters, `["pre_", "un_"] + "fix"` broadcasts
+  concatenation. Assignment respects kinds (String cells never silently
+  become numeric or vice versa; copy-on-write preserved), and every numeric
+  reduction (`min`, `max`, `norm`, `hist`, …) refuses string arrays instead
+  of reinterpreting pointers as doubles — the review found and fixed one
+  use-after-free (borrowed scalar escaping `min`) and one silent-garbage
+  path (`norm` returning 0) before they could ship. Zero new builtins: the
+  whole phase is semantics. 24 new goldens; 4,000 string-array fuzz
+  programs, ASan-clean.
 - **Strings, phase 1 (v1.1.0).** Scalar strings are no longer inert: `+`
   concatenates, comparisons are lexicographic byte-wise (shorter prefixes
   first), and indexing reuses the array machinery — `s[i]`, `s[a:b]`,

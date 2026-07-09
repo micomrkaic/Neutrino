@@ -50,6 +50,7 @@ static const char *elt_name(EltType e)
     case ELT_INT:     return "Int";
     case ELT_FLOAT:   return "Float";
     case ELT_COMPLEX: return "Complex";
+    case ELT_STRING:  return "String";
     }
     return "?";
 }
@@ -250,7 +251,7 @@ static Value scalar_cmp(Interp *I, enum TokenKind op, Value a, Value b)
 /* ------------------------------------------------------------------ */
 static EltType vk_elt(ValueKind k)
 {
-    return k == VAL_BOOL ? ELT_BOOL : k == VAL_INT ? ELT_INT : k == VAL_FLOAT ? ELT_FLOAT : ELT_COMPLEX;
+    return k == VAL_BOOL ? ELT_BOOL : k == VAL_INT ? ELT_INT : k == VAL_FLOAT ? ELT_FLOAT : k == VAL_STRING ? ELT_STRING : ELT_COMPLEX;
 }
 static EltType elt_max(EltType a, EltType b) { return a > b ? a : b; }   /* numeric tower only */
 
@@ -743,11 +744,11 @@ Value do_index(Interp *I, Value target, Value *idx, uint32_t argc, uint8_t colon
     if (argc == 1) {
         int64_t numel = (int64_t)a->rows * a->cols;
         if (!(colonmask & 1) && !is_array(idx[0])) {          /* fast path: a[i] */
-            result = arr_get(a, (size_t)scalar_ix(I, idx[0], numel, ""));
+            result = value_retain(arr_get(a, (size_t)scalar_ix(I, idx[0], numel, "")));
         } else {
         size_t cnt; bool scalar;
         sel0 = resolve_index_dim(I, idx[0], colonmask & 1, numel, &cnt, &scalar, "");
-        if (scalar) { result = arr_get(a, (size_t)sel0[0]); }
+        if (scalar) { result = value_retain(arr_get(a, (size_t)sel0[0])); }
         else {
             uint32_t orows, ocols;
             if (colonmask & 1)                         { orows = (uint32_t)cnt; ocols = cnt ? 1 : 0; }      /* a[:] -> column */
@@ -763,12 +764,12 @@ Value do_index(Interp *I, Value target, Value *idx, uint32_t argc, uint8_t colon
         if (!(colonmask & 1) && !is_array(idx[0]) && !(colonmask & 2) && !is_array(idx[1])) {   /* fast path: a[i, j] */
             int64_t r0 = scalar_ix(I, idx[0], a->rows, "row");
             int64_t c0 = scalar_ix(I, idx[1], a->cols, "column");
-            result = arr_get(a, (size_t)r0 * a->cols + (size_t)c0);
+            result = value_retain(arr_get(a, (size_t)r0 * a->cols + (size_t)c0));
         } else {
         size_t rc, cc; bool rs, cs;
         sel0 = resolve_index_dim(I, idx[0], colonmask & 1, a->rows, &rc, &rs, "row");
         sel1 = resolve_index_dim(I, idx[1], colonmask & 2, a->cols, &cc, &cs, "column");
-        if (rs && cs) { result = arr_get(a, (size_t)sel0[0] * a->cols + (size_t)sel1[0]); }
+        if (rs && cs) { result = value_retain(arr_get(a, (size_t)sel0[0] * a->cols + (size_t)sel1[0])); }
         else {
             result = val_array(a->elt, (uint32_t)rc, (uint32_t)cc);
             for (size_t r = 0; r < rc; r++)
@@ -788,7 +789,8 @@ Value do_index(Interp *I, Value target, Value *idx, uint32_t argc, uint8_t colon
 static int elt_rank(EltType e)
 {
     switch (e) { case ELT_BOOL: return 0; case ELT_INT: return 1;
-                 case ELT_FLOAT: return 2; case ELT_COMPLEX: return 3; }
+                 case ELT_FLOAT: return 2; case ELT_COMPLEX: return 3;
+                 case ELT_STRING: return 4; /* never promotes with numerics */ }
     return 0;
 }
 
@@ -799,6 +801,7 @@ static EltType scalar_elt(Interp *I, Value v)
     case VAL_INT:     return ELT_INT;
     case VAL_FLOAT:   return ELT_FLOAT;
     case VAL_COMPLEX: return ELT_COMPLEX;
+    case VAL_STRING:  return ELT_STRING;
     default: runtime_error(I, "cannot assign a value of type %s into an array", type_name(v.kind));
     }
 }
@@ -826,6 +829,10 @@ Value do_index_set(Interp *I, Value target, Value *idx, uint32_t argc,
     ArrObj *vr   = rhs_arr ? as_arr(value) : nullptr;
     size_t  vcnt = rhs_arr ? (size_t)vr->rows * vr->cols : 1;
     EltType velt = rhs_arr ? vr->elt : scalar_elt(I, value);
+    if ((a->elt == ELT_STRING) != (velt == ELT_STRING))
+        runtime_error(I, "cannot assign %s elements into a %s array",
+                      velt == ELT_STRING ? "String" : "numeric",
+                      a->elt == ELT_STRING ? "String" : "numeric");
 
     /* resolve selectors and count the addressed positions */
     size_t rc, cc; bool rs, cs;
@@ -892,19 +899,22 @@ Value build_matrix(Interp *I, Value *ev, uint32_t nrows, const int64_t *rowcount
     uint32_t ntot = 0;
     for (uint32_t r = 0; r < nrows; r++) ntot += (uint32_t)rowcounts[r];
 
-    bool saw_bool = false, saw_num = false;
+    bool saw_bool = false, saw_num = false, saw_str = false;
     EltType numelt = ELT_INT;
     for (uint32_t k = 0; k < ntot; k++) {
         Value e = ev[k];
-        if (!is_num(e) && e.kind != VAL_BOOL && !is_array(e))
-            runtime_error(I, "matrix elements must be numbers or matrices, got %s", type_name(e.kind));
+        if (!is_num(e) && e.kind != VAL_BOOL && e.kind != VAL_STRING && !is_array(e))
+            runtime_error(I, "matrix elements must be numbers, strings, or matrices, got %s", type_name(e.kind));
         EltType ee = is_array(e) ? as_arr(e)->elt : vk_elt(e.kind);
-        if (ee == ELT_BOOL) saw_bool = true;
+        if      (ee == ELT_BOOL)   saw_bool = true;
+        else if (ee == ELT_STRING) saw_str = true;
         else { saw_num = true; numelt = elt_max(numelt, ee); }
     }
+    if (saw_str && (saw_num || saw_bool))
+        runtime_error(I, "cannot mix strings with numbers in a matrix");
     if (saw_bool && saw_num)
         runtime_error(I, "cannot mix Bool and numeric elements in a matrix");
-    EltType elt = saw_bool ? ELT_BOOL : numelt;
+    EltType elt = saw_str ? ELT_STRING : saw_bool ? ELT_BOOL : numelt;
 
     uint32_t *rowh = malloc(nrows * sizeof *rowh);
     if (!rowh) abort();
@@ -1192,6 +1202,7 @@ static Value fold_all(Interp *I, Value a, Value x) { (void)I; return val_bool(a.
 static Value reduce_dim(Interp *I, ArrObj *a, int dim, Value init,
                         Value (*fold)(Interp *, Value, Value))
 {
+    if (a->elt == ELT_STRING) runtime_error(I, "reduction along a dimension is undefined for strings");
     uint32_t R = a->rows, C = a->cols;
     bool seed = init.kind == VAL_NULL;
     if (seed && ((dim == 1 && R == 0) || (dim == 2 && C == 0)))
@@ -1388,7 +1399,9 @@ static const BuiltinDoc builtin_docs[] = {
     { "str",       "str(x)",             "the display text of any value, as a string", "string" , "str(1.5) + str(true)             %= \"1.5true\"" },
     { "num",       "num(s)",             "parse a string as a number (Int if exact, else Float)", "string" , "num(\"42\") + num(\"2.5\")         %= 44.5" },
     { "fmt",       "fmt(tmpl, ...)",     "print's template, returned as a string instead of printed", "string" , "fmt(\"x = {:.2f}\", 3.14159)      %= \"x = 3.14\"" },
-    { "fields","fields(r)",         "list a record's field names with type and shape", "core" , "let d = {yr = [2020, 2021], cpi = [1.2, 5.9]}; fields(d)   % yr, cpi with shapes" },
+    { "fields","fields(r)",         "the record's field names, as a string column", "core" , "fields({yr = 1, cpi = 2})'        %= [\"yr\", \"cpi\"]" },
+    { "strsplit","strsplit(s, sep)", "split a string on a separator, giving a string row vector", "string" , "strsplit(\"a-b-c\", \"-\")          %= [\"a\", \"b\", \"c\"]" },
+    { "strjoin", "strjoin(a, sep)",  "join a string array with a separator", "string" , "strjoin([\"x\", \"y\", \"z\"], \", \")  %= \"x, y, z\"" },
     { "who",   "who",               "list the variables you have defined (name, type, shape)", "core" , "who                               % lists your variables with type and shape" },
     { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" , "help(sum)                         % details and examples for one builtin" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" , "system(\"date\")                    % run a shell command, returns its exit status" },
@@ -1952,17 +1965,35 @@ static const char *want_str(Interp *I, Value v, const char *who)
 }
 
 /* Split one CSV line in place; returns field count, fields[] point into line. */
+/* Split one CSV line in place. Quote-aware (RFC-4180-lite): a cell starting
+ * with '"' runs to its closing quote; delimiters inside are literal and ""
+ * is a literal quote. Quoted cells are rewritten in place without the
+ * surrounding quotes and with doubled quotes collapsed. */
 static uint32_t csv_split(char *line, char delim, char **fields, uint32_t max)
 {
     uint32_t n = 0;
     char *p = line;
-    fields[n++] = p;
-    for (; *p; p++)
-        if (*p == delim) {
-            *p = '\0';
-            if (n >= max) return n;
-            fields[n++] = p + 1;
+    while (n < max) {
+        if (*p == '"') {                              /* quoted cell */
+            char *w = p;                              /* rewrite window start */
+            fields[n++] = w;
+            p++;                                      /* past opening quote */
+            while (*p) {
+                if (*p == '"' && p[1] == '"') { *w++ = '"'; p += 2; }
+                else if (*p == '"')           { p++; break; }
+                else                          *w++ = *p++;
+            }
+            bool more = (*p == delim);
+            *w = '\0';
+            if (!more) break;
+            p++;                                      /* past the delimiter */
+        } else {
+            fields[n++] = p;
+            while (*p && *p != delim) p++;
+            if (*p != delim) break;
+            *p++ = '\0';
         }
+    }
     return n;
 }
 
@@ -2138,37 +2169,54 @@ static Value bi_readtable(Interp *I, Value *args, uint32_t n)
                 break;
             }
     }
-    Value *colv = calloc(cols, sizeof *colv);
-    if (!colv) abort();
-    for (uint32_t j = 0; j < cols; j++) colv[j] = val_array(ELT_FLOAT, (uint32_t)rows, 1);
+    /* Pass 1: classify each column. Any non-empty cell that does not parse
+     * fully as a number makes the whole column a String column. Because the
+     * split lines are consumed by csv_split in place, classification works on
+     * a scratch copy of each line. */
+    bool *is_str = calloc(cols, sizeof *is_str);
+    if (!is_str) abort();
     for (size_t r = 0; r < rows; r++) {
-        uint32_t k = csv_split(c.lines[hline + 1 + r], delim, fields, CSV_MAX_COLS);
+        char *scratch = strdup(c.lines[hline + 1 + r]);
+        if (!scratch) abort();
+        uint32_t k = csv_split(scratch, delim, fields, CSV_MAX_COLS);
         if (k != cols) {
-            for (uint32_t j = 0; j < cols; j++) value_release(colv[j]);
-            free(colv);
+            free(scratch); free(is_str);
             runtime_error(I, "readtable: row %zu has %u fields, expected %u", hline + r + 2, k, cols);
         }
         for (uint32_t j = 0; j < cols; j++) {
-            const char *cell = fields[j];
-            const char *p = cell;
+            if (is_str[j]) continue;
+            const char *p = fields[j];
             while (*p == ' ' || *p == '\t') p++;
-            double v;
-            if (*p == '\0') v = NAN;
-            else {
-                char *end;
-                v = strtod(p, &end);
-                while (*end == ' ' || *end == '\t') end++;
-                if (*end != '\0') {
-                    for (uint32_t jj = 0; jj < cols; jj++) value_release(colv[jj]);
-                    free(colv);
-                    runtime_error(I, "readtable: column '%s', row %zu: '%s' is not numeric "
-                                     "(string columns need first-class strings — not yet in the language)",
-                                  keys[j], hline + r + 2, cell);
-                }
+            if (*p == '\0') continue;                 /* empty: nan for numeric, "" for string */
+            char *end;
+            strtod(p, &end);
+            while (*end == ' ' || *end == '\t') end++;
+            if (*end != '\0') is_str[j] = true;
+        }
+        free(scratch);
+    }
+    /* Pass 2: allocate typed columns and fill. */
+    Value *colv = calloc(cols, sizeof *colv);
+    if (!colv) abort();
+    for (uint32_t j = 0; j < cols; j++)
+        colv[j] = val_array(is_str[j] ? ELT_STRING : ELT_FLOAT, (uint32_t)rows, 1);
+    for (size_t r = 0; r < rows; r++) {
+        csv_split(c.lines[hline + 1 + r], delim, fields, CSV_MAX_COLS);
+        for (uint32_t j = 0; j < cols; j++) {
+            const char *cell = fields[j];
+            if (is_str[j]) {
+                Value sv = val_string(cell, (uint32_t)strlen(cell));
+                arr_set(as_arr(colv[j]), r, sv);       /* arr_set retains */
+                value_release(sv);
+            } else {
+                const char *p = cell;
+                while (*p == ' ' || *p == '\t') p++;
+                double v = (*p == '\0') ? NAN : strtod(p, nullptr);
+                ((double *)as_arr(colv[j])->data)[r] = v;
             }
-            ((double *)as_arr(colv[j])->data)[r] = v;
         }
     }
+    free(is_str);
     memcpy(I->jmp, saved, sizeof(jmp_buf));
     Value rec = val_record(cols);
     RecObj *o = as_rec(rec);
@@ -2194,6 +2242,7 @@ static Value bi_writecsv(Interp *I, Value *args, uint32_t n)
     if (is_num(av)) runtime_error(I, "writecsv: expected a matrix (wrap a scalar as [x])");
     ArrObj *a = as_arr(av);
     if (a->elt == ELT_COMPLEX) runtime_error(I, "writecsv: complex matrices are not CSV-representable");
+
     FILE *f = fopen(path, "wb");
     if (!f) runtime_error(I, "writecsv: cannot open '%s': %s", path, strerror(errno));
     for (uint32_t r = 0; r < a->rows; r++) {
@@ -2202,6 +2251,19 @@ static Value bi_writecsv(Interp *I, Value *args, uint32_t n)
             Value e = arr_get(a, (size_t)r * a->cols + col);
             if (e.kind == VAL_INT)       fprintf(f, "%lld", (long long)e.as.i);
             else if (e.kind == VAL_BOOL) fprintf(f, "%d", e.as.b ? 1 : 0);
+            else if (e.kind == VAL_STRING) {
+                StrObj *sv = as_str(e);
+                bool q = memchr(sv->data, delim, sv->len) || memchr(sv->data, '"', sv->len)
+                      || memchr(sv->data, '\n', sv->len);
+                if (q) {
+                    fputc('"', f);
+                    for (uint32_t i2 = 0; i2 < sv->len; i2++) {
+                        if (sv->data[i2] == '"') fputc('"', f);   /* CSV doubles quotes */
+                        fputc(sv->data[i2], f);
+                    }
+                    fputc('"', f);
+                } else fwrite(sv->data, 1, sv->len, f);
+            }
             else                         fprintf(f, "%.17g", e.as.f);
         }
         fputc('\n', f);
@@ -2422,6 +2484,10 @@ static void gp_check_opts(Interp *I, Value opts, const char *who)
 /* Legend label for series k (1-based): labelK, else label (k == 1), else null. */
 static Value gp_label(RecObj *o, uint32_t k)
 {
+    Value la = rec_field(o, "labels");             /* {labels = ["a", "b", ...]} */
+    if (la.kind == VAL_ARRAY && as_arr(la)->elt == ELT_STRING
+        && k >= 1 && (size_t)k <= (size_t)as_arr(la)->rows * as_arr(la)->cols)
+        return arr_get(as_arr(la), (size_t)k - 1);
     char key[16];
     snprintf(key, sizeof key, "label%u", k);
     Value v = rec_field(o, key);
@@ -2473,6 +2539,7 @@ static Value bi_plot(Interp *I, Value *args, uint32_t n)
     if (!is_array(yv)) runtime_error(I, "plot: expected numeric data, got %s", type_name(yv.kind));
     Y = as_arr(yv);
     if (Y->elt == ELT_COMPLEX) runtime_error(I, "plot: complex data is not plottable directly");
+    if (Y->elt == ELT_STRING) runtime_error(I, "plot: undefined for strings");
     if ((size_t)Y->rows * Y->cols == 0) runtime_error(I, "plot: empty data");
 
     bool yvec = (Y->rows == 1 || Y->cols == 1);
@@ -2512,6 +2579,8 @@ static Value bi_plot(Interp *I, Value *args, uint32_t n)
 /* hist(y[, nbins]) — histogram with boxes; default bin count by Sturges. */
 static Value bi_hist(Interp *I, Value *args, uint32_t n)
 {
+    if (is_array(args[0]) && as_arr(args[0])->elt == ELT_STRING)
+        runtime_error(I, "hist: undefined for strings");
     Value opts = val_null();
     if (n >= 2 && args[n-1].kind == VAL_RECORD) { opts = args[n-1]; n--; }
     gp_check_opts(I, opts, "hist");                    /* before any allocation */
@@ -2749,20 +2818,67 @@ static Value bi_fmt(Interp *I, Value *args, uint32_t n)
     return rs;
 }
 
-/* fields(r): list a record's field names with type and shape, like who. */
+static Value bi_strsplit(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    StrObj *sv = want_strobj(I, args[0], "strsplit"), *sep = want_strobj(I, args[1], "strsplit");
+    if (sep->len == 0) runtime_error(I, "strsplit: the separator cannot be empty");
+    uint32_t pieces = 1;
+    for (uint32_t i = 0; i + sep->len <= sv->len; )
+        if (memcmp(sv->data + i, sep->data, sep->len) == 0) { pieces++; i += sep->len; }
+        else i++;
+    Value out = val_array(ELT_STRING, 1, pieces);
+    uint32_t start = 0, k = 0;
+    for (uint32_t i = 0; i + sep->len <= sv->len; ) {
+        if (memcmp(sv->data + i, sep->data, sep->len) == 0) {
+            Value piece = val_string(sv->data + start, i - start);
+            arr_set(as_arr(out), k++, piece); value_release(piece);
+            i += sep->len; start = i;
+        } else i++;
+    }
+    Value last = val_string(sv->data + start, sv->len - start);
+    arr_set(as_arr(out), k, last); value_release(last);
+    return out;
+}
+
+static Value bi_strjoin(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    if (args[0].kind == VAL_STRING) return value_retain(args[0]);
+    if (!is_array(args[0]) || as_arr(args[0])->elt != ELT_STRING)
+        runtime_error(I, "strjoin: expected a string array, got %s",
+                      is_array(args[0]) ? elt_name(as_arr(args[0])->elt) : type_name(args[0].kind));
+    StrObj *sep = want_strobj(I, args[1], "strjoin");
+    ArrObj *a = as_arr(args[0]);
+    size_t cells = (size_t)a->rows * a->cols;
+    char *buf = nullptr; size_t blen = 0;
+    FILE *ms = open_memstream(&buf, &blen);
+    if (!ms) runtime_error(I, "out of memory");
+    for (size_t k = 0; k < cells; k++) {
+        if (k) fwrite(sep->data, 1, sep->len, ms);
+        StrObj *e = as_str(arr_get(a, k));
+        fwrite(e->data, 1, e->len, ms);
+    }
+    fclose(ms);
+    Value r = val_string(buf, (uint32_t)blen);
+    free(buf);
+    return r;
+}
+
+/* fields(r): the record's field names, as a string column (composable). */
 static Value bi_fields(Interp *I, Value *args, uint32_t n)
 {
     (void)n;
     if (args[0].kind != VAL_RECORD)
         runtime_error(I, "fields: expected a record, got %s", type_name(args[0].kind));
     RecObj *r = as_rec(args[0]);
+    Value out = val_array(ELT_STRING, r->count, r->count ? 1 : 0);
     for (uint32_t i = 0; i < r->count; i++) {
-        fprintf(vout(), "  %-12.*s ", (int)r->keylens[i], r->keys[i]);
-        who_describe(vout(), r->vals[i]);
-        fputc('\n', vout());
+        Value sv = val_string(r->keys[i], r->keylens[i]);
+        arr_set(as_arr(out), i, sv);
+        value_release(sv);
     }
-    if (r->count == 0) fputs("(no fields)\n", vout());
-    return val_null();
+    return out;
 }
 
 static Value bi_who(Interp *I, Value *args, uint32_t n)
@@ -3119,6 +3235,8 @@ static Value bi_dot(Interp *I, Value *args, uint32_t n)
 
 static Value bi_norm(Interp *I, Value *args, uint32_t n)
 {
+    if ((is_array(args[0]) && as_arr(args[0])->elt == ELT_STRING) || args[0].kind == VAL_STRING)
+        runtime_error(I, "norm: undefined for strings");
     Value v = args[0];
     if (is_num(v)) return val_float(vmag(v));
     if (!is_array(v)) runtime_error(I, "norm: expected a number or array");
@@ -3151,6 +3269,11 @@ static Value bi_reshape(Interp *I, Value *args, uint32_t n)
         runtime_error(I, "reshape: cannot fit %zu elements into %lldx%lld", total, (long long)r, (long long)c);
     Value out = val_array(a->elt, (uint32_t)r, (uint32_t)c);
     memcpy(as_arr(out)->data, a->data, total * elt_size(a->elt));   /* row-major reinterpretation */
+    if (a->elt == ELT_STRING) {                        /* cells are refcounted pointers */
+        StrObj **cells = (StrObj **)as_arr(out)->data;
+        for (size_t k = 0; k < total; k++)
+            if (cells[k]) cells[k]->obj.rc++;
+    }
     return out;
 }
 
@@ -3949,6 +4072,7 @@ static Value bi_betainc(Interp *I, Value *args, uint32_t n)
     if (!is_array(xv)) runtime_error(I, "betainc: expected a real x, got %s", type_name(xv.kind));
     ArrObj *xa = as_arr(xv);
     if (xa->elt == ELT_COMPLEX) runtime_error(I, "betainc: expected real x");
+    if (xa->elt == ELT_STRING) runtime_error(I, "betainc: undefined for strings");
     size_t nn = (size_t)xa->rows * xa->cols;
     Value out = val_array(ELT_FLOAT, xa->rows, xa->cols);
     for (size_t k = 0; k < nn; k++)
@@ -4042,6 +4166,10 @@ static Value bi_angle(Interp *I, Value *a, uint32_t n) { (void)n; return map_una
 /* binary elementwise (broadcasts array/scalar like the arithmetic ops) */
 static Value map_binary(Interp *I, Value a, Value b, Value (*f)(Interp *, Value, Value))
 {
+    if (a.kind == VAL_STRING || b.kind == VAL_STRING
+        || (is_array(a) && as_arr(a)->elt == ELT_STRING)
+        || (is_array(b) && as_arr(b)->elt == ELT_STRING))
+        runtime_error(I, "min/max: undefined for strings");
     if (!is_array(a) && !is_array(b)) return f(I, a, b);
     bool aa, ba; uint32_t rows, cols;
     ew_dims(I, a, b, &aa, &ba, &rows, &cols);
@@ -4099,6 +4227,7 @@ static Value bi_min(Interp *I, Value *args, uint32_t n)
     if (!is_array(v)) runtime_error(I, "min: expected an array or number");
     ArrObj *a = as_arr(v);
     if (a->elt == ELT_COMPLEX) runtime_error(I, "min: undefined for complex");
+    if (a->elt == ELT_STRING) runtime_error(I, "min: undefined for strings");
     size_t nn = (size_t)a->rows * a->cols;
     if (nn == 0) runtime_error(I, "min: empty array");
     Value best = arr_get(a, 0);
@@ -4120,6 +4249,7 @@ static Value bi_max(Interp *I, Value *args, uint32_t n)
     if (!is_array(v)) runtime_error(I, "max: expected an array or number");
     ArrObj *a = as_arr(v);
     if (a->elt == ELT_COMPLEX) runtime_error(I, "max: undefined for complex");
+    if (a->elt == ELT_STRING) runtime_error(I, "max: undefined for strings");
     size_t nn = (size_t)a->rows * a->cols;
     if (nn == 0) runtime_error(I, "max: empty array");
     Value best = arr_get(a, 0);
@@ -4174,6 +4304,9 @@ static int i64_cmp(const void *a, const void *b)
 /* unique(A): sorted distinct elements. A vector keeps its orientation; a
  * matrix flattens to a row vector. NaNs compare unequal to everything,
  * themselves included, so they are all kept (Octave-compatible). */
+static int str_val_cmp(Value a, Value b);
+static int cmp_val_asc(const void *x, const void *y);
+
 static Value bi_unique(Interp *I, Value *args, uint32_t n)
 {
     (void)n;
@@ -4186,6 +4319,19 @@ static Value bi_unique(Interp *I, Value *args, uint32_t n)
     if (nn == 0) return val_array(a->elt, 0, 0);
     bool col = (a->cols == 1 && a->rows > 1);           /* column vector keeps shape */
 
+    if (a->elt == ELT_STRING) {                        /* sort borrowed Values, dedupe, pack */
+        Value *buf = malloc(nn * sizeof *buf);
+        if (!buf) abort();
+        for (size_t i = 0; i < nn; i++) buf[i] = arr_get(a, i);
+        qsort(buf, nn, sizeof *buf, cmp_val_asc);
+        size_t k = 0;
+        for (size_t i = 0; i < nn; i++)
+            if (i == 0 || str_val_cmp(buf[i], buf[k-1]) != 0) buf[k++] = buf[i];
+        Value out = val_array(ELT_STRING, col ? (uint32_t)k : 1, col ? 1 : (uint32_t)k);
+        for (size_t i = 0; i < k; i++) arr_set(as_arr(out), i, buf[i]);   /* arr_set retains */
+        free(buf);
+        return out;
+    }
     if (a->elt == ELT_INT) {
         int64_t *buf = malloc(nn * sizeof *buf);
         if (!buf) abort();
@@ -4642,9 +4788,20 @@ static Value bi_find(Interp *I, Value *args, uint32_t n)
     return out;
 }
 
+static int str_val_cmp(Value a, Value b)
+{
+    StrObj *x = as_str(a), *y = as_str(b);
+    uint32_t m = x->len < y->len ? x->len : y->len;
+    int c = memcmp(x->data, y->data, m);
+    if (c == 0) c = (x->len > y->len) - (x->len < y->len);
+    return c;
+}
+
 static int cmp_val_asc(const void *x, const void *y)
 {
-    double a = as_double(*(const Value *)x), b = as_double(*(const Value *)y);
+    Value vx = *(const Value *)x, vy = *(const Value *)y;
+    if (vx.kind == VAL_STRING && vy.kind == VAL_STRING) return str_val_cmp(vx, vy);
+    double a = as_double(vx), b = as_double(vy);
     return (a < b) ? -1 : (a > b) ? 1 : 0;
 }
 
@@ -5003,6 +5160,8 @@ EnvObj *globals_new(void)
     def_builtin(e, "str",        bi_str,        1, 1);
     def_builtin(e, "num",        bi_num,        1, 1);
     def_builtin(e, "fmt",        bi_fmt,        1, UINT32_MAX);
+    def_builtin(e, "strsplit",  bi_strsplit, 2, 2);
+    def_builtin(e, "strjoin",   bi_strjoin,  2, 2);
     def_builtin(e, "fields", bi_fields, 1, 1);
     def_builtin(e, "who",   bi_who,   0, 0);
     def_builtin(e, "help",  bi_help,  0, 1);

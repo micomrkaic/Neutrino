@@ -1,0 +1,76 @@
+# Strings phase 2: string arrays (ELT_STRING, refcounted elements)
+["a", "bb", "ccc"]
+=> ["a", "bb", "ccc"]
+["a", "b"; "c", "d"]
+=> ["a", "b"; "c", "d"]
+["a", 1]
+=> !cannot mix strings with numbers
+# indexing: scalar, gather, mask, transpose, reshape
+let v = ["one", "two", "three"]; v[2]
+=> "two"
+let v = ["one", "two", "three"]; v[[3, 1]]
+=> ["three", "one"]
+let m = ["a", "b"; "c", "d"]; m[2, 1]
+=> "c"
+let m = ["a", "b"; "c", "d"]; m'
+=> ["a", "c"; "b", "d"]
+reshape(["a", "b"; "c", "d"], 1, 4)
+=> ["a", "b", "c", "d"]
+# elementwise: masks and broadcast concatenation
+["a", "b"] == "a"
+=> [true, false]
+["a", "b", "a"] != ["a", "x", "a"]
+=> [false, true, false]
+["pre_", "un_"] + "fix"
+=> ["pre_fix", "un_fix"]
+let names = ["si", "at", "de", "si"]; names[names == "si"]
+=> ["si", "si"]
+# sort / unique with lexicographic order
+sort(["banana", "apple", "cherry"])
+=> ["apple", "banana", "cherry"]
+unique(["b", "a", "b", "c", "a"])
+=> ["a", "b", "c"]
+# assignment: within kind fine, across kinds refused, copy-on-write holds
+let v = ["a", "b", "c"]; v[2] = "XX"; v
+=> ["a", "XX", "c"]
+let v = ["a", "b"]; let w = v; w[1] = "z"; v[1] + w[1]
+=> "az"
+let v = ["a", "b"]; v[1] = 5
+=> !cannot assign numeric elements into a String array
+let m = [1, 2]; m[1] = "a"
+=> !cannot assign String elements into a numeric array
+# splicing string arrays in literals
+let v = ["a", "b"]; [v, "c"]
+=> ["a", "b", "c"]
+# numeric operations refuse instead of computing garbage
+min(["a", "b"])
+=> !undefined for strings
+norm(["a", "b"])
+=> !undefined for strings
+sum(["a", "b"])
+=> !arithmetic on non-numbers
+# save/load roundtrip
+let v = ["x", "y\"q"]; save("/tmp/nu_sa.nu"); clear(); load("/tmp/nu_sa.nu"); v[2]
+=> "y"q"
+# str() of a string array
+str(["a", "b"])
+=> "["a", "b"]"
+# Phase 3: split/join, composable fields, string CSV roundtrip
+strsplit("a-b-c", "-")
+=> ["a", "b", "c"]
+strsplit("a--b", "-")
+=> ["a", "", "b"]
+strjoin(["x", "y", "z"], ", ")
+=> "x, y, z"
+strjoin(strsplit("2024/07/09", "/"), "-")
+=> "2024-07-09"
+strsplit("abc", "")
+=> !separator cannot be empty
+strjoin([1, 2], "-")
+=> !expected a string array
+fields({yr = 1, cpi = 2})'
+=> ["yr", "cpi"]
+writecsv("/tmp/nu_sc.csv", ["h1", "h2"; "a,b", "q\"t"]); let d = readtable("/tmp/nu_sc.csv"); d.h1[1] + "|" + d.h2[1]
+=> "a,b|q"t"
+let d = readtable("tests/data/macro.csv"); numel(fields(d))
+=> 4
