@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L
 /* vmtest.c — a minimal non-readline driver that runs each input line through
  * the bytecode VM (vm_eval_program). Lets us pipe test programs and run under
  * ASan/UBSan without touching the shipping readline REPL. Each line is parsed
@@ -48,8 +49,8 @@ int main(void)
     EnvObj *globals = globals_new();
     Keep keep = {0};
 
-    char buf[8192];
-    while (fgets(buf, sizeof buf, stdin)) {
+    char *buf = nullptr; size_t bufcap = 0;   /* getline: no line-length limit */
+    while (getline(&buf, &bufcap, stdin) != -1) {
         if (is_blank(buf)) continue;
         char *src = strdup(buf);
         Arena *a = arena_new();
@@ -71,6 +72,7 @@ int main(void)
     env_clear(globals);
     env_release(globals);
     vm_session_end();            /* free closure-bearing chunks (closures now gone) */
+    free(buf);                    /* getline's buffer */
     keep_free_all(&keep);
     return 0;
 }

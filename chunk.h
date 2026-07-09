@@ -69,6 +69,7 @@ typedef struct Chunk {
     uint32_t  nname, cname;                          /* non-owning arena slices */
     /* function protos (owned sub-chunks, one per lambda compiled inside) */
     struct Chunk **protos; uint32_t nproto, cproto;
+    const char *src; uint32_t srclen;   /* lambda source span (session-lived buffer), for body()/save() */
     /* parameters, when this chunk is a function proto (non-owning arena slices) */
     const char **params; uint32_t *paramlens; uint32_t nparams;
 } Chunk;

@@ -5,6 +5,7 @@
 #include <sys/resource.h>
 #include <time.h>
 #include "eval.h"
+#include "parser.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -1365,6 +1366,9 @@ static const BuiltinDoc builtin_docs[] = {
     /* reductions ------------------------------------------------------ */
     { "sum",   "sum(A) | sum(A, dim)", "sum of all elements, or along dim (1 = columns, 2 = rows)", "reduce" , "sum([1, 2, 3])                    %= 6\nsum([1, 2; 3, 4], 1)              %= [4, 6]" },
     { "prod",  "prod(A) | prod(A, dim)","product of all elements, or along dim", "reduce" , "prod([1, 2, 3, 4])                %= 24" },
+    { "save",  "save(\"file.nu\")",  "write all variables and functions as reloadable source (restore with load)", "core" , "save(\"ws.nu\")                    % then later: load(\"ws.nu\")" },
+    { "body",  "body(f)",           "print the source of a user-defined function", "core" , "let cube = fn x -> x^3; body(cube)   %= fn x -> x^3" },
+    { "load",  "load(\"file.nu\")",  "run a file in the current session; its let-bindings persist (a record of closures makes a module)", "core" , "load(\"tests/data/mathlib.nu\"); cube(3)   %= 27\nload(\"mylib.nu\"); mylib.f(2)     % record-of-closures as a namespace" },
     { "clear", "clear() | clear(\"a\", ...)", "remove all user variables, or the named ones (builtins are untouchable)", "core" , "let junk = 42; clear(\"junk\")   % junk is gone\nclear                             % bare: everything user-defined" },
     { "mem",   "mem",               "print workspace size (variables) and peak process memory", "core" , "mem                               % e.g.  workspace: 3 variables, 2.1 MB" },
     { "tic",   "tic",               "start the wall-clock timer (monotonic)", "core" , "tic                               % starts the timer" },
@@ -1497,6 +1501,238 @@ static Value bi_dis(Interp *I, Value *args, uint32_t n)
     if (v.kind == VAL_BUILTIN) { fprintf(vout(), "<builtin %s: native code, no bytecode>\n", as_blt(v)->name); return val_null(); }
     if (v.kind != VAL_CLOSURE) runtime_error(I, "dis: expected a function, got %s", type_name(v.kind));
     chunk_disassemble(vout(), as_clo(v)->chunk, "fn");
+    return val_null();
+}
+
+/* ------------------------------------------------------------------ */
+/* load("file.nu"): run a file of definitions in the current session   */
+/* ------------------------------------------------------------------ */
+
+/* Loaded (arena, source) pairs must outlive the call: identifiers in the
+ * globals point into the loaded source text. Session lifetime, freed at
+ * exit (atexit) so sanitizer runs stay clean. */
+static struct { Arena **arenas; char **srcs; size_t len, cap; } g_loaded;
+static int g_load_depth;
+
+static void load_keep_free(void)
+{
+    for (size_t i = 0; i < g_loaded.len; i++) {
+        arena_free(g_loaded.arenas[i]);
+        free(g_loaded.srcs[i]);
+    }
+    free(g_loaded.arenas); free(g_loaded.srcs);
+    g_loaded.arenas = nullptr; g_loaded.srcs = nullptr;
+    g_loaded.len = g_loaded.cap = 0;
+}
+
+static void load_keep_push(Arena *a, char *src)
+{
+    if (g_loaded.len == 0 && g_loaded.cap == 0) atexit(load_keep_free);
+    if (g_loaded.len == g_loaded.cap) {
+        g_loaded.cap = g_loaded.cap ? g_loaded.cap * 2 : 8;
+        g_loaded.arenas = realloc(g_loaded.arenas, g_loaded.cap * sizeof *g_loaded.arenas);
+        g_loaded.srcs   = realloc(g_loaded.srcs,   g_loaded.cap * sizeof *g_loaded.srcs);
+        if (!g_loaded.arenas || !g_loaded.srcs) abort();
+    }
+    g_loaded.arenas[g_loaded.len] = a; g_loaded.srcs[g_loaded.len] = src; g_loaded.len++;
+}
+
+Value vm_eval_program(Interp *I, AstNode *block, EnvObj *globals, bool echo);
+
+/* body(f): print the source text of a user-defined function. */
+static Value bi_body(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    Value f = args[0];
+    if (f.kind == VAL_BUILTIN)
+        runtime_error(I, "body: '%s' is a builtin (see help(%s))",
+                      as_blt(f)->name, as_blt(f)->name);
+    if (f.kind != VAL_CLOSURE)
+        runtime_error(I, "body: expected a function, got %s", type_name(f.kind));
+    CloObj *c = as_clo(f);
+    if (!c->chunk->src)
+        runtime_error(I, "body: no source recorded for this function (a pipe section?)");
+    fprintf(vout(), "%.*s\n", (int)c->chunk->srclen, c->chunk->src);
+    return val_null();
+}
+
+/* ---- save("file.nu"): serialize user globals as reloadable source ---- */
+
+static bool ident_ok(const char *s, uint32_t len)
+{
+    if (len == 0 || (!((s[0] >= 'a' && s[0] <= 'z') || (s[0] >= 'A' && s[0] <= 'Z') || s[0] == '_')))
+        return false;
+    for (uint32_t i = 1; i < len; i++) {
+        char ch = s[i];
+        if (!((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_'))
+            return false;
+    }
+    return true;
+}
+
+static void save_double(FILE *f, double d)
+{
+    if (isnan(d))          fputs("(0/0)", f);
+    else if (isinf(d))     fputs(d > 0 ? "(1/0)" : "(-1/0)", f);
+    else                   fprintf(f, "%.17g", d);
+}
+
+static void save_value(Interp *I, FILE *f, Value v, const char *name)
+{
+    switch (v.kind) {
+    case VAL_NULL:  fputs("null", f); return;
+    case VAL_BOOL:  fputs(v.as.b ? "true" : "false", f); return;
+    case VAL_INT:   fprintf(f, "%lld", (long long)v.as.i); return;
+    case VAL_FLOAT: save_double(f, v.as.f); return;
+    case VAL_COMPLEX:
+        fputc('(', f); save_double(f, v.as.z.re);
+        fputs(" + ", f); save_double(f, v.as.z.im); fputs(" * 1i)", f);
+        return;
+    case VAL_STRING: {
+        StrObj *s = as_str(v);
+        fputc('"', f);
+        for (uint32_t i = 0; i < s->len; i++) {
+            char c = s->data[i];
+            if (c == '"' || c == '\\') { fputc('\\', f); fputc(c, f); }
+            else if (c == '\n') fputs("\\n", f);
+            else if (c == '\t') fputs("\\t", f);
+            else fputc(c, f);
+        }
+        fputc('"', f);
+        return;
+    }
+    case VAL_ARRAY: {
+        ArrObj *a = as_arr(v);
+        if ((size_t)a->rows * a->cols == 0) { fprintf(f, "zeros(%u, %u)", a->rows, a->cols); return; }
+        fputc('[', f);
+        for (uint32_t r = 0; r < a->rows; r++) {
+            if (r) fputs("; ", f);
+            for (uint32_t c = 0; c < a->cols; c++) {
+                if (c) fputs(", ", f);
+                save_value(I, f, arr_get(a, (size_t)r * a->cols + c), name);
+            }
+        }
+        fputc(']', f);
+        return;
+    }
+    case VAL_RECORD: {
+        RecObj *r = as_rec(v);
+        fputc('{', f);
+        for (uint32_t i = 0; i < r->count; i++) {
+            if (!ident_ok(r->keys[i], r->keylens[i]))
+                runtime_error(I, "save: '%s' has a record key that is not an identifier", name);
+            if (i) fputs(", ", f);
+            fprintf(f, "%.*s = ", (int)r->keylens[i], r->keys[i]);
+            save_value(I, f, r->vals[i], name);
+        }
+        fputc('}', f);
+        return;
+    }
+    case VAL_CLOSURE: {
+        CloObj *c = as_clo(v);
+        if (c->nupvalues > 0)
+            runtime_error(I, "save: '%s' captures variables; rebind it without captures (or clear it) before saving", name);
+        if (!c->chunk->src)
+            runtime_error(I, "save: '%s' has no recorded source (a pipe section?); rebind it as an explicit fn", name);
+        fprintf(f, "%.*s", (int)c->chunk->srclen, c->chunk->src);
+        return;
+    }
+    default:
+        runtime_error(I, "save: cannot serialize '%s' (%s)", name, type_name(v.kind));
+    }
+}
+
+static Value bi_save(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    if (args[0].kind != VAL_STRING)
+        runtime_error(I, "save: expected a file name string, e.g. save(\"ws.nu\")");
+    StrObj *ps = as_str(args[0]);
+    char path[1024];
+    if (ps->len >= sizeof path) runtime_error(I, "save: file name too long");
+    memcpy(path, ps->data, ps->len); path[ps->len] = '\0';
+
+    /* Serialize into memory first: an error mid-save must not leave a
+     * truncated workspace file on disk (or clobber a good one). */
+    char *buf = nullptr; size_t buflen = 0;
+    FILE *f = open_memstream(&buf, &buflen);
+    if (!f) runtime_error(I, "save: out of memory");
+    jmp_buf jsaved; memcpy(jsaved, I->jmp, sizeof(jmp_buf));
+    if (setjmp(I->jmp)) {                          /* serialization error: free, re-raise */
+        fclose(f); free(buf);
+        memcpy(I->jmp, jsaved, sizeof(jmp_buf)); longjmp(I->jmp, 1);
+    }
+    fputs("# neutrino workspace (reload with load)\n", f);
+    EnvObj *g = I->globals;
+    uint32_t saved = 0;
+    for (uint32_t i = 0; g && i < g->count; i++) {
+        if (g->vals[i].kind == VAL_BUILTIN) continue;
+        fprintf(f, "let %.*s = ", (int)g->namelens[i], g->names[i]);
+        char nm[128];
+        snprintf(nm, sizeof nm, "%.*s", (int)g->namelens[i], g->names[i]);
+        save_value(I, f, g->vals[i], nm);
+        fputc('\n', f);
+        saved++;
+    }
+    memcpy(I->jmp, jsaved, sizeof(jmp_buf));
+    fclose(f);                                     /* finalizes buf */
+    FILE *out = fopen(path, "w");
+    if (!out) { free(buf); runtime_error(I, "save: cannot write '%s'", path); }
+    fwrite(buf, 1, buflen, out);
+    fclose(out); free(buf);
+    (void)saved;                                   /* silent on success, like clear */
+    return val_null();
+}
+
+static Value bi_load(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    if (args[0].kind != VAL_STRING)
+        runtime_error(I, "load: expected a file name string, e.g. load(\"stats.nu\")");
+    StrObj *ps = as_str(args[0]);
+    char path[1024];
+    if (ps->len >= sizeof path) runtime_error(I, "load: file name too long");
+    memcpy(path, ps->data, ps->len); path[ps->len] = '\0';
+
+    if (g_load_depth >= 16)
+        runtime_error(I, "load: nesting too deep (circular load?)");
+
+    FILE *f = fopen(path, "rb");
+    if (!f) runtime_error(I, "load: cannot open '%s'", path);
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz < 0) { fclose(f); runtime_error(I, "load: cannot read '%s'", path); }
+    char *src = malloc((size_t)sz + 1);
+    if (!src) { fclose(f); runtime_error(I, "load: out of memory"); }
+    size_t got = fread(src, 1, (size_t)sz, f);
+    fclose(f);
+    src[got] = '\0';
+
+    Arena *a = arena_new();
+    Parser p;
+    parser_init(&p, src, a);
+    AstNode *prog = parser_parse(&p);
+    if (p.had_error) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "%s", p.err_msg);
+        uint32_t el = p.err_tok.line, ec = p.err_tok.col;
+        arena_free(a); free(src);
+        runtime_error(I, "load: parse error in '%s' at %u:%u: %s", path, el, ec, msg);
+    }
+
+    load_keep_push(a, src);                       /* owns them from here on */
+    g_load_depth++;
+    Value r = vm_eval_program(I, prog, I->globals, /*echo=*/false);
+    g_load_depth--;
+    value_release(r);
+    if (I->had_error) {                           /* re-raise into the outer program */
+        char saved[256];
+        snprintf(saved, sizeof saved, "%s", I->err);
+        if (strncmp(saved, "load:", 5) == 0)      /* nested load already labelled: don't wrap again */
+            runtime_error(I, "%s", saved);
+        runtime_error(I, "load: error in '%s': %s", path, saved);
+    }
     return val_null();
 }
 
@@ -4495,6 +4731,9 @@ EnvObj *globals_new(void)
     def_builtin(e, "rem",     bi_rem,     2, 2);
     def_builtin(e, "min",     bi_min,     1, 3);
     def_builtin(e, "max",     bi_max,     1, 3);
+    def_builtin(e, "load",    bi_load,    1, 1);
+    def_builtin(e, "save",    bi_save,    1, 1);
+    def_builtin(e, "body",    bi_body,    1, 1);
     def_builtin(e, "clear",   bi_clear,   0, UINT32_MAX);
     def_builtin(e, "mem",     bi_mem,     0, 0);
     def_builtin(e, "tic",     bi_tic,     0, 0);

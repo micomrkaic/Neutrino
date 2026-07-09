@@ -1,0 +1,24 @@
+# body(f): show a user function's source
+let cube = fn x -> x^3; body(cube)
+=> fn x -> x^3
+let h = fn a, b -> sqrt(a^2 + b^2); body(h)
+=> fn a, b -> sqrt(a^2 + b^2)
+body(sum)
+=> !is a builtin
+body(42)
+=> !expected a function
+# save/load roundtrip: scalars, arrays, records, strings, functions
+let cube = fn x -> x^3; let v = [1.5, 2.5]; let r = {m = [1, 2; 3, 4]}; save("/tmp/nu_g1.nu"); clear(); load("/tmp/nu_g1.nu"); cube(v[2]) + r.m[2, 2]
+=> 19.625
+let z = 2 + 3i; let s = "a\"b\\c"; save("/tmp/nu_g2.nu"); clear(); load("/tmp/nu_g2.nu"); imag(z)
+=> 3
+let w = 0/0; let inf2 = 1/0; save("/tmp/nu_g3.nu"); clear(); load("/tmp/nu_g3.nu"); isnan(w) && isinf(inf2)
+=> true
+# global-referencing functions save fine (dynamic lookup, not capture)
+let base = 10; let addb = fn x -> x + base; save("/tmp/nu_g4.nu"); clear(); load("/tmp/nu_g4.nu"); addb(5)
+=> 15
+# captured closures refuse honestly; failed save leaves no file
+let mk = fn n -> fn x -> x + n; let cap = mk(5); save("/tmp/nu_g5.nu")
+=> !captures variables
+save(7)
+=> !expected a file name

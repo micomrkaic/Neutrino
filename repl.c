@@ -116,11 +116,11 @@ static char *prompt_line(const char *prompt)
     return readline(prompt);
 #else
     fputs(prompt, stdout); fflush(stdout);
-    char buf[8192];
-    if (!fgets(buf, sizeof buf, stdin)) return nullptr;
-    size_t n = strlen(buf);
-    if (n && buf[n-1] == '\n') buf[--n] = '\0';
-    return strdup(buf);
+    char *buf = nullptr; size_t cap = 0;       /* getline: no line-length limit */
+    ssize_t n = getline(&buf, &cap, stdin);
+    if (n < 0) { free(buf); return nullptr; }
+    if (n && buf[n-1] == '\n') buf[n-1] = '\0';
+    return buf;                                 /* caller frees, same as readline */
 #endif
 }
 

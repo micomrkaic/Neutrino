@@ -413,6 +413,39 @@ A divergent or wildly oscillatory integrand fails with an error rather than a
 wrong answer; infinite limits are rejected — substitute to a finite domain
 first.
 
+### Packages: `load`
+
+`load("file.nu")` runs a file in the current session; its `let` bindings
+persist afterwards. A package is just a file of definitions — and a record
+of closures makes a namespace, so packages don't collide:
+
+```
+neutrino> load("tests/data/mathlib.nu")
+neutrino> cube(4)
+64
+neutrino> geo.hyp([3, 4])
+5
+```
+
+`save("ws.nu")` writes the whole workspace — every variable and function —
+as reloadable source; restore it with `load("ws.nu")`. The file is plain
+Neutrino, so it is readable and editable. Functions that capture variables
+(closures made by other functions) cannot be serialized and refuse with a
+clear message; a failed save leaves no file behind. `body(f)` prints the
+source of a user-defined function:
+
+```
+neutrino> let cube = fn x -> x^3
+neutrino> body(cube)
+fn x -> x^3
+```
+
+Packages can `load` other packages (nesting is capped, so circular loads
+error cleanly). Closures capture by value, so packages are libraries of
+functions rather than stateful modules. Errors inside a loaded file are
+reported with the file name; a parse error includes its line and column
+within the file.
+
 ## 12. Random numbers
 
 The generator is xoshiro256** seeded through splitmix64, and it is
@@ -584,6 +617,9 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `size(x)` | [rows, cols] of x (a scalar is 1x1) |
 | `length(x)` | longest dimension of x (0 if empty) |
 | `numel(x)` | number of elements (rows*cols) |
+| `save("file.nu")` | write all variables and functions as reloadable source (restore with load) |
+| `body(f)` | print the source of a user-defined function |
+| `load("file.nu")` | run a file in the current session; its let-bindings persist (a record of closures makes a module) |
 | `clear() | clear("a", ...)` | remove all user variables, or the named ones (builtins are untouchable) |
 | `mem` | print workspace size (variables) and peak process memory |
 | `tic` | start the wall-clock timer (monotonic) |

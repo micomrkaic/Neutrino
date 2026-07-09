@@ -12,6 +12,34 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **Workspace save/restore and function introspection (v1.0.3).**
+  `save("ws.nu")` serializes every variable and function as reloadable
+  Neutrino source (restore with `load`); serialization is atomic — built in
+  memory, written only on success, so a failing save never leaves a truncated
+  file. Closures now retain their source text (a zero-copy span captured at
+  parse time), which powers both `save` and the new `body(f)` that prints a
+  function's definition. Closures with captured variables refuse to
+  serialize, with a message naming the variable; functions referencing
+  globals save fine (dynamic lookup, not capture). Version bumped to 1.0.3.
+- **`load("file.nu")` — packages.** Runs a file in the current session;
+  bindings persist, so a file of `let` definitions is a package and a record
+  of closures is a namespace (`geo.hyp(v)`). Works in the REPL, scripts,
+  vmtest, and the browser (reads MEMFS). Nested loads are capped at 16 with a
+  clean circular-load error; parse and runtime errors report the file name.
+  Implementing it exposed a latent core bug: `vm_compile` clobbered the
+  interpreter's unwind target and never restored it, so any longjmp *after* a
+  nested `vm_eval_program` returned jumped into a dead stack frame (glibc
+  fortify abort). `load` was the first caller ever to do that; `vm_compile`
+  now saves and restores the caller's `jmp_buf` on every exit — the
+  setjmp-discipline bug class from LESSONS.md, sixth occurrence.
+- **Conditioning stress campaign.** Head-to-head against LAPACK (NumPy) on
+  identical matrices: backslash residuals match LAPACK's order (1e-16) on
+  Hilbert matrices up to cond 1.6e16 and a graded matrix at cond 1.6e28;
+  general eigenvalues agree to ~5e-15 relative through n=40; a defective
+  Jordan block, repeated eigenvalues, and rank-deficient SVD are exact
+  (pinned as goldens). Found along the way: input lines were silently capped
+  at 8 KB by fgets buffers in vmtest and the REPL's non-readline fallback —
+  both now use getline (unbounded), with a regression check in make test.
 - **REPL quality of life.** `clear()` / `clear("a", ...)` removes user
   variables (builtin bindings are untouchable — `clear("sum")` refuses);
   `mem` prints workspace size (payload bytes of all variables) and peak

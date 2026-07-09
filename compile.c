@@ -591,6 +591,7 @@ static void compile_lambda(Interp *I, Compiler *cc, AstNode *n,
     Chunk *proto = malloc(sizeof *proto);
     if (!proto) abort();
     chunk_init(proto);
+    proto->src = n->as.lambda.src; proto->srclen = n->as.lambda.srclen;
     uint32_t np = n->as.lambda.params.count;
     proto->nparams = np;                                  /* arity only; params are slots */
     uint32_t idx = chunk_add_proto(cc->chunk, proto);     /* enclosing owns proto */
@@ -621,10 +622,21 @@ static void compile_lambda(Interp *I, Compiler *cc, AstNode *n,
 bool vm_compile(Interp *I, AstNode *stmt, Chunk *out)
 {
     chunk_init(out);
-    if (setjmp(I->jmp)) { chunk_free(out); return false; }
+    /* Save and restore the caller's unwind target on every exit. Without
+     * this, I->jmp is left pointing at this (returned) frame; any later
+     * longjmp — e.g. load() re-raising after an inner vm_eval_program —
+     * jumps into a dead frame. Found by the first builtin to raise after
+     * running a nested program. */
+    jmp_buf saved; memcpy(saved, I->jmp, sizeof(jmp_buf));
+    if (setjmp(I->jmp)) {
+        chunk_free(out);
+        memcpy(I->jmp, saved, sizeof(jmp_buf));
+        return false;
+    }
     Compiler cc = (Compiler){ .enclosing = nullptr, .chunk = out, .depth = 0, .index_dim = -1 };
     compile_node(I, &cc, stmt);
     if (stmt->kind == AST_IDENT)        /* bare 'who' / 'rand' / a 0-arg fn name: call it */
         chunk_emit(out, OP_AUTOCALL, stmt->line);
+    memcpy(I->jmp, saved, sizeof(jmp_buf));
     return true;
 }

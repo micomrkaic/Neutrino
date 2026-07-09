@@ -189,6 +189,13 @@ static AstNode *parse_lambda(Parser *p)
     expect(p, TOK_ARROW, "'->' after lambda parameters");
     lam->as.lambda.params = vec_seal(p, &params);
     lam->as.lambda.body   = parse_expr(p, 0);  /* full expression, bounded by enclosing terminators */
+    /* Source span: from the 'fn' keyword to the token after the body (then
+     * trimmed). Powers body(f) and save(); zero-copy into session-lived source. */
+    const char *end = p->cur.start;
+    while (end > kw.start && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\n' || end[-1] == '\r'))
+        end--;
+    lam->as.lambda.src    = kw.start;
+    lam->as.lambda.srclen = (uint32_t)(end - kw.start);
     return lam;
 }
 
@@ -301,6 +308,7 @@ static AstNode *maybe_section(Parser *p, AstNode *e)
     if (holes.len == 0) { free(holes.data); return e; }
 
     AstNode *lam = ast_alloc(p->arena, AST_LAMBDA, e->line, e->col);
+    lam->as.lambda.src = nullptr; lam->as.lambda.srclen = 0;   /* sections: no direct source */
     Vec params = VEC_INIT;
     for (uint32_t i = 0; i < holes.len; i++) {
         char *nm = arena_alloc(p->arena, 16);

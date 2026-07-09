@@ -74,6 +74,7 @@ test: vmtest $(BIN)
 	@bash tests/run_plot.sh
 	@bash tests/run_examples.sh
 	@bash tests/run_ascii_plot.sh
+	@bash tests/run_longline.sh
 
 # Same corpus, every input run under AddressSanitizer/UBSan; fails on any leak.
 test-asan: vmtest-asan

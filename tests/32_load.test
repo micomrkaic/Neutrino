@@ -1,0 +1,27 @@
+# load("file.nu"): run a file in the current session (fixtures in tests/data/)
+load("tests/data/mathlib.nu"); cube(4)
+=> 64
+load("tests/data/mathlib.nu"); mean2([2, 4, 9])
+=> 5
+# record-of-closures as a module
+load("tests/data/mathlib.nu"); geo.hyp([3, 4])
+=> 5
+load("tests/data/mathlib.nu"); geo.unit([3, 4])
+=> [0.6, 0.8]
+# packages loading packages
+load("tests/data/chain.nu"); twelve
+=> 12
+# errors: circularity, parse, runtime, missing, wrong type
+load("tests/data/circ.nu")
+=> !nesting too deep
+load("tests/data/badparse.nu")
+=> !parse error in 'tests/data/badparse.nu'
+load("tests/data/badrun.nu")
+=> !undefined name 'definitely_undefined'
+load("nonexistent.nu")
+=> !cannot open
+load(42)
+=> !expected a file name string
+# load returns null: silent on success
+load("tests/data/mathlib.nu"); "ok"
+=> "ok"
