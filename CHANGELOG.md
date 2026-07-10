@@ -12,6 +12,14 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.6.2: REPL commands are first-class names.** `help(manual)`,
+  `help(pretty)`, and `help(more)` now work, the commands appear in the help
+  tour under "repl commands", and tab completion knows them — they are
+  registered as builtins that print a pointer to the REPL when called from a
+  script. The sweep also found that `exit` was never handled at all (it
+  errored as an undefined name); `exit`/`quit` are now real builtins —
+  `exit(code)` sets the process exit status — so they work in the REPL, in
+  scripts, and in completion alike.
 - **v1.6.1: rendered documentation in the REPL.** The `manual` command now
   renders markdown to formatted terminal text — colored headers, tinted code
   blocks, bullets, clean inline code — through `less -R` (plain formatted

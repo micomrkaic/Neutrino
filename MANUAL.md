@@ -715,6 +715,15 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 | `strsplit(s, sep)` | split a string on a separator, giving a string row vector |
 | `strjoin(a, sep)` | join a string array with a separator |
 
+### REPL commands
+
+| Signature | Description |
+|---|---|
+| `exit | exit(code)` | end the session (also: quit) |
+| `manual [doc]` | page rendered documentation: manual, manual packages|changelog|lessons|design|readme |
+| `pretty on|off` | aligned multi-line matrix display (default on in the REPL) |
+| `more on|off` | page long output through $PAGER |
+
 ### Solvers
 
 | Signature | Description |

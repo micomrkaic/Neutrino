@@ -1404,6 +1404,10 @@ static const BuiltinDoc builtin_docs[] = {
     { "assert", "assert(cond) | assert(cond, tmpl, ...)", "error unless cond is true", "core" , "assert(2 > 1)                     % passes silently" },
     { "strsplit","strsplit(s, sep)", "split a string on a separator, giving a string row vector", "string" , "strsplit(\"a-b-c\", \"-\")          %= [\"a\", \"b\", \"c\"]" },
     { "strjoin", "strjoin(a, sep)",  "join a string array with a separator", "string" , "strjoin([\"x\", \"y\", \"z\"], \", \")  %= \"x, y, z\"" },
+    { "exit",  "exit | exit(code)", "end the session (also: quit)", "repl" , "exit                              % goodbye" },
+    { "manual", "manual [doc]",  "page rendered documentation: manual, manual packages|changelog|lessons|design|readme", "repl" , "manual packages                  % the packages guide, formatted and paged" },
+    { "pretty", "pretty on|off", "aligned multi-line matrix display (default on in the REPL)", "repl" , "pretty off                        % single-line matrices" },
+    { "more",   "more on|off",   "page long output through $PAGER", "repl" , "more on                           % long results go through less" },
     { "who",   "who | who(\"functions\", \"sorted\")", "list the workspace; filter by \"records\"/\"functions\"/\"vars\", add \"sorted\" for name order", "core" , "who(\"functions\")                  % only your fn bindings\nwho(\"sorted\")                     % everything, alphabetical" },
     { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" , "help(sum)                         % details and examples for one builtin" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" , "system(\"date\")                    % run a shell command, returns its exit status" },
@@ -2918,6 +2922,27 @@ static int who_name_cmp(const void *x, const void *y)
 
 /* who | who("records"|"functions"|"vars") | who(..., "sorted") — list the
  * workspace, optionally filtered by kind and sorted by name. */
+/* REPL-command stand-ins: in the interactive REPL these names are handled
+ * before evaluation; as builtins they resolve for help(), the tour, and tab
+ * completion, and give a useful hint when called outside the REPL. */
+static Value bi_repl_hint(Interp *I, const char *what)
+{
+    (void)I;
+    fprintf(vout(), "%s is an interactive REPL command — start ./neutrino and type it at the prompt\n", what);
+    return val_null();
+}
+static Value bi_exit(Interp *I, Value *args, uint32_t n)
+{
+    (void)I;
+    int code = (n >= 1 && args[0].kind == VAL_INT) ? (int)args[0].as.i : 0;
+    fflush(vout());
+    exit(code);
+}
+
+static Value bi_manual_stub(Interp *I, Value *args, uint32_t n) { (void)args; (void)n; return bi_repl_hint(I, "manual"); }
+static Value bi_pretty_stub(Interp *I, Value *args, uint32_t n) { (void)args; (void)n; return bi_repl_hint(I, "pretty"); }
+static Value bi_more_stub(Interp *I, Value *args, uint32_t n)   { (void)args; (void)n; return bi_repl_hint(I, "more"); }
+
 static Value bi_who(Interp *I, Value *args, uint32_t n)
 {
     enum { W_ALL, W_REC, W_FN, W_VAR } kind = W_ALL;
@@ -3113,6 +3138,7 @@ static Value bi_help(Interp *I, Value *args, uint32_t n)
         { "trig",    "trigonometry" },{ "complex", "complex" },      { "linalg",  "linear algebra" },
         { "solve",   "solvers" },     { "io",      "data files" },   { "plot",    "plotting" },
         { "random",  "random" },      { "test",    "predicates" },   { "hof",     "higher-order" },
+        { "repl",    "repl commands" },
     };
     fputs("Neutrino builtins  —  help(name) for detail, e.g. help(svd)\n\n", vout());
     for (size_t gi = 0; gi < sizeof groups / sizeof *groups; gi++) {
@@ -5228,6 +5254,11 @@ EnvObj *globals_new(void)
     def_builtin(e, "strsplit",  bi_strsplit, 2, 2);
     def_builtin(e, "strjoin",   bi_strjoin,  2, 2);
     def_builtin(e, "fields", bi_fields, 1, 1);
+    def_builtin(e, "exit",   bi_exit,        0, 1);
+    def_builtin(e, "quit",   bi_exit,        0, 1);
+    def_builtin(e, "manual", bi_manual_stub, 0, 1);
+    def_builtin(e, "pretty", bi_pretty_stub, 0, 1);
+    def_builtin(e, "more",   bi_more_stub,   0, 1);
     def_builtin(e, "who",   bi_who,   0, 2);
     def_builtin(e, "help",  bi_help,  0, 1);
     def_builtin(e, "system",bi_system,1, 1);
