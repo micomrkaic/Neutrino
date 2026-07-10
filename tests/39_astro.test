@@ -1,0 +1,50 @@
+# packages/astro.nu — solar/lunar almanac (astral-library cross-checked, UTC)
+load("packages/astro.nu"); abs(sunrise(38.8048, -77.0469, 2026, 7, 9, 0) - 9.8606) < 0.034
+=> true
+load("packages/astro.nu"); abs(sunset(38.8048, -77.0469, 2026, 7, 9, 0) - 0.5894) < 0.034
+=> true
+load("packages/astro.nu"); abs(dawn_civil(38.8048, -77.0469, 2026, 7, 9, 0) - 9.3261) < 0.034
+=> true
+load("packages/astro.nu"); abs(dusk_civil(34.0029, -84.1446, 2026, 7, 9, 0) - 1.3319) < 0.034
+=> true
+load("packages/astro.nu"); abs(sunrise(46.0569, 14.5058, 2026, 7, 9, 0) - 3.3442) < 0.034
+=> true
+load("packages/astro.nu"); abs(sunset(46.0569, 14.5058, 2026, 7, 9, 0) - 18.8897) < 0.034
+=> true
+# winter solstice, other side of the analemma
+load("packages/astro.nu"); abs(sunrise(38.8048, -77.0469, 2026, 12, 21, 0) - 12.3864) < 0.034
+=> true
+load("packages/astro.nu"); abs(sunset(38.8048, -77.0469, 2026, 12, 21, 0) - 21.8256) < 0.034
+=> true
+load("packages/astro.nu"); abs(solar_noon(-77.0469, 2026, 7, 9, 0) - 17.2231) < 0.034
+=> true
+# identities: noon between rise and set; twilights bracket the day
+load("packages/astro.nu"); let r = sunrise(46.0569, 14.5058, 2026, 7, 9, 0); let s = sunset(46.0569, 14.5058, 2026, 7, 9, 0); abs(solar_noon(14.5058, 2026, 7, 9, 0) - (r + s) / 2) < 0.01
+=> true
+load("packages/astro.nu"); dawn_civil(46.0569, 14.5058, 2026, 7, 9, 0) < sunrise(46.0569, 14.5058, 2026, 7, 9, 0)
+=> true
+load("packages/astro.nu"); dawn_astro(46.0569, 14.5058, 2026, 3, 20, 0) < dawn_nautical(46.0569, 14.5058, 2026, 3, 20, 0)
+=> true
+# sun position: due south and at maximum altitude at local solar noon
+load("packages/astro.nu"); let p = sun_position(38.8048, -77.0469, 2026, 7, 9, 13.223, -4); (abs(p.az - 180) < 1) && (abs(p.alt - 73.5) < 0.2)
+=> true
+# polar day refuses honestly
+load("packages/astro.nu"); sunrise(80, 0, 2026, 6, 21, 0)
+=> !does not cross
+load("packages/astro.nu"); sunrise(95, 0, 2026, 6, 21, 0)
+=> !latitude must be in
+# moon: age in [0, 29.53); full-ish moon well lit
+load("packages/astro.nu"); let a = moon_age(2026, 7, 9); (a >= 0) && (a < 29.53) && (abs(a - 23.9) < 0.7)
+=> true
+load("packages/astro.nu"); abs(moon_illum(2026, 7, 9) - 0.28) < 0.1
+=> true
+# hm formatting
+load("packages/astro.nu"); hm(6.05)
+=> "06:03"
+load("packages/astro.nu"); hm(23.999)
+=> "00:00"
+# places + the driving window
+load("packages/astro.nu"); fields(places)'
+=> ["alexandria_va", "duluth_ga", "washington_dc", "ljubljana", "new_york", "london", "tokyo", "san_francisco"]
+load("packages/astro.nu"); let w = drive_daylight(places.alexandria_va, places.duluth_ga, 2026, 7, 9, -4); (w.window_hours > 15) && (w.window_hours < 16)
+=> true

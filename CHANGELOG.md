@@ -12,6 +12,43 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.6.0: the packages release.** Four standard packages ship in
+  `packages/` — `dist.nu` (probability distributions), `poly.nu`
+  (polynomials), `finance.nu` (HP-12C: TVM, cash flows, bonds, amortization,
+  dates), and `astro.nu` (solar almanac and the daylight driving window) —
+  documented in a new PACKAGES.md whose 61 transcripts are machine-verified
+  by `make test` alongside the manual's, with a typeset PACKAGES.pdf. All
+  package numerics are golden-tested against independent references (SciPy,
+  NumPy, Python datetime, astral). 778 tests total.
+- **`packages/astro.nu`** — solar and lunar almanac in pure Neutrino: the
+  NOAA solar position algorithm (with one refinement pass) gives `sunrise`,
+  `sunset`, civil/nautical/astronomical `dawn_*`/`dusk_*`, `solar_noon`,
+  `day_length`, and `sun_position` (altitude/azimuth), all within about a
+  minute of the astral reference library; `moon_age`/`moon_illum`; `hm` for
+  "HH:MM" display; a `places` record of preloaded coordinates; and
+  `drive_daylight(from, to, y, m, d, tz)` — the daylight driving window from
+  civil dawn at the origin to civil dusk at the destination. Twenty-one
+  goldens, including the physics identities (solar noon bisects the day, the
+  sun due south at maximum altitude at local noon) and honest refusals for
+  polar day. Fourth package; zero interpreter changes again.
+- **`packages/finance.nu`** — the HP-12C's greatest hits, in pure Neutrino:
+  TVM (`pmt`, `pv`, `fv`, `nper`, `rate` — the last with an adaptive fzero
+  bracket so 360-period mortgages don't overflow the probe), cash flows
+  (`npv`, `irr` with sign-change validation), bonds (`bond_price`,
+  `bond_ytm`, Macaulay/modified `duration`, `convexity`, with the par-bond
+  identity golden-tested), `amort` returning the full schedule as a record
+  of columns (plot the balance!), and HP-12C date arithmetic (`datenum`/
+  `datestr` via Julian day numbers, `days`, `dateadd`, `dow`, and the 30/360
+  US day count `days360`). Twenty-nine goldens, cross-checked against
+  SciPy and Python's datetime. Zero interpreter changes — third package of
+  the era, second in a row to touch no C.
+- **`packages/poly.nu`** — polynomials, written entirely in Neutrino:
+  `companion`, `roots` (companion matrix + `eig`, the same algorithm Octave
+  uses, on the LAPACK-verified eigensolver), `polyval` (Horner, scalar or
+  elementwise), `polyfit` (Vandermonde + least-squares backslash,
+  NumPy-checked to 8 digits), `polyder`/`polyint` (mutually inverse, golden-
+  tested), and `conv`. Sixteen goldens. Zero interpreter changes — the first
+  delivery of the packages era to touch no C at all.
 - **v1.5.0: workspace filters and completion.** `who` takes selectors —
   `who("records")`, `who("functions")`, `who("vars")`, plus `"sorted"` for
   alphabetical order, combinable (`who("functions", "sorted")`); bare `who`

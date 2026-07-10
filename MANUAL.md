@@ -510,7 +510,7 @@ neutrino> f(-4)
 error: f needs x > 0, got -4
 ```
 
-Packages can `load` other packages (nesting is capped, so circular loads
+The standard packages — distributions, polynomials, finance, and the solar almanac — are documented with verified examples in PACKAGES.md. Packages can `load` other packages (nesting is capped, so circular loads
 error cleanly). Closures capture by value, so packages are libraries of
 functions rather than stateful modules. Errors inside a loaded file are
 reported with the file name; a parse error includes its line and column

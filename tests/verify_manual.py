@@ -4,7 +4,8 @@
 matrices in the manual are compared against vmtest's single-line form."""
 import re, subprocess, sys, os
 os.chdir(os.path.join(os.path.dirname(__file__), '..'))
-text = open('MANUAL.md').read()
+doc = sys.argv[1] if len(sys.argv) > 1 else 'MANUAL.md'
+text = open(doc).read()
 blocks = re.findall(r'```[a-z]*\n(.*?)```', text, re.S)
 ok = bad = total = 0
 for b in blocks:
@@ -47,5 +48,5 @@ for b in blocks:
         else:
             bad += 1
             print(f"MANUAL MISMATCH: {inp}\n  manual : {exp_clean!r}\n  actual : {got!r}")
-print(f"manual: {ok} of {total} transcript examples verified")
+print(f"{doc}: {ok} of {total} transcript examples verified")
 sys.exit(1 if bad else 0)
