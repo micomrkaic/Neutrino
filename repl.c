@@ -250,6 +250,83 @@ static void print_banner(bool color)
 }
 
 /* ------------------------------------------------------------------ */
+/* ---- markdown -> ANSI: a renderer for Neutrino's own docs ------------- */
+/* Handles the subset our documents use: #/##/### headers, ``` fences,
+ * `inline code`, **bold**, bullets, --- rules, tables (passed through).
+ * Colors only when writing to a terminal-bound pager. */
+static void md_span(FILE *o, const char *p, bool color)
+{
+    while (*p) {
+        if (*p == '`') {
+            const char *e = strchr(p + 1, '`');
+            if (e) {
+                if (color) fputs("\033[36m", o);
+                fwrite(p + 1, 1, (size_t)(e - p - 1), o);
+                if (color) fputs("\033[0m", o);
+                p = e + 1; continue;
+            }
+        }
+        if (p[0] == '*' && p[1] == '*') {
+            const char *e = strstr(p + 2, "**");
+            if (e) {
+                if (color) fputs("\033[1m", o);
+                fwrite(p + 2, 1, (size_t)(e - p - 2), o);
+                if (color) fputs("\033[0m", o);
+                p = e + 2; continue;
+            }
+        }
+        fputc(*p++, o);
+    }
+}
+
+static void md_render(FILE *in, FILE *o, bool color)
+{
+    char *line = nullptr; size_t cap = 0; ssize_t got;
+    bool in_code = false;
+    while ((got = getline(&line, &cap, in)) != -1) {
+        if (got && line[got - 1] == '\n') line[got - 1] = '\0';
+        if (strncmp(line, "```", 3) == 0) {
+            in_code = !in_code;
+            continue;                               /* drop the fence itself */
+        }
+        if (in_code) {
+            if (color) fputs("    \033[32m", o); else fputs("    ", o);
+            fputs(line, o);
+            if (color) fputs("\033[0m", o);
+            fputc('\n', o);
+            continue;
+        }
+        if (line[0] == '#') {
+            int n = 0; while (line[n] == '#') n++;
+            const char *t = line + n; while (*t == ' ') t++;
+            if (color) fputs(n == 1 ? "\033[1;34m" : "\033[1;36m", o);
+            if (n >= 3) fputs("  ", o);
+            fputs(t, o);
+            if (color) fputs("\033[0m", o);
+            fputc('\n', o);
+            continue;
+        }
+        if (strncmp(line, "---", 3) == 0 && line[3] == '\0') {
+            if (color) fputs("\033[2m", o);
+            for (int i = 0; i < 64; i++) fputs("\u2500", o);
+            if (color) fputs("\033[0m", o);
+            fputc('\n', o);
+            continue;
+        }
+        if (line[0] == '-' && line[1] == ' ') {
+            fputs(color ? "  \033[33m\u2022\033[0m " : "  \u2022 ", o);
+            md_span(o, line + 2, color);
+            fputc('\n', o);
+            continue;
+        }
+        if (line[0] == '|' && color) fputs("\033[2m", o);   /* tables: pass, dimmed pipes stay readable */
+        md_span(o, line, color && line[0] != '|');
+        if (line[0] == '|' && color) fputs("\033[0m", o);
+        fputc('\n', o);
+    }
+    free(line);
+}
+
 int repl_run(void)
 {
     Interp I;
@@ -340,36 +417,52 @@ int repl_run(void)
                 continue;
             }
             if ((arg = match_command(q, "manual"))) {
-                /* Page MANUAL.md: look in the current directory, then next to
-                 * the binary's directory (set NEUTRINO_MANUAL to override). */
-                const char *cand[3]; int nc = 0;
+                /* manual [packages|changelog|lessons|design|readme] — render
+                 * the document as ANSI-formatted text and page it. Files are
+                 * found in the cwd or /usr/local/share/neutrino; set
+                 * NEUTRINO_MANUAL to override the main manual's path. */
+                static const struct { const char *name, *file; } docs[] = {
+                    { "",          "MANUAL.md" },     { "packages", "PACKAGES.md" },
+                    { "changelog", "CHANGELOG.md" },  { "lessons",  "LESSONS.md" },
+                    { "design",    "DESIGN_NOTES.md" },{ "readme",   "README.md" },
+                };
+                const char *file = nullptr;
+                while (*arg == ' ') arg++;
+                for (size_t di = 0; di < sizeof docs / sizeof *docs; di++)
+                    if (strcmp(arg, docs[di].name) == 0) { file = docs[di].file; break; }
+                if (!file) {
+                    fputs("manual: unknown document; try one of: manual, manual packages, "
+                          "manual changelog, manual lessons, manual design, manual readme\n", stderr);
+                    goto manual_done;
+                }
+                char path[1100]; FILE *mf = nullptr;
                 const char *envp = getenv("NEUTRINO_MANUAL");
-                if (envp && *envp) cand[nc++] = envp;
-                cand[nc++] = "MANUAL.md";
-                cand[nc++] = "/usr/local/share/neutrino/MANUAL.md";
-                const char *found = nullptr;
-                for (int ci = 0; ci < nc; ci++) {
-                    FILE *tf = fopen(cand[ci], "rb");
-                    if (tf) { fclose(tf); found = cand[ci]; break; }
+                if (*arg == '\0' && envp && *envp && (mf = fopen(envp, "rb"))) { /* override */ }
+                if (!mf && (mf = fopen(file, "rb"))) { }
+                if (!mf) {
+                    snprintf(path, sizeof path, "/usr/local/share/neutrino/%s", file);
+                    mf = fopen(path, "rb");
                 }
-                if (!found) {
-                    fputs("manual: MANUAL.md not found (run from the repo root, "
-                          "or set NEUTRINO_MANUAL=/path/to/MANUAL.md)\n", stderr);
-                } else {
+                if (!mf) {
+                    fprintf(stderr, "manual: %s not found (run from the repo root, "
+                            "or set NEUTRINO_MANUAL for the main manual)\n", file);
+                    goto manual_done;
+                }
+                bool tty = isatty(fileno(stdout));
+                if (tty) {
                     const char *pager = getenv("PAGER");
-                    if (!pager || !*pager) pager = "less";
-                    char cmd[1200];
-                    snprintf(cmd, sizeof cmd, "%s '%s'", pager, found);
-                    if (system(cmd) != 0) {           /* no pager? print it */
-                        FILE *mf = fopen(found, "rb");
-                        if (mf) {
-                            char buf[4096]; size_t got;
-                            while ((got = fread(buf, 1, sizeof buf, mf)) > 0)
-                                fwrite(buf, 1, got, stdout);
-                            fclose(mf);
-                        }
+                    FILE *pp = popen(pager && *pager ? pager : "less -R", "w");
+                    if (pp) {
+                        md_render(mf, pp, true);
+                        pclose(pp);
+                    } else {
+                        md_render(mf, stdout, true);
                     }
+                } else {
+                    md_render(mf, stdout, false);      /* piped: formatted, no colors */
                 }
+                fclose(mf);
+                manual_done: ;
 #ifdef HAVE_READLINE
                 add_history(line);
 #endif

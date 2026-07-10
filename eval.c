@@ -3136,7 +3136,7 @@ static Value bi_help(Interp *I, Value *args, uint32_t n)
     fputs("  # comment    trailing ; hides a line's result\n", vout());
     fputs("  format short|long|\"short e\"   number display     more on|off   paging (REPL)\n", vout());
     fputs("  pretty on|off   aligned multi-line matrices (REPL)\n", vout());
-    fputs("  manual          page the full MANUAL.md (REPL)\n", vout());
+    fputs("  manual [doc]    page rendered docs: manual, manual packages|changelog|lessons|design (REPL)\n", vout());
     fputs("  !cmd   run a shell command (REPL)       system(\"cmd\")   run one, get its exit code\n", vout());
     return val_null();
 }

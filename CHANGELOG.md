@@ -12,6 +12,13 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.6.1: rendered documentation in the REPL.** The `manual` command now
+  renders markdown to formatted terminal text — colored headers, tinted code
+  blocks, bullets, clean inline code — through `less -R` (plain formatted
+  text when piped), and takes a document name: `manual`, `manual packages`,
+  `manual changelog`, `manual lessons`, `manual design`, `manual readme`.
+  The renderer is ~90 lines of C handling exactly the markdown subset the
+  project's documents use; no external tools.
 - **v1.6.0: the packages release.** Four standard packages ship in
   `packages/` — `dist.nu` (probability distributions), `poly.nu`
   (polynomials), `finance.nu` (HP-12C: TVM, cash flows, bonds, amortization,

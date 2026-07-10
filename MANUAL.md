@@ -72,7 +72,7 @@ apply to scripts — they are REPL features.
 | `mem` | workspace size and peak process memory |
 | `format …` | number display: `format long`, `format short e`, `format(8)`, `format` to show |
 | `pretty on\|off` | aligned multi-line matrix display (default on in the REPL) |
-| `manual` | page the full manual in your `$PAGER` |
+| `manual [doc]` | page a rendered document: `manual`, `manual packages`, `manual changelog`, `manual lessons`, `manual design` |
 | `TAB` | complete builtins, your names, and keywords; inside a `"quoted string"` it completes file paths |
 | `more on\|off` | page long output through `$PAGER` (default off) |
 | `!cmd` | run a shell command (`!ls`, `!git status`) |
