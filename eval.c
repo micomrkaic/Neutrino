@@ -2335,6 +2335,224 @@ static const char *ascii_optstr(Value opts, const char *key, uint32_t *len)
 #define ASCII_H 18
 
 /* Line/scatter plot. get(series, k) yields the k-th y of a series. */
+/* ------------------------------------------------------------------ */
+/* SVG plot backend. Selected by NEUTRINO_PLOT_TERM=svg natively and by */
+/* default in the browser, where a JS hook (Module.neutrinoPlot) shows  */
+/* each written file. Structure borrowed from tea's graph.c.            */
+/* ------------------------------------------------------------------ */
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+static bool plot_is_svg(void)
+{
+#ifdef __EMSCRIPTEN__
+    const char *t = getenv("NEUTRINO_PLOT_TERM");
+    return !t || strcmp(t, "svg") == 0;           /* browser default */
+#else
+    const char *t = getenv("NEUTRINO_PLOT_TERM");
+    return t && strcmp(t, "svg") == 0;
+#endif
+}
+
+static int g_svg_plot_no;
+
+static void svg_announce(const char *fname)
+{
+    fprintf(vout(), "(plot written: %s)\n", fname);
+#ifdef __EMSCRIPTEN__
+    EM_ASM({ if (Module.neutrinoPlot) Module.neutrinoPlot(UTF8ToString($0)); }, fname);
+#endif
+}
+
+static void svg_esc(FILE *o, const char *s, uint32_t n)
+{
+    for (uint32_t i = 0; i < n; i++)
+        switch (s[i]) {
+        case '&': fputs("&amp;", o); break;
+        case '<': fputs("&lt;", o); break;
+        case '>': fputs("&gt;", o); break;
+        default:  fputc(s[i], o);
+        }
+}
+
+/* 1-2-5 "nice" tick step for a span */
+static double svg_nice_step(double span, int target)
+{
+    double raw = span / (target > 0 ? target : 5);
+    double mag = pow(10, floor(log10(raw)));
+    double r = raw / mag;
+    return (r < 1.5 ? 1 : r < 3.5 ? 2 : r < 7.5 ? 5 : 10) * mag;
+}
+
+static const char *svg_palette(uint32_t s)
+{
+    static const char *pal[] = { "#1f77b4", "#d62728", "#2ca02c", "#9467bd",
+                                 "#ff7f0e", "#8c564b", "#17becf", "#7f7f7f" };
+    return pal[s % 8];
+}
+
+#define SVG_W 720
+#define SVG_H 440
+#define SVG_ML 62
+#define SVG_MR 18
+#define SVG_MT 40
+#define SVG_MB 52
+
+static void svg_frame(FILE *o, double xmin, double xmax, double ymin, double ymax,
+                      const char *title, uint32_t tlen,
+                      const char *xl, uint32_t xllen, const char *yl, uint32_t yllen)
+{
+    const int PW = SVG_W - SVG_ML - SVG_MR, PH = SVG_H - SVG_MT - SVG_MB;
+    fprintf(o, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%d\" height=\"%d\" "
+               "viewBox=\"0 0 %d %d\" font-family=\"Helvetica,Arial,sans-serif\">\n",
+            SVG_W, SVG_H, SVG_W, SVG_H);
+    fprintf(o, "<rect width=\"%d\" height=\"%d\" fill=\"white\"/>\n", SVG_W, SVG_H);
+    fprintf(o, "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"none\" "
+               "stroke=\"#222\" stroke-width=\"1\"/>\n", SVG_ML, SVG_MT, PW, PH);
+    double xs = svg_nice_step(xmax - xmin, 6), ys = svg_nice_step(ymax - ymin, 5);
+    for (double v = ceil(xmin / xs) * xs; v <= xmax + 1e-12 * xs; v += xs) {
+        double X = SVG_ML + (v - xmin) / (xmax - xmin) * PW;
+        fprintf(o, "<line x1=\"%.2f\" y1=\"%d\" x2=\"%.2f\" y2=\"%d\" stroke=\"#e4e4e4\"/>\n",
+                X, SVG_MT, X, SVG_MT + PH);
+        fprintf(o, "<text x=\"%.2f\" y=\"%d\" text-anchor=\"middle\" font-size=\"12\">%g</text>\n",
+                X, SVG_MT + PH + 18, v);
+    }
+    for (double v = ceil(ymin / ys) * ys; v <= ymax + 1e-12 * ys; v += ys) {
+        double Y = SVG_MT + PH - (v - ymin) / (ymax - ymin) * PH;
+        fprintf(o, "<line x1=\"%d\" y1=\"%.2f\" x2=\"%d\" y2=\"%.2f\" stroke=\"#e4e4e4\"/>\n",
+                SVG_ML, Y, SVG_ML + PW, Y);
+        fprintf(o, "<text x=\"%d\" y=\"%.2f\" text-anchor=\"end\" dominant-baseline=\"middle\" "
+                   "font-size=\"12\">%g</text>\n", SVG_ML - 8, Y, v);
+    }
+    if (title) {
+        fprintf(o, "<text x=\"%d\" y=\"24\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"bold\">",
+                SVG_W / 2);
+        svg_esc(o, title, tlen); fputs("</text>\n", o);
+    }
+    if (xl) {
+        fprintf(o, "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"13\">",
+                SVG_ML + PW / 2, SVG_H - 12);
+        svg_esc(o, xl, xllen); fputs("</text>\n", o);
+    }
+    if (yl) {
+        fprintf(o, "<text x=\"16\" y=\"%d\" text-anchor=\"middle\" font-size=\"13\" "
+                   "transform=\"rotate(-90 16 %d)\">", SVG_MT + PH / 2, SVG_MT + PH / 2);
+        svg_esc(o, yl, yllen); fputs("</text>\n", o);
+    }
+}
+
+static void svg_plot_render(Interp *I, ArrObj *X, ArrObj *Y, bool yvec,
+                            uint32_t npts, uint32_t nser, Value opts)
+{
+    double ymin = HUGE_VAL, ymax = -HUGE_VAL, xmin = HUGE_VAL, xmax = -HUGE_VAL;
+    for (uint32_t s = 0; s < nser; s++)
+        for (uint32_t k = 0; k < npts; k++) {
+            double x = X ? as_double(arr_get(X, k)) : (double)(k + 1);
+            double y = yvec ? as_double(arr_get(Y, k))
+                            : as_double(arr_get(Y, (size_t)k * Y->cols + s));
+            if (isfinite(y)) { if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+            if (isfinite(x)) { if (x < xmin) xmin = x; if (x > xmax) xmax = x; }
+        }
+    if (!isfinite(ymin) || !isfinite(ymax)) runtime_error(I, "plot: no finite data to plot");
+    if (ymax == ymin) { ymax += 0.5; ymin -= 0.5; }
+    if (xmax == xmin) { xmax += 0.5; xmin -= 0.5; }
+    double pad = (ymax - ymin) * 0.05; ymin -= pad; ymax += pad;
+
+    char fname[64];
+    snprintf(fname, sizeof fname,
+#ifdef __EMSCRIPTEN__
+             "/plot_%d.svg",
+#else
+             "plot_%d.svg",
+#endif
+             ++g_svg_plot_no);
+    FILE *o = fopen(fname, "w");
+    if (!o) { g_svg_plot_no--; runtime_error(I, "plot: cannot write %s", fname); }
+
+    uint32_t tlen = 0, xllen = 0, yllen = 0, stlen = 0;
+    const char *title = ascii_optstr(opts, "title", &tlen);
+    const char *xl = ascii_optstr(opts, "xlabel", &xllen);
+    const char *yl = ascii_optstr(opts, "ylabel", &yllen);
+    const char *style = ascii_optstr(opts, "style", &stlen);
+    bool points_only = style && stlen >= 6 && memcmp(style, "points", 6) == 0;
+
+    svg_frame(o, xmin, xmax, ymin, ymax, title, tlen, xl, xllen, yl, yllen);
+    const int PW = SVG_W - SVG_ML - SVG_MR, PH = SVG_H - SVG_MT - SVG_MB;
+    for (uint32_t s = 0; s < nser; s++) {
+        const char *col = svg_palette(s);
+        if (!points_only) {
+            fprintf(o, "<polyline fill=\"none\" stroke=\"%s\" stroke-width=\"1.8\" points=\"", col);
+            for (uint32_t k = 0; k < npts; k++) {
+                double x = X ? as_double(arr_get(X, k)) : (double)(k + 1);
+                double y = yvec ? as_double(arr_get(Y, k))
+                                : as_double(arr_get(Y, (size_t)k * Y->cols + s));
+                if (!isfinite(x) || !isfinite(y)) continue;
+                fprintf(o, "%.2f,%.2f ",
+                        SVG_ML + (x - xmin) / (xmax - xmin) * PW,
+                        SVG_MT + PH - (y - ymin) / (ymax - ymin) * PH);
+            }
+            fputs("\"/>\n", o);
+        } else {
+            for (uint32_t k = 0; k < npts; k++) {
+                double x = X ? as_double(arr_get(X, k)) : (double)(k + 1);
+                double y = yvec ? as_double(arr_get(Y, k))
+                                : as_double(arr_get(Y, (size_t)k * Y->cols + s));
+                if (!isfinite(x) || !isfinite(y)) continue;
+                fprintf(o, "<circle cx=\"%.2f\" cy=\"%.2f\" r=\"3\" fill=\"%s\"/>\n",
+                        SVG_ML + (x - xmin) / (xmax - xmin) * PW,
+                        SVG_MT + PH - (y - ymin) / (ymax - ymin) * PH, col);
+            }
+        }
+        /* legend entry */
+        Value lv = (opts.kind == VAL_RECORD) ? gp_label(as_rec(opts), s + 1) : val_null();
+        double lx = SVG_ML + PW - 132, ly = SVG_MT + 16 + 18 * s;
+        fprintf(o, "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2\"/>\n",
+                lx, ly - 4, lx + 22, ly - 4, col);
+        fprintf(o, "<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\">", lx + 28, ly);
+        if (lv.kind == VAL_STRING) svg_esc(o, as_str(lv)->data, as_str(lv)->len);
+        else fprintf(o, "series %u", s + 1);
+        fputs("</text>\n", o);
+    }
+    fputs("</svg>\n", o);
+    fclose(o);
+    svg_announce(fname);
+}
+
+static void svg_hist_render(Interp *I, double lo, double w, uint32_t nb,
+                            const uint64_t *cnt, Value opts)
+{
+    uint32_t cmax = 1;
+    for (uint32_t b = 0; b < nb; b++) if (cnt[b] > cmax) cmax = cnt[b];
+    char fname[64];
+    snprintf(fname, sizeof fname,
+#ifdef __EMSCRIPTEN__
+             "/plot_%d.svg",
+#else
+             "plot_%d.svg",
+#endif
+             ++g_svg_plot_no);
+    FILE *o = fopen(fname, "w");
+    if (!o) { g_svg_plot_no--; runtime_error(I, "hist: cannot write %s", fname); }
+    uint32_t tlen = 0, xllen = 0;
+    const char *title = ascii_optstr(opts, "title", &tlen);
+    const char *xl = ascii_optstr(opts, "xlabel", &xllen);
+    svg_frame(o, lo, lo + w * nb, 0, (double)cmax * 1.05, title, tlen, xl, xllen, nullptr, 0);
+    const int PW = SVG_W - SVG_ML - SVG_MR, PH = SVG_H - SVG_MT - SVG_MB;
+    double xspan = w * nb, yspan = (double)cmax * 1.05;
+    for (uint32_t b = 0; b < nb; b++) {
+        double bx = SVG_ML + (b * w) / xspan * PW;
+        double bw = w / xspan * PW;
+        double bh = cnt[b] / yspan * PH;
+        fprintf(o, "<rect x=\"%.2f\" y=\"%.2f\" width=\"%.2f\" height=\"%.2f\" "
+                   "fill=\"#1f77b4\" fill-opacity=\"0.75\" stroke=\"#0d3a5c\"/>\n",
+                bx + 0.5, SVG_MT + PH - bh, bw - 1.0, bh);
+    }
+    fputs("</svg>\n", o);
+    fclose(o);
+    svg_announce(fname);
+}
+
 static void ascii_plot_render(Interp *I, ArrObj *X, ArrObj *Y, bool yvec,
                               uint32_t npts, uint32_t nser, Value opts)
 {
@@ -2557,6 +2775,7 @@ static Value bi_plot(Interp *I, Value *args, uint32_t n)
     }
 
     gp_check_opts(I, opts, "plot");
+    if (plot_is_svg())   { svg_plot_render(I, X, Y, yvec, npts, nser, opts); return val_null(); }
     if (plot_is_ascii()) { ascii_plot_render(I, X, Y, yvec, npts, nser, opts); return val_null(); }
     FILE *g = gp_open(I);
     gp_opts(I, g, opts);
@@ -2610,6 +2829,7 @@ static Value bi_hist(Interp *I, Value *args, uint32_t n)
         if (b >= nb) b = nb - 1;
         cnt[b]++;
     }
+    if (plot_is_svg())   { svg_hist_render(I, lo, w, nb, cnt, opts); free(cnt); return val_null(); }
     if (plot_is_ascii()) { ascii_hist_render(vout(), lo, w, nb, cnt, opts); free(cnt); return val_null(); }
     FILE *g = gp_open(I);
     Value hlv = (opts.kind == VAL_RECORD) ? gp_label(as_rec(opts), 1) : val_null();

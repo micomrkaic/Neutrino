@@ -669,6 +669,11 @@ line and echoes each result, so `printf 'sum(1:100)\n' | ./vmtest` prints
 (`make test`) and its ASan twin (`make test-asan`) are how changes prove
 themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 
+**SVG plots.** `NEUTRINO_PLOT_TERM=svg` makes `plot` and `hist` write
+`plot_N.svg` files instead of using gnuplot or ASCII. The browser build uses
+this by default: plots appear in the page's Plots panel, and "download new
+files" saves them.
+
 ## 17. Builtin reference
 
 *Generated from the interpreter's own documentation table (the same data

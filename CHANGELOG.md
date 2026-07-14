@@ -12,6 +12,21 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.7.0: the browser grows up (structure borrowed from tea).** The web
+  page is now a two-pane workbench: the terminal on the left; on the right, a
+  **Plots panel** and a **script Editor** in tabs. `plot` and `hist` gained a
+  third backend that writes SVG (`NEUTRINO_PLOT_TERM=svg` natively; the
+  browser default) — nice 1-2-5 ticks, gridlines, multi-series polylines with
+  a palette, legends from `labels`, XML-escaped text — announced to the page
+  through a `Module.neutrinoPlot` hook, tea's protocol. The editor persists
+  in localStorage, runs with Ctrl+Enter (selection or whole buffer, via
+  `load("/_editor.nu")` — multi-line definitions welcome), and opens/saves
+  `.nu` files. **File exchange**: an upload button and whole-window drag &
+  drop (`.nu` opens in the editor; data files land in MEMFS for `readtable`/
+  `load`), and "download new files" fetches everything the session created —
+  workspace saves, CSVs, and the SVG plots themselves. A native SVG smoke
+  test joins `make test`; `make wasm` now uses `-std=gnu2x` (EM_ASM needs
+  GNU extensions).
 - **v1.6.2: REPL commands are first-class names.** `help(manual)`,
   `help(pretty)`, and `help(more)` now work, the commands appear in the help
   tour under "repl commands", and tab completion knows them — they are

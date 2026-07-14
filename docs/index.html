@@ -56,6 +56,39 @@
   #term .err { color: var(--err); }
   #term .prompt { color: var(--cyan); }
   #term .dim { color: var(--dim); }
+  /* ---- split layout: terminal left, panel right ---- */
+  #main { flex: 1; display: flex; min-height: 0; }
+  #left { flex: 1.2; display: flex; flex-direction: column; min-width: 0; }
+  #right { flex: 1; display: flex; flex-direction: column; min-width: 0;
+           border-left: 1px solid #1c2230; background: var(--bg2); }
+  #tabs { display: flex; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid #1c2230; }
+  #tabs button { background: none; border: 1px solid #232a3a; border-bottom: none;
+    color: var(--dim); font: inherit; font-size: 12.5px; padding: 6px 16px;
+    border-radius: 8px 8px 0 0; cursor: pointer; }
+  #tabs button.on { color: var(--cyan); border-color: #2b3550; background: var(--bg); }
+  #plots { flex: 1; overflow-y: auto; padding: 14px; background: #fff; }
+  #plots svg { max-width: 100%; height: auto; display: block; margin: 0 auto 14px;
+               border-bottom: 1px solid #eee; }
+  #plots .placeholder { color: #99a3b3; font-size: 13px; padding: 24px;
+                        font-family: inherit; }
+  #editor { flex: 1; display: none; flex-direction: column; min-height: 0; }
+  #edbar { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #1c2230;
+           align-items: center; }
+  #edbar .hint { color: var(--dim); font-size: 11.5px; margin-left: auto; }
+  .btn { color: var(--fg); background: #171d2b; border: 1px solid #232a3a;
+         border-radius: 6px; padding: 4px 12px; font: inherit; font-size: 12.5px;
+         cursor: pointer; }
+  .btn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .btn input[type=file] { display: none; }
+  #edtext { flex: 1; background: var(--bg); color: var(--fg); border: none;
+    outline: none; resize: none; padding: 14px 16px; font: inherit;
+    line-height: 1.5; tab-size: 4; white-space: pre; }
+  body.dragging::after { content: ".nu files open in the editor \00b7 data files upload";
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(11,14,20,.85); color: var(--cyan); font-size: 16px;
+    border: 2px dashed var(--cyan); z-index: 40; }
+  @media (max-width: 900px) { #main { flex-direction: column; }
+    #right { border-left: none; border-top: 1px solid #1c2230; } }
   .inputline { display: flex; align-items: baseline; padding: 2px 20px 16px; }
   .inputline .prompt { color: var(--cyan); flex: none; margin-right: 8px; }
   #input {
@@ -83,9 +116,13 @@
   <span class="logo">Neutrino</span>
   <span class="tagline">a small functional array language · in your browser</span>
   <span class="spacer"></span>
+  <label class="btn">upload<input type="file" id="upload" multiple></label>
+  <button class="btn" id="dl" title="download files your session created (saves, CSVs, plots)">download new files</button>
   <a href="https://github.com/micomrkaic/Neutrino" target="_blank" rel="noopener">GitHub</a>
 </header>
 
+<div id="main">
+<div id="left">
 <div id="term"><span class="dim">booting WebAssembly…</span>
 </div>
 
@@ -107,6 +144,24 @@
 </footer>
 
 <script src="neutrino.js"></script>
+</div>
+<div id="right">
+  <div id="tabs">
+    <button id="tab-plots" class="on">Plots</button>
+    <button id="tab-editor">Editor</button>
+  </div>
+  <div id="plots"><div class="placeholder">plot(...) and hist(...) render here as SVG.</div></div>
+  <div id="editor">
+    <div id="edbar">
+      <button class="btn" id="ed-run">Run &nbsp;&#9654;</button>
+      <label class="btn">Open<input type="file" id="ed-open" accept=".nu,.txt"></label>
+      <button class="btn" id="ed-save">Save .nu</button>
+      <span class="hint">Ctrl+Enter runs selection (whole buffer if none)</span>
+    </div>
+    <textarea id="edtext" spellcheck="false" placeholder="% write Neutrino here — multi-line definitions welcome&#10;let cube = fn x -&gt; x^3&#10;plot(1:20, map(cube, 1:20), {title = &quot;cubes&quot;})"></textarea>
+  </div>
+</div>
+</div>
 <script>
 (function () {
   var term = document.getElementById('term');
@@ -175,6 +230,17 @@
       return r;
     };
     M._nu_init();
+    window.NU = M;
+    M.neutrinoPlot = function (fname) {
+      try {
+        var svg = new TextDecoder().decode(M.FS.readFile(fname));
+        var box = document.getElementById('plots');
+        if (box.firstChild && box.firstChild.className === 'placeholder') box.innerHTML = '';
+        box.insertAdjacentHTML('afterbegin', svg);
+        showTab(false);
+      } catch (e) {}
+    };
+    for (var fi = 0; fi < M.FS.readdir('/').length; fi++) known.add(M.FS.readdir('/')[fi]);
     var ver = M.UTF8ToString(M._nu_version());
     term.innerHTML = '';
     banner();
@@ -182,7 +248,8 @@
     writeLine('dim', '');
     writeLine('dim', 'Type an expression and press Enter. help lists the builtins;');
     writeLine('dim', 'help(name) shows one with examples. format(n) sets precision.');
-    writeLine('dim', 'plot and hist draw as ASCII here.');
+    writeLine('dim', 'plot and hist render as SVG in the Plots panel. Drop files anywhere:');
+    writeLine('dim', '.nu opens in the editor, data files upload for readtable/load.');
     writeLine('dim', '');
     inputline.style.display = 'flex';
     input.focus();
@@ -241,6 +308,124 @@
     if (window.getSelection().toString() === '') input.focus();
   });
 })();
+
+  /* ---- tabs ---- */
+  var known = new Set();
+  var tabP = document.getElementById('tab-plots'), tabE = document.getElementById('tab-editor');
+  function showTab(edon) {
+    document.getElementById('plots').style.display  = edon ? 'none' : 'block';
+    document.getElementById('editor').style.display = edon ? 'flex' : 'none';
+    tabE.classList.toggle('on', edon); tabP.classList.toggle('on', !edon);
+    if (edon) edtext.focus();
+  }
+  tabP.addEventListener('click', function () { showTab(false); });
+  tabE.addEventListener('click', function () { showTab(true); });
+
+  /* ---- script editor (persists in localStorage) ---- */
+  var edtext = document.getElementById('edtext');
+  var EDKEY = 'neutrino_editor_v1';
+  try { var t0 = localStorage.getItem(EDKEY); if (t0) edtext.value = t0; } catch (e) {}
+  var edTimer = null;
+  edtext.addEventListener('input', function () {
+    clearTimeout(edTimer);
+    edTimer = setTimeout(function () { try { localStorage.setItem(EDKEY, edtext.value); } catch (e) {} }, 400);
+  });
+  function runScript(text) {
+    if (!window.NU || !text.trim().length) return;
+    window.NU.FS.writeFile('/_editor.nu', text.charAt(text.length - 1) === '\n' ? text : text + '\n');
+    run('load("/_editor.nu")');
+    input.focus();
+  }
+  document.getElementById('ed-run').addEventListener('click', function () { runScript(edtext.value); });
+  edtext.addEventListener('keydown', function (ev) {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+      ev.preventDefault();
+      var a = edtext.selectionStart, b = edtext.selectionEnd, v = edtext.value;
+      if (a === b) { runScript(v); return; }
+      while (a > 0 && v[a - 1] !== '\n') a--;
+      while (b < v.length && v[b] !== '\n') b++;
+      runScript(v.slice(a, b));
+    } else if (ev.key === 'Tab') {
+      ev.preventDefault();
+      edtext.setRangeText('    ', edtext.selectionStart, edtext.selectionEnd, 'end');
+    }
+  });
+  document.getElementById('ed-open').addEventListener('change', function (ev) {
+    var f = ev.target.files[0]; if (!f) return;
+    f.text().then(function (t) {
+      edtext.value = t;
+      try { localStorage.setItem(EDKEY, t); } catch (e) {}
+      showTab(true);
+    });
+    ev.target.value = '';
+  });
+  document.getElementById('ed-save').addEventListener('click', function () {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([edtext.value], { type: 'text/plain' }));
+    a.download = 'script.nu'; a.click(); URL.revokeObjectURL(a.href);
+  });
+
+  /* ---- upload + download-new-files ---- */
+  document.getElementById('upload').addEventListener('change', function (ev) {
+    var files = Array.prototype.slice.call(ev.target.files);
+    files.forEach(function (f) {
+      f.arrayBuffer().then(function (buf) {
+        window.NU.FS.writeFile('/' + f.name, new Uint8Array(buf));
+        known.add(f.name);
+        var hint = /\.nu$/i.test(f.name) ? 'run it with: load("/' + f.name + '")'
+                                          : 'e.g. readtable("/' + f.name + '")';
+        writeLine('dim', '(uploaded ' + f.name + ', ' + buf.byteLength + ' bytes — ' + hint + ')');
+        scroll();
+      });
+    });
+    ev.target.value = '';
+  });
+  document.getElementById('dl').addEventListener('click', function () {
+    if (!window.NU) return;
+    var n = 0, names = window.NU.FS.readdir('/');
+    for (var i = 0; i < names.length; i++) {
+      var f = names[i];
+      if (known.has(f) || f === '.' || f === '..' || f === '_editor.nu') continue;
+      try {
+        if (!window.NU.FS.isFile(window.NU.FS.stat('/' + f).mode)) continue;
+        var data = window.NU.FS.readFile('/' + f);
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([data]));
+        a.download = f; a.click(); URL.revokeObjectURL(a.href); n++;
+      } catch (e) {}
+    }
+    writeLine('dim', '(' + n + ' new file' + (n === 1 ? '' : 's') + ' downloaded)');
+    scroll();
+  });
+
+  /* ---- drag & drop: .nu -> editor, everything else -> MEMFS ---- */
+  var dragDepth = 0;
+  window.addEventListener('dragenter', function (ev) { ev.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
+  window.addEventListener('dragleave', function () { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+  window.addEventListener('dragover', function (ev) { ev.preventDefault(); });
+  window.addEventListener('drop', function (ev) {
+    ev.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging');
+    if (!window.NU) return;
+    var files = Array.prototype.slice.call(ev.dataTransfer.files);
+    files.forEach(function (f) {
+      if (/\.(nu|txt)$/i.test(f.name)) {
+        f.text().then(function (t) {
+          edtext.value = t;
+          try { localStorage.setItem(EDKEY, t); } catch (e) {}
+          showTab(true);
+          writeLine('dim', '(opened ' + f.name + ' in the editor — Ctrl+Enter runs it)');
+          scroll();
+        });
+      } else {
+        f.arrayBuffer().then(function (buf) {
+          window.NU.FS.writeFile('/' + f.name, new Uint8Array(buf));
+          known.add(f.name);
+          writeLine('dim', '(uploaded ' + f.name + ', ' + buf.byteLength + ' bytes)');
+          scroll();
+        });
+      }
+    });
+  });
 </script>
 </body>
 </html>

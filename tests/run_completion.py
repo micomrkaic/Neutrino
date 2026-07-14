@@ -5,6 +5,11 @@ import os, pty, re, signal, sys, time
 
 if not os.path.exists('./neutrino'):
     print("completion: ./neutrino not built, skipping"); sys.exit(0)
+# a readline-less build has no completion to test
+import subprocess
+if b'rl_completion' not in subprocess.run(['strings', './neutrino'], capture_output=True).stdout and \
+   subprocess.run(['sh', '-c', 'ldd ./neutrino 2>/dev/null | grep -q readline'], capture_output=True).returncode != 0:
+    print("completion: built without readline, skipping"); sys.exit(0)
 
 def drive(keys):
     pid, fd = pty.fork()

@@ -76,6 +76,7 @@ test: vmtest $(BIN)
 	@bash tests/run_ascii_plot.sh
 	@bash tests/run_longline.sh
 	@timeout 30 python3 tests/run_completion.py || true
+	@bash tests/run_svg.sh
 
 # Same corpus, every input run under AddressSanitizer/UBSan; fails on any leak.
 test-asan: vmtest-asan
@@ -113,7 +114,7 @@ WASM_FLAGS  = -sMODULARIZE=1 -sEXPORT_NAME=Neutrino -sALLOW_MEMORY_GROWTH=1 \
               -sEXPORTED_FUNCTIONS=_nu_init,_nu_eval,_nu_version,_malloc,_free \
               -sEXPORTED_RUNTIME_METHODS=cwrap,ccall,UTF8ToString,stringToUTF8,lengthBytesUTF8,FS
 wasm: $(WASM_SRCS) $(HDRS) wasm_api.c version.h
-	$(EMCC) -std=$(STD) -O2 $(EMCC_C23) $(WASM_FLAGS) $(WASM_SRCS) -o docs/neutrino.js
+	$(EMCC) -std=gnu2x -O2 $(EMCC_C23) $(WASM_FLAGS) $(WASM_SRCS) -o docs/neutrino.js  # gnu2x: EM_ASM (plot hook) needs GNU extensions
 	@echo "built docs/neutrino.js ($$(wc -c < docs/neutrino.js) bytes) — commit and push to update GitHub Pages"
 
 .PHONY: run repl sample ast tokens clean test test-asan wasm
