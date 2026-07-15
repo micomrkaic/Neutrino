@@ -105,7 +105,7 @@ clean:; rm -f $(BIN) vmtest vmtest-asan
 #
 # EMCC_C23 is empty for a current emsdk (full C23). Only the older Ubuntu-
 # packaged emscripten 3.1.6 (clang-15, partial C23) needs polyfills; for that,
-# build with:  make wasm EMCC_C23='-Dnullptr=NULL -Dalignof(x)=_Alignof(x) -Dstatic_assert=_Static_assert'
+# build with:  make wasm EMCC_C23="-Dnullptr=NULL '-Dalignof(x)=_Alignof(x)' -Dstatic_assert=_Static_assert"
 EMCC       ?= emcc
 EMCC_C23   ?=
 WASM_SRCS   = lexer.c arena.c ast.c parser.c value.c eval.c chunk.c compile.c vm.c wasm_api.c
@@ -114,7 +114,10 @@ WASM_FLAGS  = -sMODULARIZE=1 -sEXPORT_NAME=Neutrino -sALLOW_MEMORY_GROWTH=1 \
               -sEXPORTED_FUNCTIONS=_nu_init,_nu_eval,_nu_version,_malloc,_free \
               -sEXPORTED_RUNTIME_METHODS=cwrap,ccall,UTF8ToString,stringToUTF8,lengthBytesUTF8,FS
 wasm: $(WASM_SRCS) $(HDRS) wasm_api.c version.h
-	$(EMCC) -std=gnu2x -O2 $(EMCC_C23) $(WASM_FLAGS) $(WASM_SRCS) -o docs/neutrino.js  # gnu2x: EM_ASM (plot hook) needs GNU extensions
+	$(EMCC) -std=gnu2x -O2 $(EMCC_C23) $(WASM_FLAGS) \
+	  --embed-file packages --embed-file MANUAL.md --embed-file PACKAGES.md \
+	  --embed-file CHANGELOG.md --embed-file LESSONS.md --embed-file DESIGN_NOTES.md \
+	  $(WASM_SRCS) -o docs/neutrino.js  # gnu2x: EM_ASM needs GNU extensions; docs+packages ride in the bundle
 	@echo "built docs/neutrino.js ($$(wc -c < docs/neutrino.js) bytes) — commit and push to update GitHub Pages"
 
 .PHONY: run repl sample ast tokens clean test test-asan wasm

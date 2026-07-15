@@ -1,0 +1,2 @@
+# Neutrino sources are not Nushell; render .nu as Octave (closest highlighting).
+*.nu linguist-language=Octave

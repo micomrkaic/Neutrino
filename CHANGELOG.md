@@ -12,6 +12,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.8.0: the whole project in one file.** The browser bundle now embeds
+  the four standard packages and the five documents (manual, packages guide,
+  changelog, lessons, design notes) — `load("packages/dist.nu")` works in the
+  browser exactly as natively, every PACKAGES.md transcript is browser-valid,
+  and nothing can version-skew because interpreter, library, and docs travel
+  together (~650 KB total, offline-capable). A third **Docs tab** renders any
+  of the five documents as clean HTML via a small JS markdown renderer (the
+  C ANSI renderer's subset, ported); typing `manual` or `manual packages` in
+  the browser terminal opens it directly. `make wasm` carries the
+  `--embed-file` flags.
 - **v1.7.0: the browser grows up (structure borrowed from tea).** The web
   page is now a two-pane workbench: the terminal on the left; on the right, a
   **Plots panel** and a **script Editor** in tabs. `plot` and `hist` gained a

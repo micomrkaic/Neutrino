@@ -83,7 +83,28 @@
   #edtext { flex: 1; background: var(--bg); color: var(--fg); border: none;
     outline: none; resize: none; padding: 14px 16px; font: inherit;
     line-height: 1.5; tab-size: 4; white-space: pre; }
-  body.dragging::after { content: ".nu files open in the editor \00b7 data files upload";
+  #docs { flex: 1; display: none; flex-direction: column; min-height: 0; }
+  #docbar { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #1c2230; align-items: center; }
+  #docbar select { background: #171d2b; color: var(--fg); border: 1px solid #232a3a;
+    border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 12.5px; }
+  #docview { flex: 1; overflow-y: auto; padding: 22px 28px; background: #fdfdfc;
+    color: #24292f; font-family: Georgia, "Times New Roman", serif; font-size: 15px;
+    line-height: 1.55; }
+  #docview h1 { font-size: 24px; color: #0b2d5c; border-bottom: 2px solid #e3e6ea; padding-bottom: 6px; }
+  #docview h2 { font-size: 19px; color: #0b2d5c; margin-top: 28px; }
+  #docview h3 { font-size: 16px; color: #1a4a8a; margin-top: 22px; }
+  #docview pre { background: #f4f6f8; border: 1px solid #e3e6ea; border-radius: 6px;
+    padding: 10px 14px; overflow-x: auto; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 13px; line-height: 1.45; color: #1b2733; }
+  #docview code { background: #eef1f4; border-radius: 4px; padding: 1px 5px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; color: #0a4d68; }
+  #docview pre code { background: none; padding: 0; }
+  #docview table { border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+  #docview th, #docview td { border: 1px solid #d7dce2; padding: 5px 10px; text-align: left; }
+  #docview th { background: #eef1f4; }
+  #docview hr { border: none; border-top: 1px solid #e3e6ea; margin: 22px 0; }
+  #docview li { margin: 3px 0; }
+    body.dragging::after { content: ".nu files open in the editor \00b7 data files upload";
     position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
     background: rgba(11,14,20,.85); color: var(--cyan); font-size: 16px;
     border: 2px dashed var(--cyan); z-index: 40; }
@@ -149,8 +170,22 @@
   <div id="tabs">
     <button id="tab-plots" class="on">Plots</button>
     <button id="tab-editor">Editor</button>
+    <button id="tab-docs">Docs</button>
   </div>
   <div id="plots"><div class="placeholder">plot(...) and hist(...) render here as SVG.</div></div>
+  <div id="docs">
+    <div id="docbar">
+      <select id="doc-pick">
+        <option value="/MANUAL.md">The Neutrino Manual</option>
+        <option value="/PACKAGES.md">The Neutrino Packages</option>
+        <option value="/CHANGELOG.md">Changelog</option>
+        <option value="/LESSONS.md">Lessons</option>
+        <option value="/DESIGN_NOTES.md">Design notes</option>
+      </select>
+      <span class="hint" style="color:var(--dim);font-size:11.5px;margin-left:auto">also: type manual [packages|changelog|lessons|design] in the terminal</span>
+    </div>
+    <div id="docview"></div>
+  </div>
   <div id="editor">
     <div id="edbar">
       <button class="btn" id="ed-run">Run &nbsp;&#9654;</button>
@@ -250,6 +285,8 @@
     writeLine('dim', 'help(name) shows one with examples. format(n) sets precision.');
     writeLine('dim', 'plot and hist render as SVG in the Plots panel. Drop files anywhere:');
     writeLine('dim', '.nu opens in the editor, data files upload for readtable/load.');
+    writeLine('dim', 'The standard packages are preloaded: try load("packages/dist.nu").');
+    writeLine('dim', 'Type manual (or manual packages) to read the docs in the Docs tab.');
     writeLine('dim', '');
     inputline.style.display = 'flex';
     input.focus();
@@ -263,6 +300,16 @@
     d.appendChild(el('prompt', 'neutrino> '));
     d.appendChild(el('echo', line));
     term.appendChild(d);
+    var mm = line.match(/^\s*manual(?:\s+(packages|changelog|lessons|design|readme))?\s*$/);
+    if (mm) {
+      var map = { packages: '/PACKAGES.md', changelog: '/CHANGELOG.md',
+                  lessons: '/LESSONS.md', design: '/DESIGN_NOTES.md', readme: '/MANUAL.md' };
+      showPane('docs');
+      loadDoc(mm[1] ? map[mm[1]] : '/MANUAL.md');
+      writeLine('dim', '(opened in the Docs tab \u2192)');
+      scroll();
+      return;
+    }
     if (line.trim()) {
       history.push(line);
       histpos = history.length;
@@ -311,15 +358,88 @@
 
   /* ---- tabs ---- */
   var known = new Set();
-  var tabP = document.getElementById('tab-plots'), tabE = document.getElementById('tab-editor');
-  function showTab(edon) {
-    document.getElementById('plots').style.display  = edon ? 'none' : 'block';
-    document.getElementById('editor').style.display = edon ? 'flex' : 'none';
-    tabE.classList.toggle('on', edon); tabP.classList.toggle('on', !edon);
-    if (edon) edtext.focus();
+  var tabP = document.getElementById('tab-plots'), tabE = document.getElementById('tab-editor'),
+      tabD = document.getElementById('tab-docs');
+  function showPane(which) {                     /* 'plots' | 'editor' | 'docs' */
+    document.getElementById('plots').style.display  = which === 'plots'  ? 'block' : 'none';
+    document.getElementById('editor').style.display = which === 'editor' ? 'flex'  : 'none';
+    document.getElementById('docs').style.display   = which === 'docs'   ? 'flex'  : 'none';
+    tabP.classList.toggle('on', which === 'plots');
+    tabE.classList.toggle('on', which === 'editor');
+    tabD.classList.toggle('on', which === 'docs');
+    if (which === 'editor') edtext.focus();
   }
-  tabP.addEventListener('click', function () { showTab(false); });
-  tabE.addEventListener('click', function () { showTab(true); });
+  function showTab(edon) { showPane(edon ? 'editor' : 'plots'); }   /* legacy callers */
+  tabP.addEventListener('click', function () { showPane('plots'); });
+  tabE.addEventListener('click', function () { showPane('editor'); });
+  tabD.addEventListener('click', function () { showPane('docs'); loadDoc(); });
+
+  /* ---- markdown -> HTML: the same subset the C renderer handles ---- */
+  function mdToHtml(src) {
+    var esc = function (t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+    var span = function (t) {
+      return esc(t)
+        .replace(/`([^`]+)`/g, function (_, c) { return '<code>' + c + '</code>'; })
+        .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+        .replace(/(^|\s)\*([^*\s][^*]*)\*(?=[\s.,;:)]|$)/g, '$1<i>$2</i>');
+    };
+    var lines = src.split('\n'), out = [], i = 0, inList = false, para = [];
+    var flushPara = function () {
+      if (para.length) { out.push('<p>' + para.map(span).join(' ') + '</p>'); para = []; }
+    };
+    var flushList = function () { if (inList) { out.push('</ul>'); inList = false; } };
+    while (i < lines.length) {
+      var L = lines[i];
+      if (/^```/.test(L)) {                      /* fenced code */
+        flushPara(); flushList();
+        var code = [];
+        for (i++; i < lines.length && !/^```/.test(lines[i]); i++) code.push(esc(lines[i]));
+        i++;
+        out.push('<pre><code>' + code.join('\n') + '</code></pre>');
+        continue;
+      }
+      if (/^\|/.test(L)) {                       /* table block */
+        flushPara(); flushList();
+        var rows = [];
+        while (i < lines.length && /^\|/.test(lines[i])) { rows.push(lines[i]); i++; }
+        var html = ['<table>'];
+        for (var r = 0; r < rows.length; r++) {
+          if (/^\|[\s:|-]+\|?$/.test(rows[r])) continue;   /* separator row */
+          var cells = rows[r].replace(/^\||\|$/g, '').split('|');
+          var tag = r === 0 ? 'th' : 'td';
+          html.push('<tr>' + cells.map(function (c) { return '<' + tag + '>' + span(c.trim()) + '</' + tag + '>'; }).join('') + '</tr>');
+        }
+        html.push('</table>');
+        out.push(html.join(''));
+        continue;
+      }
+      var h = L.match(/^(#{1,3})\s+(.*)/);
+      if (h) { flushPara(); flushList(); out.push('<h' + h[1].length + '>' + span(h[2]) + '</h' + h[1].length + '>'); i++; continue; }
+      if (/^---+$/.test(L)) { flushPara(); flushList(); out.push('<hr>'); i++; continue; }
+      var b = L.match(/^-\s+(.*)/);
+      if (b) { flushPara(); if (!inList) { out.push('<ul>'); inList = true; } out.push('<li>' + span(b[1]) + '</li>'); i++; continue; }
+      if (/^\s*$/.test(L)) { flushPara(); flushList(); i++; continue; }
+      para.push(L); i++;
+    }
+    flushPara(); flushList();
+    return out.join('\n');
+  }
+
+  var docPick = document.getElementById('doc-pick');
+  var docCache = {};
+  function loadDoc(path) {
+    if (path) docPick.value = path;
+    var p = docPick.value;
+    if (!window.NU) return;
+    if (!docCache[p]) {
+      try {
+        docCache[p] = mdToHtml(new TextDecoder().decode(window.NU.FS.readFile(p)));
+      } catch (e) { docCache[p] = '<p>(document not found in this build)</p>'; }
+    }
+    document.getElementById('docview').innerHTML = docCache[p];
+    document.getElementById('docview').scrollTop = 0;
+  }
+  docPick.addEventListener('change', function () { loadDoc(); });
 
   /* ---- script editor (persists in localStorage) ---- */
   var edtext = document.getElementById('edtext');
