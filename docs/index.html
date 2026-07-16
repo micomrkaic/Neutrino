@@ -345,13 +345,18 @@
     setTimeout(function () { input.selectionStart = input.selectionEnd = input.value.length; }, 0);
   }
 
-  // clicking anywhere focuses the input; chips run their command
+  // clicking in the terminal area focuses the input; chips run their command.
+  // Clicks in the right panel (editor, docs, plots) or on any interactive
+  // element must keep their own focus — v1.8.1 fix for editor keystrokes
+  // being stolen by the REPL.
   document.addEventListener('click', function (e) {
     if (e.target.classList.contains('chip')) {
       input.value = e.target.getAttribute('data-cmd');
       run(input.value); input.value = ''; input.focus();
       return;
     }
+    if (e.target.closest('#right') ||
+        e.target.closest('input, textarea, select, button, label, a')) return;
     if (window.getSelection().toString() === '') input.focus();
   });
 })();

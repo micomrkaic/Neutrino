@@ -5,6 +5,13 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v1.8.1: editor focus fix (browser).** The page's "click anywhere to
+  focus the terminal" handler was stealing keystrokes from the script
+  editor — clicking into the editor bounced focus back to the REPL, so typed
+  text appeared in the terminal. The handler now leaves clicks in the right
+  panel and on any interactive element alone; clicking the terminal area
+  still focuses the prompt. Verified with a headless DOM focus matrix
+  (editor, docs picker, terminal).
 - **REPL history recall included a trailing newline.** The accumulated input
   buffer (which carries a `\n` per physical line for the parser) was passed to
   `add_history` untrimmed, so an up-arrow recalled the command plus a newline
