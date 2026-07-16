@@ -359,6 +359,14 @@
         e.target.closest('input, textarea, select, button, label, a')) return;
     if (window.getSelection().toString() === '') input.focus();
   });
+
+  /* terminal API for the panel wiring below (which is outside this IIFE) */
+  window.nuTerm = {
+    run: run,
+    writeLine: writeLine,
+    scroll: scroll,
+    focusInput: function () { input.focus(); }
+  };
 })();
 
   /* ---- tabs ---- */
@@ -458,8 +466,9 @@
   function runScript(text) {
     if (!window.NU || !text.trim().length) return;
     window.NU.FS.writeFile('/_editor.nu', text.charAt(text.length - 1) === '\n' ? text : text + '\n');
-    run('load("/_editor.nu")');
-    input.focus();
+    nuTerm.run('load("/_editor.nu")');   /* focus stays in the editor */
+    nuTerm.writeLine('dim', '(script ran — use print(...) for output)');
+    nuTerm.scroll();
   }
   document.getElementById('ed-run').addEventListener('click', function () { runScript(edtext.value); });
   edtext.addEventListener('keydown', function (ev) {
@@ -499,8 +508,8 @@
         known.add(f.name);
         var hint = /\.nu$/i.test(f.name) ? 'run it with: load("/' + f.name + '")'
                                           : 'e.g. readtable("/' + f.name + '")';
-        writeLine('dim', '(uploaded ' + f.name + ', ' + buf.byteLength + ' bytes — ' + hint + ')');
-        scroll();
+        nuTerm.writeLine('dim', '(uploaded ' + f.name + ', ' + buf.byteLength + ' bytes — ' + hint + ')');
+        nuTerm.scroll();
       });
     });
     ev.target.value = '';
@@ -519,8 +528,8 @@
         a.download = f; a.click(); URL.revokeObjectURL(a.href); n++;
       } catch (e) {}
     }
-    writeLine('dim', '(' + n + ' new file' + (n === 1 ? '' : 's') + ' downloaded)');
-    scroll();
+    nuTerm.writeLine('dim', '(' + n + ' new file' + (n === 1 ? '' : 's') + ' downloaded)');
+    nuTerm.scroll();
   });
 
   /* ---- drag & drop: .nu -> editor, everything else -> MEMFS ---- */
@@ -538,15 +547,15 @@
           edtext.value = t;
           try { localStorage.setItem(EDKEY, t); } catch (e) {}
           showTab(true);
-          writeLine('dim', '(opened ' + f.name + ' in the editor — Ctrl+Enter runs it)');
-          scroll();
+          nuTerm.writeLine('dim', '(opened ' + f.name + ' in the editor — Ctrl+Enter runs it)');
+          nuTerm.scroll();
         });
       } else {
         f.arrayBuffer().then(function (buf) {
           window.NU.FS.writeFile('/' + f.name, new Uint8Array(buf));
           known.add(f.name);
-          writeLine('dim', '(uploaded ' + f.name + ', ' + buf.byteLength + ' bytes)');
-          scroll();
+          nuTerm.writeLine('dim', '(uploaded ' + f.name + ', ' + buf.byteLength + ' bytes)');
+          nuTerm.scroll();
         });
       }
     });
