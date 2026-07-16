@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v1.8.3: editor results echo in the terminal (browser).** Running the
+  editor previously went through `load("/_editor.nu")` — script semantics,
+  which are silent for bare expressions (natively too, by design). The
+  editor now sends its buffer directly to the evaluator, which treats it as
+  a program typed at the prompt: every statement's value echoes in the
+  terminal, `let` bindings included, exactly like interactive use. The page
+  test gained a second phase that drives the real wasm bundle through the
+  real page and asserts the echoed values.
 - **v1.8.1: editor focus fix (browser).** The page's "click anywhere to
   focus the terminal" handler was stealing keystrokes from the script
   editor — clicking into the editor bounced focus back to the REPL, so typed

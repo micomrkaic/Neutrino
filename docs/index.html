@@ -365,7 +365,18 @@
     run: run,
     writeLine: writeLine,
     scroll: scroll,
-    focusInput: function () { input.focus(); }
+    focusInput: function () { input.focus(); },
+    /* run editor text as if typed at the prompt: nu_eval takes a whole
+     * program and echoes each statement's value (v1.8.3) */
+    runBuffer: function (text) {
+      writeLine('dim', '% editor script:');
+      try {
+        writeResult(evalLine(text));
+      } catch (e) {
+        writeLine('err', '  internal error: ' + e.message);
+      }
+      scroll();
+    }
   };
 })();
 
@@ -465,10 +476,7 @@
   });
   function runScript(text) {
     if (!window.NU || !text.trim().length) return;
-    window.NU.FS.writeFile('/_editor.nu', text.charAt(text.length - 1) === '\n' ? text : text + '\n');
-    nuTerm.run('load("/_editor.nu")');   /* focus stays in the editor */
-    nuTerm.writeLine('dim', '(script ran — use print(...) for output)');
-    nuTerm.scroll();
+    nuTerm.runBuffer(text);              /* interactive echo; focus stays in the editor */
   }
   document.getElementById('ed-run').addEventListener('click', function () { runScript(edtext.value); });
   edtext.addEventListener('keydown', function (ev) {
