@@ -59,15 +59,15 @@ error: quantile: p must be in (0,1), got 1.5
 neutrino> student.inv(1.5, 10)
 ```
 
-| Function | Meaning |
-|---|---|
-| `norm.pdf/cdf/inv(x, mu, sigma)` | normal density, CDF, quantile |
-| `norm.rand(n, mu, sigma)` | n normal draws (column) |
-| `student.pdf/cdf/inv(x, v)` | Student t with v degrees of freedom |
-| `chi2.pdf/cdf/inv(x, k)` | chi-squared with k degrees of freedom |
-| `fdist.pdf/cdf/inv(x, d1, d2)` | F distribution |
-| `expo.pdf/cdf/inv(x, rate)` | exponential |
-| `unif.pdf/cdf/inv(x, a, b)` | uniform on [a, b] |
+| Function | Worked example | Result |
+|---|---|---|
+| `norm.pdf/cdf/inv(x, mu, sigma)` | `norm.cdf(1.96, 0, 1)` | `0.975002` |
+| `norm.rand(n, mu, sigma)` | `mean(norm.rand(500, 10, 2)) > 9` | `true` |
+| `student.pdf/cdf/inv(x, v)` | `student.inv(0.975, 30)` | `2.04227` |
+| `chi2.pdf/cdf/inv(x, k)` | `chi2.inv(0.95, 3)` | `7.81473` |
+| `fdist.pdf/cdf/inv(x, d1, d2)` | `fdist.cdf(3.0, 4, 20)` | `0.956799` |
+| `expo.pdf/cdf/inv(x, rate)` | `expo.inv(0.5, 2)` | `0.346574` |
+| `unif.pdf/cdf/inv(x, a, b)` | `unif.cdf(3, 0, 10)` | `0.300000` |
 
 ---
 
@@ -108,14 +108,15 @@ neutrino> conv([1, -1], [1, -2])
 [1, -3, 2]
 ```
 
-| Function | Meaning |
-|---|---|
-| `polyval(c, x)` | evaluate (Horner); x scalar or array |
-| `roots(c)` | all complex roots, via `eig(companion(c))` |
-| `companion(c)` | the companion matrix |
-| `polyfit(x, y, n)` | degree-n least-squares fit |
-| `polyder(c)` / `polyint(c, k)` | derivative / antiderivative (constant k) |
-| `conv(a, b)` | polynomial multiplication |
+| Function | Worked example | Result |
+|---|---|---|
+| `polyval(c, x)` | `polyval([2, -3, 1], 4)` | `21` |
+| `roots(c)` | `sort(real(roots([1, -6, 11, -6])))'` | `[1.00000, 2.00000, 3.00000]` |
+| `companion(c)` | `companion([1, 0, -4])` | `[0.00000, 4.00000; 1.00000, 0.00000]` |
+| `polyfit(x, y, n)` | `polyfit([1, 2, 3], [2, 5, 10], 2)` | `[1.00000, -8.32667e-16, 1.00000]` |
+| `polyder(c)` | `polyder([1, -6, 11, -6])` | `[3, -12, 11]` |
+| `polyint(c, k)` | `polyint([3, -12, 11], -6)` | `[1.00000, -6.00000, 11.0000, -6.00000]` |
+| `conv(a, b)` | `conv([1, -1], [1, -2])` | `[1.00000, -3.00000, 2.00000]` |
 
 ---
 
@@ -172,27 +173,51 @@ neutrino> sum(s.principal)
 ```
 
 Dates, HP-12C style — actual day counts, date arithmetic, day of week, and
-the bond market's 30/360 convention:
+the bond market's 30/360 convention. `datestr` returns a display string,
+`daterec` the `{y, m, d}` record, and `today()` a serial day number, so
+arithmetic reads naturally — `datestr(today() + 90)` is the date in 90 days:
 
 ```
 neutrino> load("packages/finance.nu")
 neutrino> days(2026, 1, 1, 2026, 7, 9)
 189
+neutrino> datestr(datenum(2026, 7, 17) + 90)
+"2026-10-15"
+neutrino> daterec(datenum(2024, 2, 29))
+{y = 2024, m = 2, d = 29}
 neutrino> dateadd(2024, 2, 28, 2)
 {y = 2024, m = 3, d = 1}
 neutrino> dow(2026, 7, 9)
 4
 neutrino> days360(2024, 1, 31, 2024, 7, 31)
 180
+neutrino> daterec(today()).y >= 2026
+true
 ```
 
-| Function | Meaning |
-|---|---|
-| `pmt/pv/fv(n, i, ...)`, `nper`, `rate` | the TVM five-key block (END mode) |
-| `npv(r, cfs)` / `irr(cfs)` | cash-flow analysis; cfs[1] is CF₀ at t = 0 |
-| `bond_price/ytm/duration/mduration/convexity` | period-based bond math |
-| `amort(principal, i, n)` | full schedule: {period, payment, interest, principal, balance} |
-| `datenum/datestr/days/dateadd/dow/days360` | date arithmetic (Julian day core) |
+| Function | Worked example | Result |
+|---|---|---|
+| `pmt(n, i, pv, fv)` | `pmt(360, 0.005, 250000, 0)` | `-1498.88` |
+| `pv(n, i, pmt, fv)` | `pv(360, 0.005, -1498.88, 0)` | `250001.` |
+| `fv(n, i, pv, pmt)` | `fv(120, 0.004, 0, -200)` | `30726.4` |
+| `nper(i, pv, pmt, fv)` | `nper(0.005, 250000, -1498.88, 0)` | `359.998` |
+| `rate(n, pv, pmt, fv)` | `rate(360, 250000, -1498.876313, 0)` | `0.00500000` |
+| `npv(r, cfs)` | `npv(0.10, [-1000, 300, 420, 680])` | `130.729` |
+| `irr(cfs)` | `irr([-1000, 300, 420, 680])` | `0.163406` |
+| `bond_price(face, crate, y, n, freq)` | `bond_price(100, 0.08, 0.06, 10, 1)` | `114.720` |
+| `bond_ytm(price, face, crate, n, freq)` | `bond_ytm(114.7202, 100, 0.08, 10, 1)` | `0.0600000` |
+| `bond_duration(face, crate, y, n, freq)` | `bond_duration(100, 0.08, 0.06, 10, 1)` | `7.44502` |
+| `bond_mduration(face, crate, y, n, freq)` | `bond_mduration(100, 0.08, 0.06, 10, 1)` | `7.02360` |
+| `bond_convexity(face, crate, y, n, freq)` | `bond_convexity(100, 0.08, 0.06, 10, 1)` | `65.1716` |
+| `amort(principal, i, n)` | `amort(1000, 0.01, 3).balance[3]` | `4.26326e-12` |
+| `datenum(y, m, d)` | `datenum(2026, 7, 17)` | `2.46124e+06` |
+| `datestr(jdn)` | `datestr(datenum(2026, 7, 17) + 90)` | `"2026-10-15"` |
+| `daterec(jdn)` | `daterec(datenum(2026, 7, 17))` | `{y = 2026.00, m = 7.00000, d = 17.0000}` |
+| `dateadd(y, m, d, k)` | `dateadd(2024, 12, 31, 1)` | `{y = 2025.00, m = 1.00000, d = 1.00000}` |
+| `today()` | `today() == datenum(now().y, now().m, now().d)` | `true` |
+| `dow(y, m, d)` | `dow(2026, 7, 17)` | `5.00000` |
+| `days(y1,m1,d1, y2,m2,d2)` | `days(2026, 1, 1, 2026, 7, 17)` | `197.000` |
+| `days360(y1,m1,d1, y2,m2,d2)` | `days360(2024, 1, 31, 2024, 7, 31)` | `180` |
 
 ---
 
@@ -244,15 +269,21 @@ neutrino> moon_illum(2026, 7, 10)
 neutrino> sunrise(80, 0, 2026, 6, 21, 0)
 ```
 
-| Function | Meaning |
-|---|---|
-| `sunrise/sunset(lat, lon, y, m, d, tz)` | local decimal hours |
-| `dawn_civil/dusk_civil` (also `_nautical`, `_astro`) | twilight bounds (−6°, −12°, −18°) |
-| `solar_noon(lon, y, m, d, tz)` / `day_length(lat, lon, y, m, d)` | noon and daylight hours |
-| `sun_position(lat, lon, y, m, d, hour, tz)` | {alt, az} in degrees |
-| `moon_age(y, m, d)` / `moon_illum(y, m, d)` | lunar phase |
-| `drive_daylight(from, to, y, m, d, tz)` | daylight driving window |
-| `places`, `hm(h)` | preloaded coordinates; "HH:MM" formatting |
+| Function | Worked example | Result |
+|---|---|---|
+| `sunrise(lat, lon, y, m, d, tz)` | `hm(sunrise(38.8048, -77.0469, 2026, 7, 17, -4))` | `"05:57"` |
+| `sunset(lat, lon, y, m, d, tz)` | `hm(sunset(38.8048, -77.0469, 2026, 7, 17, -4))` | `"20:31"` |
+| `dawn_civil / dusk_civil(lat, lon, y, m, d, tz)` | `hm(dawn_civil(38.8048, -77.0469, 2026, 7, 17, -4))` | `"05:26"` |
+| `dawn_nautical / dusk_nautical(lat, lon, y, m, d, tz)` | `hm(dawn_nautical(38.8048, -77.0469, 2026, 7, 17, -4))` | `"04:48"` |
+| `dawn_astro / dusk_astro(lat, lon, y, m, d, tz)` | `hm(dusk_astro(38.8048, -77.0469, 2026, 7, 17, -4))` | `"22:23"` |
+| `solar_noon(lon, y, m, d, tz)` | `hm(solar_noon(-77.0469, 2026, 7, 17, -4))` | `"13:14"` |
+| `day_length(lat, lon, y, m, d)` | `day_length(46.0569, 14.5058, 2026, 7, 17)` | `15.3443` |
+| `sun_position(lat, lon, y, m, d, hour, tz)` | `sun_position(38.8048, -77.0469, 2026, 7, 17, 13.2, -4).alt` | `72.2914` |
+| `moon_age(y, m, d)` | `moon_age(2026, 7, 17)` | `2.70686` |
+| `moon_illum(y, m, d)` | `moon_illum(2026, 7, 17)` | `0.0806581` |
+| `hm(h)` | `hm(6.05)` | `"06:03"` |
+| `places` | `places.duluth_ga.lat` | `34.0029` |
+| `drive_daylight(from, to, y, m, d, tz)` | `drive_daylight(places.alexandria_va, places.duluth_ga, 2026, 7, 17, -4).window_hours` | `15.8284` |
 
 ---
 

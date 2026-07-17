@@ -8,10 +8,13 @@ for src in *.c *.h; do
   [[ -e "$src" && "$src" -nt ./vmtest ]] && { echo "run_manual: WARNING: $src newer than ./vmtest (stale binary?)" >&2; break; }
 done
 python3 tests/verify_manual.py MANUAL.md || exit 1
-exec python3 tests/verify_manual.py PACKAGES.md
+python3 tests/verify_manual.py PACKAGES.md || exit 1
 
 # stray-escape guard: the REPL renderer must consume markdown \| escapes
 if ./neutrino 2>/dev/null <<< manual | grep -q 'on\\|off'; then
   echo "manual render: stray backslash-pipe leaked"; exit 1
 fi
 echo "manual render: escapes clean"
+
+# worked-example tables in PACKAGES.md must match the interpreter
+python3 tools/gen_package_tables.py --check || exit 1

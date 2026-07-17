@@ -121,7 +121,8 @@ let datenum = fn y, m, d -> (
   d + floor((153 * m2 + 2) / 5) + 365 * y2
     + floor(y2 / 4) - floor(y2 / 100) + floor(y2 / 400) - 32045)
 
-let datestr = fn jdn -> (
+# daterec(jdn): the calendar date as a record {y, m, d}.
+let daterec = fn jdn -> (
   let a = jdn + 32044;
   let b = floor((4 * a + 3) / 146097);
   let c = a - floor(146097 * b / 4);
@@ -132,11 +133,25 @@ let datestr = fn jdn -> (
    m = m2 + 3 - 12 * floor(m2 / 10),
    d = e - floor((153 * m2 + 2) / 5) + 1})
 
+# fin_pad2: zero-pad a day or month number to two digits.
+let fin_pad2 = fn v -> (if v < 10 then "0" else "" end) + fmt("{:.0f}", v)
+
+# datestr(jdn): the calendar date as a string, "YYYY-MM-DD".
+let datestr = fn jdn -> (
+  let r = daterec(jdn);
+  fmt("{:.0f}", r.y) + "-" + fin_pad2(r.m) + "-" + fin_pad2(r.d))
+
+# today(): the current date as a serial day number (JDN), so date
+# arithmetic reads naturally: datestr(today() + 90), days to a maturity, ...
+let today = fn -> (
+  let t = now();
+  datenum(t.y, t.m, t.d))
+
 # days(y1,m1,d1, y2,m2,d2): actual days between two dates (HP-12C ΔDYS).
 let days = fn y1, m1, d1, y2, m2, d2 -> datenum(y2, m2, d2) - datenum(y1, m1, d1)
 
-# dateadd(y,m,d, k): the calendar date k days later (HP-12C DATE).
-let dateadd = fn y, m, d, k -> datestr(datenum(y, m, d) + k)
+# dateadd(y,m,d, k): the calendar date k days later, as {y, m, d} (HP-12C DATE).
+let dateadd = fn y, m, d, k -> daterec(datenum(y, m, d) + k)
 
 # dow(y,m,d): day of week, 1 = Monday .. 7 = Sunday.
 let dow = fn y, m, d -> mod(datenum(y, m, d), 7) + 1

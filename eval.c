@@ -1404,6 +1404,12 @@ static const BuiltinDoc builtin_docs[] = {
     { "assert", "assert(cond) | assert(cond, tmpl, ...)", "error unless cond is true", "core" , "assert(2 > 1)                     % passes silently" },
     { "strsplit","strsplit(s, sep)", "split a string on a separator, giving a string row vector", "string" , "strsplit(\"a-b-c\", \"-\")          %= [\"a\", \"b\", \"c\"]" },
     { "strjoin", "strjoin(a, sep)",  "join a string array with a separator", "string" , "strjoin([\"x\", \"y\", \"z\"], \", \")  %= \"x, y, z\"" },
+    { "version", "version",       "the interpreter version, as a string", "core" , "version                           % the version, e.g. \"1.10.0\"" },
+    { "now",   "now",             "current local date and time: {y, m, d, h, mi, s}", "core" , "now().y                           % this year\nlet t = now                       % bare now echoes the record" },
+    { "whov",  "whov | whov(\"sorted\")", "your variables only (shorthand for who(\"vars\"))", "core" , "whov                              % scalars, arrays, strings" },
+    { "whof",  "whof | whof(\"sorted\")", "your functions only (shorthand for who(\"functions\"))", "core" , "whof(\"sorted\")                    % functions, alphabetical" },
+    { "whor",  "whor | whor(\"sorted\")", "your records only (shorthand for who(\"records\"))", "core" , "whor                              % records, insertion order" },
+    { "whos",  "whos",            "the whole workspace, sorted by name (who(\"sorted\"))", "core" , "whos                              % everything, alphabetical" },
     { "exit",  "exit | exit(code)", "end the session (also: quit)", "repl" , "exit                              % goodbye" },
     { "manual", "manual [doc]",  "page rendered documentation: manual, manual packages|changelog|lessons|design|readme", "repl" , "manual packages                  % the packages guide, formatted and paged" },
     { "pretty", "pretty on|off", "aligned multi-line matrix display (default on in the REPL)", "repl" , "pretty off                        % single-line matrices" },
@@ -3129,6 +3135,34 @@ static Value bi_fields(Interp *I, Value *args, uint32_t n)
     return out;
 }
 
+#include <time.h>
+#include "version.h"
+
+/* version(): the interpreter version as a string. */
+static Value bi_version(Interp *I, Value *args, uint32_t n)
+{
+    (void)I; (void)args; (void)n;
+    return val_string(NEUTRINO_VERSION, (uint32_t)strlen(NEUTRINO_VERSION));
+}
+
+/* now(): the current local date and time as {y, m, d, h, mi, s}. */
+static Value bi_now(Interp *I, Value *args, uint32_t n)
+{
+    (void)I; (void)args; (void)n;
+    time_t t = time(nullptr);
+    struct tm tmv;
+    localtime_r(&t, &tmv);
+    Value r = val_record(6); RecObj *o = as_rec(r);
+    static const char *K[6] = { "y", "m", "d", "h", "mi", "s" };
+    int64_t V[6] = { tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday,
+                     tmv.tm_hour, tmv.tm_min, tmv.tm_sec };
+    for (uint32_t i = 0; i < 6; i++) {
+        o->keys[i] = K[i]; o->keylens[i] = (uint32_t)strlen(K[i]);
+        o->vals[i] = val_int(V[i]);
+    }
+    return r;
+}
+
 /* name comparator over global slots, for who("sorted") */
 static EnvObj *g_who_env;
 static int who_name_cmp(const void *x, const void *y)
@@ -3163,9 +3197,13 @@ static Value bi_manual_stub(Interp *I, Value *args, uint32_t n) { (void)args; (v
 static Value bi_pretty_stub(Interp *I, Value *args, uint32_t n) { (void)args; (void)n; return bi_repl_hint(I, "pretty"); }
 static Value bi_more_stub(Interp *I, Value *args, uint32_t n)   { (void)args; (void)n; return bi_repl_hint(I, "more"); }
 
+enum WhoKind { W_ALL, W_REC, W_FN, W_VAR };
+
+static Value who_impl(Interp *I, enum WhoKind kind, bool sorted);
+
 static Value bi_who(Interp *I, Value *args, uint32_t n)
 {
-    enum { W_ALL, W_REC, W_FN, W_VAR } kind = W_ALL;
+    enum WhoKind kind = W_ALL;
     bool sorted = false;
     for (uint32_t i = 0; i < n; i++) {
         StrObj *sv = want_strobj(I, args[i], "who");
@@ -3177,6 +3215,26 @@ static Value bi_who(Interp *I, Value *args, uint32_t n)
                               "(try \"records\", \"functions\", \"vars\", \"sorted\")",
                            (int)sv->len, sv->data);
     }
+    return who_impl(I, kind, sorted);
+}
+
+/* whov/whof/whor: filtered who; whos: everything, sorted. Each shorthand
+ * accepts an optional "sorted". */
+static bool who_arg_sorted(Interp *I, Value *args, uint32_t n, const char *cmd)
+{
+    if (n == 0) return false;
+    StrObj *sv = want_strobj(I, args[0], cmd);
+    if (sv->len == 6 && !memcmp(sv->data, "sorted", 6)) return true;
+    runtime_error(I, "%s: the only selector is \"sorted\"", cmd);
+    return false;
+}
+static Value bi_whov(Interp *I, Value *args, uint32_t n) { return who_impl(I, W_VAR, who_arg_sorted(I, args, n, "whov")); }
+static Value bi_whof(Interp *I, Value *args, uint32_t n) { return who_impl(I, W_FN,  who_arg_sorted(I, args, n, "whof")); }
+static Value bi_whor(Interp *I, Value *args, uint32_t n) { return who_impl(I, W_REC, who_arg_sorted(I, args, n, "whor")); }
+static Value bi_whos(Interp *I, Value *args, uint32_t n) { (void)args; (void)n; return who_impl(I, W_ALL, true); }
+
+static Value who_impl(Interp *I, enum WhoKind kind, bool sorted)
+{
     EnvObj *g = I->globals;
     uint32_t *sel = nullptr, nsel = 0;
     if (g) {
@@ -5480,6 +5538,12 @@ EnvObj *globals_new(void)
     def_builtin(e, "pretty", bi_pretty_stub, 0, 1);
     def_builtin(e, "more",   bi_more_stub,   0, 1);
     def_builtin(e, "who",   bi_who,   0, 2);
+    def_builtin(e, "whov",  bi_whov,  0, 1);
+    def_builtin(e, "whof",  bi_whof,  0, 1);
+    def_builtin(e, "whor",  bi_whor,  0, 1);
+    def_builtin(e, "whos",  bi_whos,  0, 0);
+    def_builtin(e, "version", bi_version, 0, 0);
+    def_builtin(e, "now",   bi_now,   0, 0);
     def_builtin(e, "help",  bi_help,  0, 1);
     def_builtin(e, "system",bi_system,1, 1);
     def_builtin(e, "dis",   bi_dis,   1, 1);

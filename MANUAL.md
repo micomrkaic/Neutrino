@@ -68,6 +68,8 @@ apply to scripts — they are REPL features.
 |---|---|
 | `help` / `help(f)` | catalogue of all builtins / details plus usage examples for one |
 | `who` | your variables, with type and shape; `who("records")`, `who("functions")`, `who("vars")`, add `"sorted"` |
+| `whov` / `whof` / `whor` / `whos` | shorthands: vars, functions, records, everything-sorted |
+| `version` | the interpreter version, as a string |
 | `clear()` / `clear("a", ...)` | remove all user variables / the named ones (builtins are safe) |
 | `mem` | workspace size and peak process memory |
 | `format …` | number display: `format long`, `format short e`, `format(8)`, `format` to show |
@@ -716,6 +718,12 @@ files" saves them.
 | `fields(r)` | the record's field names, as a string column |
 | `error(msg) \| error(tmpl, ...)` | raise a runtime error (fmt-style template) |
 | `assert(cond) \| assert(cond, tmpl, ...)` | error unless cond is true |
+| `version` | the interpreter version, as a string |
+| `now` | current local date and time: {y, m, d, h, mi, s} |
+| `whov \| whov("sorted")` | your variables only (shorthand for who("vars")) |
+| `whof \| whof("sorted")` | your functions only (shorthand for who("functions")) |
+| `whor \| whor("sorted")` | your records only (shorthand for who("records")) |
+| `whos` | the whole workspace, sorted by name (who("sorted")) |
 | `who \| who("functions", "sorted")` | list the workspace; filter by "records"/"functions"/"vars", add "sorted" for name order |
 | `help / help(f)` | help lists every builtin; help(f) describes one |
 | `system(cmd)` | run a shell command string; return its exit status |
