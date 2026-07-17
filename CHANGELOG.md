@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v1.9.1: documentation renderer escapes.** Markdown table cells use `\|`
+  for a literal pipe; both the REPL's ANSI renderer and the browser's Docs
+  tab were passing the backslash through (and the browser split cells on the
+  escaped pipe, mangling the REPL-commands table). Both renderers now honor
+  `\|` — including inside code spans, where the first fix didn't reach —
+  and render `[text](url)` links as their text. Permanent guards in both
+  suites: `run_manual.sh` greps the rendered manual for leaked escapes, and
+  the page test asserts `mdToHtml` keeps escaped-pipe cells whole.
 - **v1.8.3: editor results echo in the terminal (browser).** Running the
   editor previously went through `load("/_editor.nu")` — script semantics,
   which are silent for bare expressions (natively too, by design). The

@@ -9,3 +9,9 @@ for src in *.c *.h; do
 done
 python3 tests/verify_manual.py MANUAL.md || exit 1
 exec python3 tests/verify_manual.py PACKAGES.md
+
+# stray-escape guard: the REPL renderer must consume markdown \| escapes
+if ./neutrino 2>/dev/null <<< manual | grep -q 'on\\|off'; then
+  echo "manual render: stray backslash-pipe leaked"; exit 1
+fi
+echo "manual render: escapes clean"

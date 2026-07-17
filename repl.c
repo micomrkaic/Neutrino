@@ -257,11 +257,28 @@ static void print_banner(bool color)
 static void md_span(FILE *o, const char *p, bool color)
 {
     while (*p) {
+        if (p[0] == '\\' && p[1] == '|') {   /* markdown table escape: \| is a literal pipe */
+            fputc('|', o);
+            p += 2; continue;
+        }
+        if (*p == '[') {                       /* [text](url) -> text */
+            const char *rb = strchr(p + 1, ']');
+            if (rb && rb[1] == '(') {
+                const char *cp = strchr(rb + 2, ')');
+                if (cp) {
+                    fwrite(p + 1, 1, (size_t)(rb - p - 1), o);
+                    p = cp + 1; continue;
+                }
+            }
+        }
         if (*p == '`') {
             const char *e = strchr(p + 1, '`');
             if (e) {
                 if (color) fputs("\033[36m", o);
-                fwrite(p + 1, 1, (size_t)(e - p - 1), o);
+                for (const char *q = p + 1; q < e; q++) {   /* \| stays a pipe here too */
+                    if (q[0] == '\\' && q + 1 < e && q[1] == '|') { fputc('|', o); q++; }
+                    else fputc(*q, o);
+                }
                 if (color) fputs("\033[0m", o);
                 p = e + 1; continue;
             }

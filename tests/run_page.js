@@ -40,6 +40,11 @@ setTimeout(() => {
   input.value = "manual packages";
   input.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   if (d.getElementById("docs").style.display !== "flex") fail("manual did not open Docs tab");
+  // renderer escape guard: \| inside table cells and code spans stays a pipe
+  if (typeof w.mdToHtml === "function") {
+    const h = w.mdToHtml("| `pretty on\\|off` | x |\n|---|---|\n| `a\\|b` | y |");
+    if (!h.includes("<code>pretty on|off</code>") || h.includes("\\|")) fail("mdToHtml mishandles \\| escapes");
+  }
   console.log("page: editor run, terminal echo, focus, and manual interception OK (stub)");
   // ---- phase 2: the real bundle through the real page ----
   try {

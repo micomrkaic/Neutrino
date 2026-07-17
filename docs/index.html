@@ -402,7 +402,7 @@
   function mdToHtml(src) {
     var esc = function (t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
     var span = function (t) {
-      return esc(t)
+      return esc(t.replace(/\\\|/g, '|').replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1'))
         .replace(/`([^`]+)`/g, function (_, c) { return '<code>' + c + '</code>'; })
         .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
         .replace(/(^|\s)\*([^*\s][^*]*)\*(?=[\s.,;:)]|$)/g, '$1<i>$2</i>');
@@ -429,7 +429,10 @@
         var html = ['<table>'];
         for (var r = 0; r < rows.length; r++) {
           if (/^\|[\s:|-]+\|?$/.test(rows[r])) continue;   /* separator row */
-          var cells = rows[r].replace(/^\||\|$/g, '').split('|');
+          /* \| is a literal pipe inside a cell, not a separator */
+          var protectedRow = rows[r].replace(/\\\|/g, '\u0001');
+          var cells = protectedRow.replace(/^\||\|$/g, '').split('|')
+                                  .map(function (c) { return c.replace(/\u0001/g, '|'); });
           var tag = r === 0 ? 'th' : 'td';
           html.push('<tr>' + cells.map(function (c) { return '<' + tag + '>' + span(c.trim()) + '</' + tag + '>'; }).join('') + '</tr>');
         }
