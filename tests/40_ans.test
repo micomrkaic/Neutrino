@@ -1,0 +1,15 @@
+# ans: the last value you saw and didn't name (echo-coupled by design).
+# Fresh-session negatives live here; the positive chaining clauses are
+# machine-verified transcripts in MANUAL.md (persistent-session semantics).
+# fresh session: no anonymous result yet
+ans
+=> !undefined name
+# suppressed-only statements never give birth to ans
+3 + 4; ans
+=> !undefined name
+# load()ed scripts are silent, therefore inert to ans
+load("tests/data/ans_probe.nu"); ans
+=> !undefined name
+# let alone does not create ans
+let a = 5; ans
+=> !undefined name

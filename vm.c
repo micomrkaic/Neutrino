@@ -532,6 +532,11 @@ Value vm_eval_program(Interp *I, AstNode *block, EnvObj *globals, bool echo)
         if (echo && !s->silent && last.kind != VAL_NULL) {
             value_print(vout(), last);
             fputc('\n', vout());
+            /* ans: the last value you saw and didn't name. Echo-coupled by
+             * design — suppressed statements and load()ed scripts (echo off)
+             * never touch it, so ans always matches the screen. */
+            if (s->kind != AST_LET)
+                env_define(globals, "ans", 3, last);
         }
     }
     return last;

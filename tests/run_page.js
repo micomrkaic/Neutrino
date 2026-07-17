@@ -55,9 +55,13 @@ setTimeout(() => {
       const ed2 = d2.getElementById("edtext");
       ed2.value = "let cube = fn x -> x^3\ncube(4)\nlet v = [1, 2, 3]\nv * 2";
       d2.getElementById("ed-run").dispatchEvent(new w2.MouseEvent("click", { bubbles: true }));
+      // ans chains from the editor run into the terminal
+      const input2 = d2.querySelector(".inputline input");
+      input2.value = "ans + [1, 1, 1]";
+      input2.dispatchEvent(new w2.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
       setTimeout(() => {
         const t = d2.getElementById("term").textContent;
-        const want = ["% editor script", "64", "[2, 4, 6]"];
+        const want = ["% editor script", "64", "[2, 4, 6]", "[3, 5, 7]"];
         const missing = want.filter(x => !t.includes(x));
         if (missing.length) { console.error("page FAIL (real wasm): missing " + missing.join(" | ")); process.exit(1); }
         console.log("page: real-bundle editor run echoes statement values in the terminal");

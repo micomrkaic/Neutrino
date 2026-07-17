@@ -27,6 +27,18 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.9.0: `ans`.** The last value you saw and didn't name. Every echoed
+  expression statement rebinds `ans`; `let` doesn't (named results aren't
+  anonymous), semicolon-suppressed statements don't, and `load()`ed scripts
+  don't (they don't echo) — one rule, echo-coupled by design, so `ans` can
+  never hold something that didn't print. This deliberately fixes two Octave
+  warts: suppressed statements silently mutating `ans`, and scripts
+  clobbering it as a side effect. `ans` is an ordinary global (visible in
+  `who`, removable with `clear`), implemented as four lines at the echo site
+  in `vm_eval_program`, so the REPL, vmtest, and the browser inherit
+  identical behavior. Negative clauses are goldens; positive chains are
+  machine-verified manual transcripts (81 now); the browser page test chains
+  `ans` through the live terminal.
 - **v1.8.0: the whole project in one file.** The browser bundle now embeds
   the four standard packages and the five documents (manual, packages guide,
   changelog, lessons, design notes) — `load("packages/dist.nu")` works in the

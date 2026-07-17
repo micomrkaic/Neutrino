@@ -102,6 +102,35 @@ the `end` arrives.
 and numbers in a terse 6-significant-digit format; both are configurable — see
 [Output and formatting](#13-output-and-formatting).
 
+**`ans` — the last value you saw and didn't name.** Every echoed
+expression statement rebinds `ans`; `let` statements don't (their result has
+a name), semicolon-suppressed statements don't, and `load()`ed scripts don't
+(they don't echo). One rule: *if a value printed without a name, it's in
+`ans`* — the screen is the spec. `ans` is an ordinary global: it shows in
+`who`, `clear("ans")` removes it, and a `let ans = ...` of your own is legal
+and simply gets overwritten by your next anonymous result.
+
+```
+neutrino> 3 + 4
+7
+neutrino> ans * 2
+neutrino> sqrt(ans)
+neutrino> let named = ans
+neutrino> 9 * 9
+neutrino> let x = 1
+81
+neutrino> ans
+1
+neutrino> ans + 100;
+neutrino> ans
+neutrino> who
+```
+
+Note the two quiet guarantees in that transcript: `ans` survived both the
+`let` and the suppressed statement — it can never hold something you didn't
+see. This differs from Octave, where `3 + 4;` sets `ans` silently and
+scripts clobber it as a side effect.
+
 ## 3. Values and types
 
 Neutrino has nine value kinds. The scalar kinds:
