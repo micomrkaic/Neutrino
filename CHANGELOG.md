@@ -5,6 +5,15 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v1.9.2: documentation audit — generated tables.** The builtin
+  reference's doc rows use ` | ` for signature alternatives, and the
+  reference generator emitted them into markdown cells unescaped — 55
+  structural violations across the reference (rows shattered into phantom
+  columns in the Docs tab, exactly as reported). The generator is now a repo
+  tool (`tools/gen_reference.py`) that escapes cell contents, and a new
+  documentation linter (`tests/run_doclint.py`, in `make test`) audits every
+  table in all five documents for column-count consistency, unescaped pipes
+  in code spans, and unbalanced backticks — 55 problems found, zero remain.
 - **v1.9.1: documentation renderer escapes.** Markdown table cells use `\|`
   for a literal pipe; both the REPL's ANSI renderer and the browser's Docs
   tab were passing the backslash through (and the browser split cells on the

@@ -77,6 +77,7 @@ test: vmtest $(BIN)
 	@bash tests/run_longline.sh
 	@timeout 30 python3 tests/run_completion.py || true
 	@bash tests/run_svg.sh
+	@python3 tests/run_doclint.py
 
 # Same corpus, every input run under AddressSanitizer/UBSan; fails on any leak.
 test-asan: vmtest-asan

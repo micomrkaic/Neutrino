@@ -712,11 +712,11 @@ files" saves them.
 
 | Signature | Description |
 |---|---|
-| `print(...) | print(tmpl, ...)` | print values; template fills {} in order; {:[-][w][.p][f|e|g]} formats a hole ({{ }} literal) |
+| `print(...) \| print(tmpl, ...)` | print values; template fills {} in order; {:[-][w][.p][f\|e\|g]} formats a hole ({{ }} literal) |
 | `fields(r)` | the record's field names, as a string column |
-| `error(msg) | error(tmpl, ...)` | raise a runtime error (fmt-style template) |
-| `assert(cond) | assert(cond, tmpl, ...)` | error unless cond is true |
-| `who | who("functions", "sorted")` | list the workspace; filter by "records"/"functions"/"vars", add "sorted" for name order |
+| `error(msg) \| error(tmpl, ...)` | raise a runtime error (fmt-style template) |
+| `assert(cond) \| assert(cond, tmpl, ...)` | error unless cond is true |
+| `who \| who("functions", "sorted")` | list the workspace; filter by "records"/"functions"/"vars", add "sorted" for name order |
 | `help / help(f)` | help lists every builtin; help(f) describes one |
 | `system(cmd)` | run a shell command string; return its exit status |
 | `dis(f)` | disassemble a function's bytecode (compiler/VM introspection) |
@@ -727,7 +727,7 @@ files" saves them.
 | `save("file.nu")` | write all variables and functions as reloadable source (restore with load) |
 | `body(f)` | print the source of a user-defined function |
 | `load("file.nu")` | run a file in the current session; its let-bindings persist (a record of closures makes a module) |
-| `clear() | clear("a", ...)` | remove all user variables, or the named ones (builtins are untouchable) |
+| `clear() \| clear("a", ...)` | remove all user variables, or the named ones (builtins are untouchable) |
 | `mem` | print workspace size (variables) and peak process memory |
 | `tic` | start the wall-clock timer (monotonic) |
 | `toc` | seconds elapsed since tic |
@@ -753,10 +753,10 @@ files" saves them.
 
 | Signature | Description |
 |---|---|
-| `exit | exit(code)` | end the session (also: quit) |
-| `manual [doc]` | page rendered documentation: manual, manual packages|changelog|lessons|design|readme |
-| `pretty on|off` | aligned multi-line matrix display (default on in the REPL) |
-| `more on|off` | page long output through $PAGER |
+| `exit \| exit(code)` | end the session (also: quit) |
+| `manual [doc]` | page rendered documentation: manual, manual packages\|changelog\|lessons\|design\|readme |
+| `pretty on\|off` | aligned multi-line matrix display (default on in the REPL) |
+| `more on\|off` | page long output through $PAGER |
 
 ### Solvers
 
@@ -778,7 +778,7 @@ files" saves them.
 
 | Signature | Description |
 |---|---|
-| `plot(y) | plot(x, y) | plot(x, Y, opts)` | line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange, label, label1..labelN} |
+| `plot(y) \| plot(x, y) \| plot(x, Y, opts)` | line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange, label, label1..labelN} |
 | `hist(y[, nbins][, opts])` | histogram via gnuplot; opts as in plot (yrange to anchor the axis, label for the legend) |
 
 ### Array construction
@@ -797,19 +797,19 @@ files" saves them.
 
 | Signature | Description |
 |---|---|
-| `sum(A) | sum(A, dim)` | sum of all elements, or along dim (1 = columns, 2 = rows) |
-| `prod(A) | prod(A, dim)` | product of all elements, or along dim |
-| `cov(X[, w]) | cov(x, y[, w])` | covariance matrix of X's columns (rows = observations), or scalar cov of two vectors; w as in var |
-| `corr(X) | corr(x, y)` | Pearson correlation matrix of X's columns, or scalar correlation of two vectors |
-| `var(A) | var(A, w) | var(A, w, dim)` | variance; w = 0 divides by N-1 (default), w = 1 by N |
-| `std(A) | std(A, w) | std(A, w, dim)` | standard deviation (sqrt of var, same normalization) |
-| `median(A) | median(A, dim)` | median of all elements, or along dim |
+| `sum(A) \| sum(A, dim)` | sum of all elements, or along dim (1 = columns, 2 = rows) |
+| `prod(A) \| prod(A, dim)` | product of all elements, or along dim |
+| `cov(X[, w]) \| cov(x, y[, w])` | covariance matrix of X's columns (rows = observations), or scalar cov of two vectors; w as in var |
+| `corr(X) \| corr(x, y)` | Pearson correlation matrix of X's columns, or scalar correlation of two vectors |
+| `var(A) \| var(A, w) \| var(A, w, dim)` | variance; w = 0 divides by N-1 (default), w = 1 by N |
+| `std(A) \| std(A, w) \| std(A, w, dim)` | standard deviation (sqrt of var, same normalization) |
+| `median(A) \| median(A, dim)` | median of all elements, or along dim |
 | `quantile(x, p)` | quantile(s) of the data at probability p (scalar or vector); linear interpolation |
-| `mean(A) | mean(A, dim)` | mean of all elements, or along dim |
-| `min(A) | min(a, b) | min(A, [], dim)` | smallest element; elementwise min; or min along dim |
-| `max(A) | max(a, b) | max(A, [], dim)` | largest element; elementwise max; or max along dim |
-| `any(mask) | any(mask, dim)` | true if any element is nonzero/true (overall or along dim) |
-| `all(mask) | all(mask, dim)` | true if every element is nonzero/true (overall or along dim) |
+| `mean(A) \| mean(A, dim)` | mean of all elements, or along dim |
+| `min(A) \| min(a, b) \| min(A, [], dim)` | smallest element; elementwise min; or min along dim |
+| `max(A) \| max(a, b) \| max(A, [], dim)` | largest element; elementwise max; or max along dim |
+| `any(mask) \| any(mask, dim)` | true if any element is nonzero/true (overall or along dim) |
+| `all(mask) \| all(mask, dim)` | true if every element is nonzero/true (overall or along dim) |
 
 ### Array utilities
 
@@ -818,7 +818,7 @@ files" saves them.
 | `unique(A)` | sorted distinct elements; vectors keep orientation, matrices flatten to a row |
 | `sort(A)` | ascending sort: a vector as a whole, a matrix by column |
 | `find(mask)` | 1-based positions of nonzero/true elements (row-major) |
-| `where(mask) | where(mask, a, b)` | indices of true, or pick a where true and b where false |
+| `where(mask) \| where(mask, a, b)` | indices of true, or pick a where true and b where false |
 | `cumsum(A)` | cumulative sum along a vector, or down each column |
 | `cumprod(A)` | cumulative product along a vector, or down each column |
 | `diff(A)` | consecutive differences along a vector, or down each column |
@@ -837,7 +837,7 @@ files" saves them.
 | `ln(x)` | natural logarithm (alias for log) |
 | `log10(x)` | base-10 logarithm (complex for negatives) |
 | `log2(x)` | base-2 logarithm (complex for negatives) |
-| `sign(x)` | -1 / 0 / +1 by sign; z/|z| for complex |
+| `sign(x)` | -1 / 0 / +1 by sign; z/\|z\| for complex |
 | `floor(x)` | round toward -infinity (componentwise on complex) |
 | `ceil(x)` | round toward +infinity (componentwise on complex) |
 | `round(x)` | round to nearest (componentwise on complex) |
@@ -856,7 +856,7 @@ files" saves them.
 | `digamma(x)` | digamma psi(x) = d/dx log gamma(x) |
 | `besselj(n, x)` | Bessel function of the first kind, integer order n |
 | `bessely(n, x)` | Bessel function of the second kind, integer order n (x > 0) |
-| `lgamma(x)` | log of |gamma(x)| (real, elementwise) |
+| `lgamma(x)` | log of \|gamma(x)\| (real, elementwise) |
 
 ### Linear algebra
 
@@ -864,7 +864,7 @@ files" saves them.
 |---|---|
 | `kron(A, B)` | Kronecker product: (m x n) kron (p x q) -> (mp x nq) |
 | `dot(a, b)` | inner product of two vectors |
-| `norm(x) | norm(x, p)` | vector p-norm (p = 1 or 2, default 2); matrix Frobenius norm |
+| `norm(x) \| norm(x, p)` | vector p-norm (p = 1 or 2, default 2); matrix Frobenius norm |
 | `trace(A)` | sum of the diagonal |
 | `det(A)` | determinant via LU |
 | `inv(A)` | matrix inverse (solves A \ I) |
@@ -907,9 +907,9 @@ files" saves them.
 | Signature | Description |
 |---|---|
 | `rng(seed)` | reseed the generator (xoshiro256**); same seed, same stream |
-| `rand() | rand(n) | rand(r, c)` | uniform draws on [0, 1) |
-| `randn() | randn(n) | randn(r, c)` | standard-normal draws |
-| `randi(imax[, r, c]) | randi([lo, hi], ...)` | uniform random integers |
+| `rand() \| rand(n) \| rand(r, c)` | uniform draws on [0, 1) |
+| `randn() \| randn(n) \| randn(r, c)` | standard-normal draws |
+| `randi(imax[, r, c]) \| randi([lo, hi], ...)` | uniform random integers |
 
 ### Predicates
 
