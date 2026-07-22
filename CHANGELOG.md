@@ -65,6 +65,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.13.0: rmt.nu — random matrices, structured.** A fifth standard
+  package: `randsym`, `randspd` (chol-safe by construction), `wishart`,
+  `randorth` (Haar, QR sign-fixed), `randperm` (ranks of uniform draws — an
+  oscillation-pipe one-liner), `permmat`, `randcorr`, `randstoch` (random
+  Markov chains), and `goe` — the Gaussian orthogonal ensemble, scaled so
+  the spectrum follows Wigner's semicircle. Ten property-based goldens
+  (symmetry, chol roundtrip at 1e-16, Q'Q = I, permutation validity, unit
+  diagonals, row sums, spectral radius), nine machine-verified worked
+  examples, and a verified transcript demonstrating the semicircle edge on
+  a 200×200 draw. All reproducible under rng(seed).
 - **v1.12.0: the pipe family.** Three pipes from the design notes, shipped
   together. The **elementwise pipe `~>`**: `x ~> f` is `map(f, x)`, and `@`
   under `~>` binds the *element* — the whole-vs-elementwise distinction

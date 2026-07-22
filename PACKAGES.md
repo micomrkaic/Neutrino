@@ -1,7 +1,8 @@
 # The Neutrino Packages
 
 *The standard packages that ship with Neutrino: probability distributions,
-polynomials, finance, and a solar almanac — all written in Neutrino itself.*
+polynomials, finance, a solar almanac, and structured random matrices — all
+written in Neutrino itself.*
 
 A package is a file of `let` definitions; `load("packages/name.nu")` runs it
 in the current session and its bindings persist. Records of closures act as
@@ -286,6 +287,44 @@ neutrino> sunrise(80, 0, 2026, 6, 21, 0)
 | `drive_daylight(from, to, y, m, d, tz)` | `drive_daylight(places.alexandria_va, places.duluth_ga, 2026, 7, 17, -4).window_hours` | `15.8284` |
 
 ---
+
+## 5. rmt.nu — random matrices, structured
+
+`packages/rmt.nu` is sugar over `randn`/`qr`/`eye` for the matrices you
+actually reach for at the prompt: symmetric, positive definite (chol-safe by
+construction: eigenvalues at least 1), Haar orthogonal, permutations and
+their matrices, correlation, row-stochastic (random Markov chains), and the
+Gaussian orthogonal ensemble — whose spectrum follows Wigner's semicircle on
+[-2, 2], as the last line demonstrates on a 200×200 draw. Everything is
+reproducible under `rng(seed)`.
+
+```
+neutrino> load("packages/rmt.nu")
+neutrino> format(6)
+neutrino> rng(11)
+neutrino> randorth(2)
+[0.684752, 0.728776; -0.728776, 0.684752]
+neutrino> let P = randspd(3); chol(P)[1, 1] > 0
+true
+neutrino> randperm(6)
+[4, 5, 1, 2, 3, 6]
+neutrino> permmat([3, 1, 2])
+[0, 0, 1; 1, 0, 0; 0, 1, 0]
+neutrino> let H = goe(200); max(abs(eig(H).values))
+1.99476
+```
+
+| Function | Worked example | Result |
+|---|---|---|
+| `randsym(n)` | `let S = randsym(3); max(max(abs(S - S'))) == 0` | `true` |
+| `randspd(n)` | `let P = randspd(3); min(eig(P).values) >= 1` | `true` |
+| `wishart(n)` | `let W = wishart(3); min(eig(W).values) > 0` | `true` |
+| `randorth(n)` | `let Q = randorth(3); max(max(abs(Q' * Q - eye(3)))) < 1e-12` | `true` |
+| `randperm(n)` | `sort(randperm(5)) == 1:5` | `[true, true, true, true, true]` |
+| `permmat(p)` | `permmat([2, 3, 1])` | `[0, 1, 0; 0, 0, 1; 1, 0, 0]` |
+| `randcorr(n)` | `let C = randcorr(3); max(abs(diag(C) - 1)) < 1e-12` | `true` |
+| `randstoch(n)` | `let T = randstoch(4); max(abs(sum(T, 2) - 1)) < 1e-12` | `true` |
+| `goe(n)` | `let H = goe(150); max(abs(eig(H).values)) < 2.4` | `true` |
 
 ## Writing your own
 
