@@ -44,6 +44,15 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.11.0: an Emacs mode.** `editors/neutrino-mode.el` — syntax
+  highlighting with the builtin list machine-generated from eval.c
+  (`tools/gen_emacs_mode.py`, drift-checked in `make test`), `%` comment
+  syntax, a syntax table that knows `'` is transpose and not a string quote,
+  bracket-and-block-aware indentation, and an inferior REPL over comint
+  (`M-x run-neutrino`; `C-c C-r`/`C-c C-b`/`C-c C-l`/`C-c C-z`). Batch
+  tests verify fontification at known positions, an indentation golden, and
+  a live comint session against the interpreter — skipping politely where
+  Emacs is absent.
 - **v1.10.0: quality of life, round two.** (1) `version` returns the
   interpreter version as a string. (2) Workspace shorthands: `whov`, `whof`,
   `whor` (vars, functions, records; each takes an optional `"sorted"`) and

@@ -705,6 +705,18 @@ themselves; `tests/dis/` pins the emitted bytecode for core constructs.
 this by default: plots appear in the page's Plots panel, and "download new
 files" saves them.
 
+## Editors
+
+**Emacs.** `editors/neutrino-mode.el` provides a major mode for `.nu` files:
+syntax highlighting (the builtin list is generated from the interpreter's own
+documentation table, so it cannot drift), `%` comments, block-aware
+indentation, and an inferior REPL. Put the file on your `load-path` and
+`(require 'neutrino-mode)`; then `M-x run-neutrino` starts the REPL, and from
+any `.nu` buffer `C-c C-r` sends the region, `C-c C-b` the buffer,
+`C-c C-l` loads the file, `C-c C-z` jumps to the REPL. On GitHub, a
+`.gitattributes` rule highlights `.nu` as Octave — close enough until
+linguist learns Neutrino.
+
 ## 17. Builtin reference
 
 *Generated from the interpreter's own documentation table (the same data
