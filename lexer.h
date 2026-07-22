@@ -27,7 +27,7 @@ enum TokenKind : uint8_t {
 
     /* keywords — see KEYWORDS[] in lexer.c; that table is the single source. */
     TOK_KW_LET, TOK_KW_FN, TOK_KW_IF, TOK_KW_THEN, TOK_KW_ELSE,
-    TOK_KW_FOR, TOK_KW_WHILE, TOK_KW_DO, TOK_KW_END, TOK_KW_RETURN,
+    TOK_KW_FOR, TOK_KW_WHILE, TOK_KW_WHERE, TOK_KW_DO, TOK_KW_END, TOK_KW_RETURN,
     TOK_KW_TRUE, TOK_KW_FALSE, TOK_KW_NULL, TOK_KW_IN,
     TOK_KW_BREAK, TOK_KW_CONTINUE,
 

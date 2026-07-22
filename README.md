@@ -348,7 +348,7 @@ sum(A > 2)              -> 3              # sum of a logical array counts trues
 any(A > 10)             -> false
 all(A > 0)              -> true
 find(A > 2)             -> [3, 4, 5]      # 1-based positions of the trues
-where(A > 2, A, 0)      -> [0, 0, 3, 4, 5]  # pick A where true, else 0
+pick(A > 2, A, 0)      -> [0, 0, 3, 4, 5]  # pick A where true, else 0
 A[A > 3] = 0            -> A is now [1, 2, 3, 0, 0]   # masked assignment
 ```
 
@@ -729,8 +729,8 @@ non-local exit releases in-flight temporaries back to it); block expressions —
 statement sequence (function bodies, pipe stages, nested), with bindings local
 to the block; a single shared error-path cleanup helper (`array_build_abort`) behind every array-builder (`map`, the elementwise
 kernels, and axis reductions), so a kernel that raises mid-array never strands
-scratch; `where(mask, a, b)` elementwise select (and
-`where(mask)` / `find` for mask-to-index, plus logical-mask assignment
+scratch; `pick(mask, a, b)` elementwise select (and
+`find(mask)` / `find` for mask-to-index, plus logical-mask assignment
 `A[mask] = v`); axis-aware reductions (`sum(A, dim)`, `mean`, `prod`,
 `any`, `all`, and `min(A, [], dim)` / `max(A, [], dim)`); a full eigensolver —
 `eig` returns `{values, vectors}` for symmetric/Hermitian (Jacobi) *and* general
@@ -746,7 +746,7 @@ the elementwise math library and complex accessors (`real`/`imag`/`conj`/
 
 ## Reserved words
 
-`let in fn if then else end true false null for while do break continue return`
+`let in fn if then else end true false null for while where do break continue return`
 are in use.
 
 ## License

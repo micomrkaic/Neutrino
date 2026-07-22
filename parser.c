@@ -98,7 +98,7 @@ static AstList vec_seal(Parser *p, Vec *v)
 /* precedence                                                          */
 /* ------------------------------------------------------------------ */
 enum {
-    BP_PIPE = 10, BP_OR = 20, BP_AND = 30, BP_BITOR = 40, BP_BITAND = 50,
+    BP_WHERE = 5, BP_PIPE = 10, BP_OR = 20, BP_AND = 30, BP_BITOR = 40, BP_BITAND = 50,
     BP_CMP = 60, BP_RANGE = 70, BP_ADD = 80, BP_MUL = 90,
     BP_UNARY = 100, BP_POW = 110, BP_POSTFIX = 120, BP_CALL = 130,
 };
@@ -106,6 +106,7 @@ enum {
 static int infix_bp(enum TokenKind k)
 {
     switch (k) {
+    case TOK_KW_WHERE:  return BP_WHERE;
     case TOK_PIPE_GT:   return BP_PIPE;
     case TOK_PIPE_GTGT: return BP_PIPE;
     case TOK_TILDE_GT:  return BP_PIPE;
@@ -707,6 +708,38 @@ static AstNode *parse_led(Parser *p, AstNode *left, int lbp)
     case TOK_COLON:
         return parse_range(p, left);
 
+    case TOK_KW_WHERE: {
+        /* expr where a = e1, b = e2, ...  ==>  let a = e1 in let b = e2 in expr
+         * Sequential (later bindings see earlier), scoped to this expression,
+         * never crossing ';'. Pure desugar to let..in. */
+        advance(p);
+        const char *names[16]; uint32_t namelens[16];
+        AstNode *values[16];
+        uint32_t nb = 0;
+        for (;;) {
+            if (p->cur.kind != TOK_IDENT)
+                parse_error(p, "expected a name after 'where' (where a = expr, ...)");
+            if (nb >= 16)
+                parse_error(p, "too many bindings in one where clause");
+            names[nb] = p->cur.start; namelens[nb] = p->cur.len;
+            advance(p);
+            if (!accept(p, TOK_ASSIGN))
+                parse_error(p, "expected '=' after the name in a where clause");
+            values[nb] = parse_expr(p, BP_WHERE);
+            nb++;
+            if (!accept(p, TOK_COMMA)) break;
+        }
+        AstNode *body = left;
+        for (uint32_t i = nb; i > 0; i--) {
+            AstNode *let = node(p, AST_LET, t);
+            let->as.let.name = names[i - 1];
+            let->as.let.namelen = namelens[i - 1];
+            let->as.let.value = values[i - 1];
+            let->as.let.body = body;
+            body = let;
+        }
+        return body;
+    }
     case TOK_EQ: case TOK_NE: case TOK_LT:
     case TOK_LE: case TOK_GT: case TOK_GE:
         return parse_cmp_chain(p, left, lbp, t);

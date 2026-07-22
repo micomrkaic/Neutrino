@@ -35,7 +35,7 @@ static enum TokenKind keyword_lookup(const char *s, size_t n)
     static const struct { const char *kw; enum TokenKind kind; } KEYWORDS[] = {
         {"let",    TOK_KW_LET},   {"fn",    TOK_KW_FN},    {"if",     TOK_KW_IF},
         {"then",   TOK_KW_THEN},  {"else",  TOK_KW_ELSE},  {"for",    TOK_KW_FOR},
-        {"while",  TOK_KW_WHILE}, {"do",    TOK_KW_DO},    {"end",    TOK_KW_END},
+        {"while",  TOK_KW_WHILE}, {"where", TOK_KW_WHERE}, {"do",    TOK_KW_DO},    {"end",    TOK_KW_END},
         {"return", TOK_KW_RETURN},{"true",  TOK_KW_TRUE},  {"false",  TOK_KW_FALSE},
         {"null",   TOK_KW_NULL},  {"in",    TOK_KW_IN},
         {"break",  TOK_KW_BREAK}, {"continue", TOK_KW_CONTINUE},
@@ -295,6 +295,7 @@ const char *token_kind_name(enum TokenKind k)
     case TOK_KW_ELSE:    return "KW_ELSE";
     case TOK_KW_FOR:     return "KW_FOR";
     case TOK_KW_WHILE:   return "KW_WHILE";
+    case TOK_KW_WHERE:   return "KW_WHERE";
     case TOK_KW_DO:      return "KW_DO";
     case TOK_KW_END:     return "KW_END";
     case TOK_KW_RETURN:  return "KW_RETURN";

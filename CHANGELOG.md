@@ -65,6 +65,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.15.0: where clauses — definitions after use.** `expr where a = 1,
+  b = -3` names an expression's constants after the fact, the way
+  mathematics writes them. Bindings are sequential (later sees earlier, not
+  vice versa — this is a let-chain, not Haskell's binding group), scoped to
+  the single expression (never leak, shadow safely), and bind looser than
+  pipes and chains, so a whole pipeline can be qualified at its end:
+  `1:n ~> (@ ^ 2) |> sum where n = 5`. Pure desugar to let..in; no new AST,
+  no VM changes. `where` is now a reserved word: the old builtin split along
+  its natural seam into `find(mask)` (which already existed — the 1-arg form
+  was always an alias) and `pick(mask, a, b)`; twelve call sites migrated.
+  17 goldens, a 500-program fuzz under ASan, zero regressions.
 - **v1.14.0: chained comparisons.** `a < b < c` now means what mathematics
   means: `a < b` and `b < c`, with the middle term evaluated exactly once
   (verified by rand-stream position). Chains run in one direction —

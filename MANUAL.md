@@ -314,6 +314,25 @@ neutrino> 9 |> sqrt              # bare callable: sqrt(9)
 3
 ```
 
+**Where clauses.** Any expression can name its constants after the fact, the
+way mathematics writes them: `expr where a = 1, b = -3`. Bindings are
+sequential (later ones may use earlier ones — not vice versa), scoped to that
+one expression (they never leak, and they shadow without damaging outer
+names), and the clause binds looser than everything else in the expression,
+so a whole pipeline can be qualified at its end. It is pure sugar for a
+`let..in` chain. The former `where(...)` builtin is now `find(mask)` (indices
+of true) and `pick(mask, a, b)` (elementwise select).
+
+```
+neutrino> let y = a * x ^ 2 + b * x + c where a = 1, b = -3, c = 2, x = 4
+6
+neutrino> sqrt(h) where hs = 3, h = hs + 1
+2
+neutrino> 1:n ~> (@ ^ 2) |> sum where n = 5
+55
+neutrino> b
+```
+
 Pipes chain left to right, which reads as a data-flow pipeline.
 
 **The elementwise pipe `~>`.** Where `|>` feeds the *whole* value, `~>` feeds
@@ -399,7 +418,7 @@ plain name and indices must be in range (no auto-growing).
 `unique(A)` returns the sorted distinct elements — vectors keep their
 orientation, matrices flatten to a row. **Logical arrays** come from comparisons and drive masking and counting:
 `sum(A > 2)` counts, `any`/`all` test, `find(mask)` gives 1-based positions,
-`where(mask, a, b)` selects elementwise.
+`pick(mask, a, b)` selects elementwise.
 
 **Construction and reshaping**: `zeros`, `ones`, `eye`, `diag`, `linspace`,
 `reshape` (row-major), `repmat`, ranges `1:n`. **Reductions** take an optional
@@ -901,7 +920,7 @@ linguist learns Neutrino.
 | `unique(A)` | sorted distinct elements; vectors keep orientation, matrices flatten to a row |
 | `sort(A)` | ascending sort: a vector as a whole, a matrix by column |
 | `find(mask)` | 1-based positions of nonzero/true elements (row-major) |
-| `where(mask) \| where(mask, a, b)` | indices of true, or pick a where true and b where false |
+| `pick(mask, a, b)` | elementwise select: a where the mask is true, else b |
 | `cumsum(A)` | cumulative sum along a vector, or down each column |
 | `cumprod(A)` | cumulative product along a vector, or down each column |
 | `diff(A)` | consecutive differences along a vector, or down each column |
@@ -1030,6 +1049,7 @@ expr       := 'let' NAME '=' expr 'in' expr
             | NAME | literal | '[' rows ']' | '{' fields '}'
             | expr '|>' expr | expr '|>>' expr | expr '~>' expr
             | expr relop expr relop expr ...   (* one direction; middles bound once *)
+            | expr 'where' name '=' expr (',' name '=' expr)*
 postfix    := "'" | ".'" | '(' args ')' | '[' indices ']' | '.' NAME
 ```
 

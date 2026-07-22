@@ -53,7 +53,7 @@
   "Syntax table for `neutrino-mode'.")
 
 (defconst neutrino--keywords
-  '("let" "fn" "if" "then" "else" "end" "for" "while" "do" "in"
+  '("let" "fn" "if" "then" "else" "end" "for" "while" "where" "do" "in"
     "return" "break" "continue")
   "Neutrino reserved words.")
 
@@ -153,6 +153,7 @@
     "num"
     "numel"
     "ones"
+    "pick"
     "plot"
     "pretty"
     "print"
@@ -197,7 +198,6 @@
     "upper"
     "var"
     "version"
-    "where"
     "who"
     "whof"
     "whor"

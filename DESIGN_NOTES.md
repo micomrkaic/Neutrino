@@ -72,7 +72,7 @@ parser lookahead. A full session.
 
 ---
 
-## 3. `where` clauses: definitions after use
+## 3. `where` clauses: definitions after use  *(SHIPPED in v1.15.0 — the math tradition won; the builtin split into find/pick)*
 
 ```
 let y = a * x^2 + b*x + c  where a = 1, b = -3, c = 2

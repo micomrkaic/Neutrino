@@ -1463,7 +1463,7 @@ static const BuiltinDoc builtin_docs[] = {
     /* array shaping --------------------------------------------------- */
     { "sort",  "sort(A)",            "ascending sort: a vector as a whole, a matrix by column", "array" , "sort([3, 1, 2])                   %= [1, 2, 3]" },
     { "find",  "find(mask)",         "1-based positions of nonzero/true elements (row-major)", "array" , "find([0, 5, 0, 7] > 1)            %= [2, 4]" },
-    { "where", "where(mask) | where(mask, a, b)", "indices of true, or pick a where true and b where false", "array" , "where([1, 0, 1] > 0, [9, 9, 9], [0, 0, 0])   %= [9, 0, 9]" },
+    { "pick",  "pick(mask, a, b)",   "elementwise select: a where the mask is true, else b", "array" , "pick([1, 0, 1] > 0, [9, 9, 9], [0, 0, 0])   %= [9, 0, 9]" },
     { "cumsum","cumsum(A)",          "cumulative sum along a vector, or down each column", "array" , "cumsum([1, 2, 3, 4])              %= [1, 3, 6, 10]" },
     { "cumprod","cumprod(A)",        "cumulative product along a vector, or down each column", "array" , "cumprod([1, 2, 3, 4])             %= [1, 2, 6, 24]" },
     { "diff",  "diff(A)",            "consecutive differences along a vector, or down each column", "array" , "diff([1, 4, 9, 16])               %= [3, 5, 7]" },
@@ -5107,11 +5107,10 @@ static Value bi_numel(Interp *I, Value *args, uint32_t n)
 }
 
 static Value bi_find(Interp *I, Value *args, uint32_t n);
-static Value bi_where(Interp *I, Value *args, uint32_t n)
+static Value bi_pick(Interp *I, Value *args, uint32_t n)
 {
-    if (n == 1) return bi_find(I, args, 1);            /* where(mask) -> indices, like find */
-    if (n != 3) runtime_error(I, "where: takes 1 argument (indices) or 3 (select)");
-    Value m = args[0], a = args[1], b = args[2];       /* where(mask, a, b): pick a where true, else b */
+    (void)n;
+    Value m = args[0], a = args[1], b = args[2];       /* pick(mask, a, b): a where true, else b */
     Value src[3] = { m, a, b }; bool isa[3];
     uint32_t rows = 0, cols = 0; bool have = false;
     for (int i = 0; i < 3; i++) {
@@ -5120,7 +5119,7 @@ static Value bi_where(Interp *I, Value *args, uint32_t n)
             uint32_t r = as_arr(src[i])->rows, c = as_arr(src[i])->cols;
             if (!have) { rows = r; cols = c; have = true; }
             else if (r != rows || c != cols)
-                runtime_error(I, "where: shape mismatch (%ux%u vs %ux%u)", rows, cols, r, c);
+                runtime_error(I, "pick: shape mismatch (%ux%u vs %ux%u)", rows, cols, r, c);
         }
     }
     if (!have) return elt_nonzero(m) ? value_retain(a) : value_retain(b);
@@ -5502,7 +5501,7 @@ EnvObj *globals_new(void)
     def_builtin(e, "length",  bi_length,  1, 1);
     def_builtin(e, "numel",   bi_numel,   1, 1);
     def_builtin(e, "find",    bi_find,    1, 1);
-    def_builtin(e, "where",   bi_where,   1, 3);
+    def_builtin(e, "pick",    bi_pick,    3, 3);
     def_builtin(e, "sort",    bi_sort,    1, 1);
     def_builtin(e, "cumsum",  bi_cumsum,  1, 1);
     def_builtin(e, "cumprod", bi_cumprod, 1, 1);
