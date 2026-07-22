@@ -48,22 +48,47 @@ ifeq ($(READLINE),1)
   endif
 endif
 
-$(BIN): $(SRCS) $(HDRS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(SRCS) $(LIBS) -o $@
+# ---------------------------------------------------------------------------
+# Object build: each .c compiles once into build/obj/, with compiler-generated
+# header dependencies (-MMD -MP), so an edit recompiles exactly the affected
+# translation units and `make -jN` parallelizes the rest. The core objects are
+# shared between `neutrino` and `vmtest` (identical flags); the sanitizer
+# build lives in its own tree (build/asan/) because ASan objects cannot mix.
+# Tip:  make -j$(nproc)
+# ---------------------------------------------------------------------------
+.DEFAULT_GOAL := $(BIN)
+OBJDIR   = build/obj
+ASANDIR  = build/asan
+CORE     = lexer arena ast parser value eval chunk compile vm
+CORE_O   = $(CORE:%=$(OBJDIR)/%.o)
+ASAN_O   = $(CORE:%=$(ASANDIR)/%.o) $(ASANDIR)/vmtest.o
+ASANFLAGS = -std=$(STD) -Wall -Wextra -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
+
+$(OBJDIR) $(ASANDIR):
+	mkdir -p $@
+
+$(OBJDIR)/%.o: %.c | $(OBJDIR)
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+# ASan/UBSan objects: -O1 matters — setjmp-clobber bugs (handlers reading
+# register-cached locals) only manifest when the optimizer register-allocates;
+# at -O0 they hide.
+$(ASANDIR)/%.o: %.c | $(ASANDIR)
+	$(CC) $(ASANFLAGS) -MMD -MP -c $< -o $@
+
+-include $(wildcard $(OBJDIR)/*.d) $(wildcard $(ASANDIR)/*.d)
+
+$(BIN): $(CORE_O) $(OBJDIR)/repl.o $(OBJDIR)/main.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # Headless test driver: same VM as `neutrino`, but reads stdin line by line and
 # echoes each result (no readline), so piping a script in gives one result per
 # line. Handy for batch/regression testing and ASan runs.
-VM_SRCS = lexer.c arena.c ast.c parser.c value.c eval.c chunk.c compile.c vm.c vmtest.c
-vmtest: $(VM_SRCS)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(VM_SRCS) -lm -o $@
+vmtest: $(CORE_O) $(OBJDIR)/vmtest.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -lm -o $@
 
-# ASan/UBSan build of the VM driver, for leak-checking the error path.
-# -O1 matters: setjmp-clobber bugs (handlers reading register-cached locals)
-# only manifest when the optimizer register-allocates — at -O0 they hide.
-vmtest-asan: $(VM_SRCS)
-	$(CC) -std=$(STD) -Wall -Wextra -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer \
-	   $(VM_SRCS) -lm -o $@
+vmtest-asan: $(ASAN_O)
+	$(CC) $(ASANFLAGS) $^ -lm -o $@
 
 # Regression suite: golden-output tests in tests/*.test (see tests/run.sh),
 # plus bytecode-disassembly goldens in tests/dis/ (see tests/run_dis.sh).
@@ -96,7 +121,7 @@ repl:   $(BIN); ./$(BIN)
 sample: $(BIN); ./$(BIN) --sample
 ast:    $(BIN); ./$(BIN) --ast
 tokens: $(BIN); ./$(BIN) --tokens
-clean:; rm -f $(BIN) vmtest vmtest-asan
+clean:; rm -rf $(BIN) vmtest vmtest-asan build
 
 # WebAssembly browser build: compiles the interpreter to a single self-contained
 # docs/neutrino.js (the .wasm is embedded as base64 via SINGLE_FILE, so there is

@@ -5,6 +5,18 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v1.11.1: incremental, parallel builds.** The Makefile compiled every
+  translation unit in one monolithic command per binary — any edit rebuilt
+  everything, serially, three times over. Now each .c compiles once into
+  build/obj/ with compiler-generated header dependencies (-MMD -MP), the
+  core objects are shared between `neutrino` and `vmtest`, the sanitizer
+  build lives in its own build/asan/ tree, and `make -jN` parallelizes.
+  Measured on one core: full build 34.7s to 22.2s, a `repl.c` edit 7.9s to
+  0.6s, an `eval.c` edit 30.9s to 14.6s; multicore machines gain the -j
+  factor on top. One bug caught mid-review: the mkdir rule had silently
+  become the default goal (`make` built a directory); `.DEFAULT_GOAL` now
+  pins `neutrino`. All external interfaces unchanged: make, vmtest,
+  vmtest-asan, test, test-asan, wasm, clean.
 - **v1.9.2: documentation audit — generated tables.** The builtin
   reference's doc rows use ` | ` for signature alternatives, and the
   reference generator emitted them into markdown cells unescaped — 55
