@@ -254,11 +254,11 @@ Token lexer_next(Lexer *lx)
     case '=': return tok(lx, match(lx, '=') ? TOK_EQ
                            : match(lx, '>') ? TOK_FATARROW : TOK_ASSIGN, start, line, col);
     case '!': return tok(lx, match(lx, '=') ? TOK_NE : TOK_BANG,   start, line, col);
-    case '~': return tok(lx, match(lx, '=') ? TOK_NE : TOK_TILDE,  start, line, col);
+    case '~': return tok(lx, match(lx, '=') ? TOK_NE : match(lx, '>') ? TOK_TILDE_GT : TOK_TILDE,  start, line, col);
     case '<': return tok(lx, match(lx, '=') ? TOK_LE : TOK_LT,     start, line, col);
     case '>': return tok(lx, match(lx, '=') ? TOK_GE : TOK_GT,     start, line, col);
     case '&': return tok(lx, match(lx, '&') ? TOK_AND : TOK_AMP,   start, line, col);
-    case '|': return tok(lx, match(lx, '>') ? TOK_PIPE_GT
+    case '|': return tok(lx, match(lx, '>') ? (match(lx, '>') ? TOK_PIPE_GTGT : TOK_PIPE_GT)
                            : match(lx, '|') ? TOK_OR : TOK_PIPE,   start, line, col);
 
     case '.':   /* not a number (that was handled above): dot-op, .', or field dot */
@@ -341,6 +341,8 @@ const char *token_kind_name(enum TokenKind k)
     case TOK_ARROW:      return "ARROW";
     case TOK_FATARROW:   return "FATARROW";
     case TOK_PIPE_GT:    return "PIPE_GT";
+    case TOK_PIPE_GTGT:  return "PIPE_GTGT";
+    case TOK_TILDE_GT:   return "TILDE_GT";
     case TOK_TRANSPOSE:  return "TRANSPOSE";
     case TOK_CTRANSPOSE: return "CTRANSPOSE";
     }

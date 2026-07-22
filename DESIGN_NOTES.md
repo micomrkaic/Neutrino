@@ -10,7 +10,7 @@ Status of everything in this file: **not implemented, not promised.**
 
 ---
 
-## 1. Fan-out pipe: piping into a record of functions
+## 1. Fan-out pipe: piping into a record of functions  *(SHIPPED in v1.12.0)*
 
 ```
 data |> {n = length, mu = mean, sd = std, q = fn v -> quantile(v, [0.25, 0.75])}
@@ -104,7 +104,7 @@ let-in nodes. No VM work.
 
 ---
 
-## 4. Oscillation pipe `~>`: an elementwise pipe
+## 4. Oscillation pipe `~>`: an elementwise pipe  *(SHIPPED in v1.12.0 — trigger discipline consciously overridden: the language had a birthday)*
 
 ```
 x ~> sin ~> (_ ^ 2) |> sum        # map sin, map square, then sum
@@ -158,7 +158,7 @@ which lowers the urgency.
 
 ---
 
-## 6. Tee pipe `|>>`: a pipe that shows its work
+## 6. Tee pipe `|>>`: a pipe that shows its work  *(SHIPPED in v1.12.0)*
 
 ```
 data |>> detrend |>> standardize |> regress

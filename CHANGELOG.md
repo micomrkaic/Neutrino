@@ -56,6 +56,20 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.12.0: the pipe family.** Three pipes from the design notes, shipped
+  together. The **elementwise pipe `~>`**: `x ~> f` is `map(f, x)`, and `@`
+  under `~>` binds the *element* — the whole-vs-elementwise distinction
+  (`*` vs `.*`) extended to pipelines; in a language named Neutrino, the
+  elementwise pipe oscillates. `~>` compiles the map primitive itself, so
+  shadowing the name `map` cannot change the operator. The **tee pipe
+  `|>>`**: exactly `|>` but the flowing value is printed before being passed
+  on — pipeline debugging without dismantling the pipeline (one new opcode,
+  OP_TEE). **Fan-out**: `x |> {n = length, mu = mean}` applies each record
+  field to the piped value and returns a record of results — a `describe()`
+  composed from syntax; one level, whole-value only, `@` in the record
+  rejected, non-callable field a type error. Also: readline's
+  blink-matching-paren is on in the REPL. 15 new goldens, 5 verified manual
+  transcripts, a 700-program fuzz pass over the new operators under ASan.
 - **v1.11.0: an Emacs mode.** `editors/neutrino-mode.el` — syntax
   highlighting with the builtin list machine-generated from eval.c
   (`tools/gen_emacs_mode.py`, drift-checked in `make test`), `%` comment

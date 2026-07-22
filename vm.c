@@ -344,6 +344,11 @@ static Value vm_run(Interp *I, Chunk *ch, Value closure, Value *args, uint32_t a
             break;
         }
         case OP_POP: st->sp -= 1; value_release(st->stack[st->sp]); break;
+        case OP_TEE: {
+            value_print(vout(), PEEK(0));
+            fputc('\n', vout());
+            break;
+        }
 
         case OP_SCOPE_PUSH: scope_push(st, fr); break;
         case OP_SCOPE_POP:  scope_pop(st, fr);  break;

@@ -234,40 +234,7 @@ static bool node_has_end(AstNode *n)
     }
 }
 
-/* Does this subtree reference '@' at its own pipe level? Used to decide whether
- * `x |> rhs` substitutes @ (rhs uses @) or applies a bare callable (rhs(x)).
- * Descends into lambdas (a lambda body can capture the enclosing @) but not into
- * a nested |>'s right side, which rebinds @ for itself. */
-static bool contains_at(const AstNode *n)
-{
-    if (!n) return false;
-    switch (n->kind) {
-    case AST_AT: return true;
-    case AST_UNARY: case AST_POSTFIX: case AST_RETURN: return contains_at(n->as.unary.operand);
-    case AST_BINARY:
-        if (n->as.binary.op == TOK_PIPE_GT) return contains_at(n->as.binary.lhs);  /* rhs rebinds @ */
-        return contains_at(n->as.binary.lhs) || contains_at(n->as.binary.rhs);
-    case AST_ASSIGN: return contains_at(n->as.binary.rhs);
-    case AST_RANGE:
-        return contains_at(n->as.range.start) || contains_at(n->as.range.step) || contains_at(n->as.range.stop);
-    case AST_CALL: case AST_INDEX:
-        if (contains_at(n->as.call.callee)) return true;
-        for (uint32_t i = 0; i < n->as.call.args.count; i++) if (contains_at(n->as.call.args.items[i])) return true;
-        return false;
-    case AST_FIELD: return contains_at(n->as.field.target);
-    case AST_IF:
-        return contains_at(n->as.iff.cond) || contains_at(n->as.iff.then_e) || contains_at(n->as.iff.else_e);
-    case AST_RECORD: case AST_MATRIX: case AST_ROW: case AST_BLOCK: case AST_BLOCK_EXPR:
-        for (uint32_t i = 0; i < n->as.list.count; i++) if (contains_at(n->as.list.items[i])) return true;
-        return false;
-    case AST_RECORD_FIELD: return contains_at(n->as.recfield.value);
-    case AST_LET: return contains_at(n->as.let.value) || contains_at(n->as.let.body);
-    case AST_LAMBDA: return contains_at(n->as.lambda.body);
-    case AST_FOR: return contains_at(n->as.forloop.iter) || contains_at(n->as.forloop.body);
-    case AST_WHILE: return contains_at(n->as.whileloop.cond) || contains_at(n->as.whileloop.body);
-    default: return false;
-    }
-}
+#define contains_at ast_contains_at
 
 static void compile_node(Interp *I, Compiler *cc, AstNode *n)
 {
@@ -303,19 +270,54 @@ static void compile_node(Interp *I, Compiler *cc, AstNode *n)
             compile_node(I, cc, n->as.binary.rhs);
             chunk_emit(c, OP_ASSERT_BOOL, L);
             patch_jump(I, n, c, sc);
-        } else if (op == TOK_PIPE_GT) {
-            if (!contains_at(n->as.binary.rhs)) {       /* bare callable: x |> f  ==>  f(x) */
-                compile_node(I, cc, n->as.binary.rhs);
+        } else if (op == TOK_PIPE_GT || op == TOK_PIPE_GTGT) {
+            bool tee = (op == TOK_PIPE_GTGT);
+            AstNode *rhs = n->as.binary.rhs;
+            if (rhs->kind == AST_RECORD) {
+                /* fan-out: x |> {a = f, b = g} ==> {a = f(x), b = g(x)} */
+                if (contains_at(rhs))
+                    compile_error(I, rhs, "the fan-out record cannot use '@' (each field is applied to the piped value)");
+                uint32_t cnt = rhs->as.list.count;
                 compile_node(I, cc, n->as.binary.lhs);
-                chunk_emit(c, OP_CALL, L); chunk_emit(c, 1, L);
-            } else {
-                compile_node(I, cc, n->as.binary.lhs);
+                if (tee) chunk_emit(c, OP_TEE, L);
                 chunk_emit(c, OP_SCOPE_PUSH, L); cc->scope_count++;
                 emit_name_op_g(c, OP_DEFINE, "@", 1, L);
                 chunk_emit(c, OP_POP, L);
-                compile_node(I, cc, n->as.binary.rhs);
+                for (uint32_t k = 0; k < cnt; k++) {
+                    compile_node(I, cc, rhs->as.list.items[k]->as.recfield.value);
+                    chunk_emit(c, OP_GET_AT, L);
+                    chunk_emit(c, OP_CALL, L); chunk_emit(c, 1, L);
+                }
+                chunk_emit(c, OP_RECORD, L); chunk_emit_u16(c, (uint16_t)cnt, L);
+                for (uint32_t k = 0; k < cnt; k++) {
+                    AstNode *f = rhs->as.list.items[k];
+                    uint32_t ni = chunk_add_name(c, f->as.recfield.name, f->as.recfield.namelen);
+                    chunk_emit_u16(c, (uint16_t)ni, L);
+                }
+                chunk_emit(c, OP_SCOPE_POP, L); cc->scope_count--;
+            } else if (!contains_at(rhs)) {             /* bare callable: x |> f  ==>  f(x) */
+                compile_node(I, cc, rhs);
+                compile_node(I, cc, n->as.binary.lhs);
+                if (tee) chunk_emit(c, OP_TEE, L);
+                chunk_emit(c, OP_CALL, L); chunk_emit(c, 1, L);
+            } else {
+                compile_node(I, cc, n->as.binary.lhs);
+                if (tee) chunk_emit(c, OP_TEE, L);
+                chunk_emit(c, OP_SCOPE_PUSH, L); cc->scope_count++;
+                emit_name_op_g(c, OP_DEFINE, "@", 1, L);
+                chunk_emit(c, OP_POP, L);
+                compile_node(I, cc, rhs);
                 chunk_emit(c, OP_SCOPE_POP, L); cc->scope_count--;
             }
+        } else if (op == TOK_TILDE_GT) {
+            /* elementwise pipe: x ~> f ==> map(f, x); the parser has already
+             * wrapped an '@'-form rhs into fn @ -> rhs, so rhs is a callable. */
+            if (n->as.binary.rhs->kind == AST_RECORD)
+                compile_error(I, n->as.binary.rhs, "~> cannot fan out; use |> {...} (fan-out is a whole-value operation)");
+            emit_const(c, eval_map_builtin(), L);   /* ~> means map-the-primitive: immune to shadowing */
+            compile_node(I, cc, n->as.binary.rhs);
+            compile_node(I, cc, n->as.binary.lhs);
+            chunk_emit(c, OP_CALL, L); chunk_emit(c, 2, L);
         } else {
             compile_node(I, cc, n->as.binary.lhs);
             compile_node(I, cc, n->as.binary.rhs);

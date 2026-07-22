@@ -226,3 +226,43 @@ void ast_print(FILE *out, const AstNode *n)
     print(out, n, 0);
     fputc('\n', out);
 }
+
+#include "lexer.h"
+#define contains_at ast_contains_at
+/* Does this subtree reference '@' at its own pipe level? Used to decide whether
+ * `x |> rhs` substitutes @ (rhs uses @) or applies a bare callable (rhs(x)).
+ * Descends into lambdas (a lambda body can capture the enclosing @) but not into
+ * a nested |>'s right side, which rebinds @ for itself. */
+bool ast_contains_at(const AstNode *n)
+{
+    if (!n) return false;
+    switch (n->kind) {
+    case AST_AT: return true;
+    case AST_UNARY: case AST_POSTFIX: case AST_RETURN: return contains_at(n->as.unary.operand);
+    case AST_BINARY:
+        if (n->as.binary.op == TOK_PIPE_GT || n->as.binary.op == TOK_PIPE_GTGT ||
+            n->as.binary.op == TOK_TILDE_GT) return contains_at(n->as.binary.lhs);  /* rhs rebinds @ */
+        return contains_at(n->as.binary.lhs) || contains_at(n->as.binary.rhs);
+    case AST_ASSIGN: return contains_at(n->as.binary.rhs);
+    case AST_RANGE:
+        return contains_at(n->as.range.start) || contains_at(n->as.range.step) || contains_at(n->as.range.stop);
+    case AST_CALL: case AST_INDEX:
+        if (contains_at(n->as.call.callee)) return true;
+        for (uint32_t i = 0; i < n->as.call.args.count; i++) if (contains_at(n->as.call.args.items[i])) return true;
+        return false;
+    case AST_FIELD: return contains_at(n->as.field.target);
+    case AST_IF:
+        return contains_at(n->as.iff.cond) || contains_at(n->as.iff.then_e) || contains_at(n->as.iff.else_e);
+    case AST_RECORD: case AST_MATRIX: case AST_ROW: case AST_BLOCK: case AST_BLOCK_EXPR:
+        for (uint32_t i = 0; i < n->as.list.count; i++) if (contains_at(n->as.list.items[i])) return true;
+        return false;
+    case AST_RECORD_FIELD: return contains_at(n->as.recfield.value);
+    case AST_LET: return contains_at(n->as.let.value) || contains_at(n->as.let.body);
+    case AST_LAMBDA: return contains_at(n->as.lambda.body);
+    case AST_FOR: return contains_at(n->as.forloop.iter) || contains_at(n->as.forloop.body);
+    case AST_WHILE: return contains_at(n->as.whileloop.cond) || contains_at(n->as.whileloop.body);
+    default: return false;
+    }
+}
+
+#undef contains_at

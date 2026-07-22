@@ -107,6 +107,8 @@ static int infix_bp(enum TokenKind k)
 {
     switch (k) {
     case TOK_PIPE_GT:   return BP_PIPE;
+    case TOK_PIPE_GTGT: return BP_PIPE;
+    case TOK_TILDE_GT:  return BP_PIPE;
     case TOK_OR:        return BP_OR;
     case TOK_AND:       return BP_AND;
     case TOK_PIPE:      return BP_BITOR;
@@ -521,6 +523,47 @@ static AstNode *parse_range(Parser *p, AstNode *left)
     return n;
 }
 
+
+/* Rewrite '@' into the reserved identifier '_@e' (for the ~> element lambda).
+ * Mirrors ast_contains_at's traversal: a nested pipe's rhs rebinds '@', so
+ * only its lhs is walked. Descends into lambda bodies: there '@' becomes a
+ * captured free variable of the element lambda, i.e. lexical element binding. */
+static void rewrite_at_to_elem(AstNode *n)
+{
+    if (!n) return;
+    switch (n->kind) {
+    case AST_AT:
+        n->kind = AST_IDENT;
+        n->as.lit.text = "_@e";
+        n->as.lit.len  = 3;
+        return;
+    case AST_UNARY: case AST_POSTFIX: rewrite_at_to_elem(n->as.unary.operand); return;
+    case AST_BINARY:
+        if (n->as.binary.op == TOK_PIPE_GT || n->as.binary.op == TOK_PIPE_GTGT ||
+            n->as.binary.op == TOK_TILDE_GT) { rewrite_at_to_elem(n->as.binary.lhs); return; }
+        rewrite_at_to_elem(n->as.binary.lhs); rewrite_at_to_elem(n->as.binary.rhs); return;
+    case AST_ASSIGN: rewrite_at_to_elem(n->as.binary.lhs); rewrite_at_to_elem(n->as.binary.rhs); return;
+    case AST_RANGE:
+        rewrite_at_to_elem(n->as.range.start); rewrite_at_to_elem(n->as.range.step); rewrite_at_to_elem(n->as.range.stop); return;
+    case AST_CALL: case AST_INDEX:
+        rewrite_at_to_elem(n->as.call.callee);
+        for (uint32_t i = 0; i < n->as.call.args.count; i++) rewrite_at_to_elem(n->as.call.args.items[i]);
+        return;
+    case AST_FIELD: rewrite_at_to_elem(n->as.field.target); return;
+    case AST_IF:
+        rewrite_at_to_elem(n->as.iff.cond); rewrite_at_to_elem(n->as.iff.then_e); rewrite_at_to_elem(n->as.iff.else_e); return;
+    case AST_RECORD: case AST_MATRIX: case AST_ROW: case AST_BLOCK: case AST_BLOCK_EXPR:
+        for (uint32_t i = 0; i < n->as.list.count; i++) rewrite_at_to_elem(n->as.list.items[i]);
+        return;
+    case AST_RECORD_FIELD: rewrite_at_to_elem(n->as.recfield.value); return;
+    case AST_LAMBDA: rewrite_at_to_elem(n->as.lambda.body); return;
+    case AST_LET: rewrite_at_to_elem(n->as.let.value); rewrite_at_to_elem(n->as.let.body); return;
+    case AST_FOR: rewrite_at_to_elem(n->as.forloop.iter); rewrite_at_to_elem(n->as.forloop.body); return;
+    case AST_WHILE: rewrite_at_to_elem(n->as.whileloop.cond); rewrite_at_to_elem(n->as.whileloop.body); return;
+    default: return;
+    }
+}
+
 static AstNode *parse_led(Parser *p, AstNode *left, int lbp)
 {
     Token t = p->cur;
@@ -566,6 +609,31 @@ static AstNode *parse_led(Parser *p, AstNode *left, int lbp)
     case TOK_COLON:
         return parse_range(p, left);
 
+    case TOK_TILDE_GT: {                          /* elementwise pipe: x ~> f == map(f, x) */
+        advance(p);
+        AstNode *n = node(p, AST_BINARY, t);
+        n->as.binary.op = t.kind;
+        n->as.binary.lhs = left;
+        AstNode *rhs = parse_expr(p, lbp);
+        if (rhs->kind != AST_RECORD && ast_contains_at(rhs)) {
+            /* '@' under ~> binds the ELEMENT: rewrite '@' to the reserved
+             * ident '_@e' and wrap rhs as fn _@e -> rhs. Params live in
+             * stack slots, so '@' must become a real identifier here. */
+            rewrite_at_to_elem(rhs);
+            AstNode *lam = node(p, AST_LAMBDA, t);
+            AstNode *pn = node(p, AST_IDENT, t);
+            pn->as.lit.text = "_@e"; pn->as.lit.len = 3;
+            Vec params = VEC_INIT;
+            vec_push(p, &params, pn);
+            lam->as.lambda.params = vec_seal(p, &params);
+            lam->as.lambda.body   = rhs;
+            lam->as.lambda.src    = "fn @ -> ...";
+            lam->as.lambda.srclen = 11;
+            rhs = lam;
+        }
+        n->as.binary.rhs = rhs;
+        return n;
+    }
     default: {                                    /* left-associative binary */
         advance(p);
         AstNode *n = node(p, AST_BINARY, t);

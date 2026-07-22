@@ -5558,3 +5558,8 @@ EnvObj *globals_new(void)
     def_builtin(e, "format",bi_format,0, 1);
     return e;
 }
+
+Value eval_map_builtin(void)
+{
+    return val_builtin("map", bi_map, 2, 2);
+}

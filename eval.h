@@ -23,4 +23,6 @@ typedef struct Interp {
 void    interp_init(Interp *I);
 EnvObj *globals_new(void);                 /* env preloaded with builtins (+1 ref) */
 
+Value eval_map_builtin(void);
+
 #endif

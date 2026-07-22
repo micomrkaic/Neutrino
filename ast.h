@@ -65,4 +65,6 @@ struct AstNode {
 AstNode *ast_alloc(Arena *a, AstKind kind, uint32_t line, uint32_t col);
 void     ast_print(FILE *out, const AstNode *n);
 
+bool ast_contains_at(const AstNode *n);
+
 #endif

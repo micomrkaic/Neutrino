@@ -174,7 +174,7 @@ From loosest to tightest binding:
 
 | Level | Operators | Notes |
 |---|---|---|
-| pipe | `\|>` | left-assoc; see [Functions](#7-functions) |
+| pipe | `\|>` `\|>>` `~>` | left-assoc; see [Functions](#7-functions) |
 | logical or | `\|\|` | short-circuit |
 | logical and | `&&` | short-circuit |
 | elementwise or | `\|` | on logicals/arrays |
@@ -296,6 +296,50 @@ neutrino> 9 |> sqrt              # bare callable: sqrt(9)
 ```
 
 Pipes chain left to right, which reads as a data-flow pipeline.
+
+**The elementwise pipe `~>`.** Where `|>` feeds the *whole* value, `~>` feeds
+each *element*: `x ~> f` is `map(f, x)`. The same right-hand-side rules apply,
+with one deliberate twist: under `~>`, `@` binds the **element**, not the whole
+array. The operator extends Neutrino's whole-vs-elementwise distinction
+(`*` vs `.*`) to pipelines — and yes, in a language named Neutrino, the
+elementwise pipe oscillates. `~>` always means the map primitive itself, so
+shadowing the name `map` cannot change what the operator does.
+
+```
+neutrino> [0.5, 1.5, 2.5] ~> (@ * 2) ~> floor
+[1, 3, 5]
+neutrino> 1:5 ~> (@ ^ 2) |> sum
+55
+neutrino> [1, 2, 3] ~> (fn x -> x * 10)
+[10, 20, 30]
+```
+
+**The tee pipe `|>>`.** Exactly `|>`, but the value flowing through is printed
+(echo style) before being passed on — pipeline debugging without dismantling
+the pipeline. Swap `|>` for `|>>` at the stage you want to watch, then swap
+back:
+
+```
+neutrino> [3, 1, 4, 1, 5] |>> sort |>> unique |> length
+[3, 1, 4, 1, 5]
+[1, 1, 3, 4, 5]
+4
+```
+
+**Fan-out.** When the right-hand side of `|>` (or `|>>`) is a record literal,
+each field's callable is applied to the piped value, and the result is a
+record of results with the same keys — a `describe()` composed from syntax:
+
+```
+neutrino> [2.1, 3.7, 1.4, 5.0] |> {n = length, mu = mean, sd = std, top = max}
+{n = 4, mu = 3.05, sd = 1.61761, top = 5}
+```
+
+Fan-out is one level deep and whole-value only (`~>` into a record is an
+error). A non-callable field is a type error, and `@` inside the fan-out
+record is rejected: each field already receives the piped value as its
+argument.
+
 
 ## 8. Arrays and matrices
 
@@ -965,7 +1009,7 @@ expr       := 'let' NAME '=' expr 'in' expr
             | '(' statement (';' statement)* ')'     # block expression
             | expr binop expr | unop expr | expr postfix
             | NAME | literal | '[' rows ']' | '{' fields '}'
-            | expr '|>' expr
+            | expr '|>' expr | expr '|>>' expr | expr '~>' expr
 postfix    := "'" | ".'" | '(' args ')' | '[' indices ']' | '.' NAME
 ```
 

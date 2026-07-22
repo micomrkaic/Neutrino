@@ -45,6 +45,7 @@ enum TokenKind : uint8_t {
     /* comparison / logical / assignment */
     TOK_ASSIGN, TOK_EQ, TOK_NE, TOK_LT, TOK_LE, TOK_GT, TOK_GE,
     TOK_AND, TOK_OR, TOK_AMP, TOK_PIPE, TOK_BANG, TOK_TILDE,
+    TOK_TILDE_GT, TOK_PIPE_GTGT,
 
     /* punctuation / misc */
     TOK_COLON, TOK_COMMA, TOK_SEMI, TOK_DOT, TOK_AT,

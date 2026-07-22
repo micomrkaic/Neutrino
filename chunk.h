@@ -30,6 +30,7 @@ typedef enum : uint8_t {
     OP_JUMP_IF_FALSE,  /* u16 off   : top must be Bool; if false ip += off    */
     OP_JUMP_IF_TRUE,   /* u16 off   : top must be Bool; if true  ip += off    */
     OP_POP,            /*           : pop and release                         */
+    OP_TEE,            /*           : print top of stack (tee pipe), no pop   */
     /* --- stage 2: scopes, loops, iteration --- */
     OP_LOOP,           /* u16 off   : ip -= off (backward jump)               */
     OP_SCOPE_PUSH,     /*           : env = child(env)                        */

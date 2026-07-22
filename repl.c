@@ -361,6 +361,7 @@ int repl_run(void)
 #ifdef HAVE_READLINE
     rl_readline_name = "neutrino";
     rl_attempted_completion_function = repl_completion;
+    rl_variable_bind("blink-matching-paren", "on");
 #ifdef HAVE_GNU_READLINE
     rl_catch_signals = 0;                       /* we install our own SIGINT */
 #endif

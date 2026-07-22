@@ -146,6 +146,7 @@ void chunk_disassemble(FILE *out, const Chunk *c, const char *title)
         case OP_UNARY:      { uint8_t t = U8(); fprintf(out, "UNARY          %s", tok_sym(t)); break; }
         case OP_TRANSPOSE:  { uint8_t cj = U8(); fprintf(out, "TRANSPOSE      %s", cj ? "conj" : "plain"); break; }
         case OP_RANGE:        fputs("RANGE", out); break;
+        case OP_TEE:          fputs("TEE", out); break;
         case OP_CALL:       { uint8_t a = U8(); fprintf(out, "CALL           argc=%u", a); break; }
         case OP_AUTOCALL:     fputs("AUTOCALL", out); break;
         case OP_RETURN:       fputs("RETURN", out); break;
