@@ -181,6 +181,24 @@ From loosest to tightest binding:
 | elementwise or | `\|` | on logicals/arrays |
 | elementwise and | `&` | on logicals/arrays |
 | comparison | `== ~= < <= > >=` | elementwise on arrays -> logical array |
+
+**Chained comparisons.** Relational operators chain the way mathematics
+writes them: `a < b < c` means `a < b` **and** `b < c`, with the middle
+term evaluated exactly once. Chains must run in one direction — `{<, <=}`,
+`{>, >=}`, or all `==`; mixing directions is a parse error (write
+`(a < b) & (b > c)` for that), and `!=` never chains, because `a != b != c`
+would not mean "all distinct". The conjunction is the elementwise `&`, so a
+chain over an array is a mask — counting draws in a band is one `sum`:
+
+```
+neutrino> 0 <= 0.5 < 1
+true
+neutrino> let z = [-1, 0.5, 0.8, 3]; sum(0 < z < 1)
+2
+neutrino> rng(1); sum(-1.96 < randn(1, 100) < 1.96) >= 90
+true
+```
+
 | range | `a:b`, `a:step:b` | inclusive; float steps fine |
 | additive | `+ -` | |
 | multiplicative | `* / .* ./ \ .\` | `*` is the **matrix** product on matrices; `.*` elementwise; `\` left division (solve) |
@@ -1011,6 +1029,7 @@ expr       := 'let' NAME '=' expr 'in' expr
             | expr binop expr | unop expr | expr postfix
             | NAME | literal | '[' rows ']' | '{' fields '}'
             | expr '|>' expr | expr '|>>' expr | expr '~>' expr
+            | expr relop expr relop expr ...   (* one direction; middles bound once *)
 postfix    := "'" | ".'" | '(' args ')' | '[' indices ']' | '.' NAME
 ```
 

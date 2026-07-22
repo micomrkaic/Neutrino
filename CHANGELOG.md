@@ -65,6 +65,18 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.14.0: chained comparisons.** `a < b < c` now means what mathematics
+  means: `a < b` and `b < c`, with the middle term evaluated exactly once
+  (verified by rand-stream position). Chains run in one direction —
+  `{<, <=}`, `{>, >=}`, or all `==`; mixing directions is a parse error with
+  a teaching message, and `!=` never chains (`a != b != c` would not mean
+  all-distinct). The conjunction is elementwise `&`, so chains over arrays
+  are masks: `sum(0 < z < 1)` counts a band. Implemented as a pure parser
+  desugar into a scoped block expression with reserved temps — no new AST
+  node, no VM changes; previously `a < b < c` was a runtime type error, so
+  the feature is purely additive. 17 goldens, a 900-program fuzz over
+  comparison/operator mixtures under ASan, zero regressions on the existing
+  811.
 - **v1.13.0: rmt.nu — random matrices, structured.** A fifth standard
   package: `randsym`, `randspd` (chol-safe by construction), `wishart`,
   `randorth` (Haar, QR sign-fixed), `randperm` (ranks of uniform draws — an

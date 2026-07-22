@@ -129,7 +129,7 @@ day the language wants a birthday present.
 
 ---
 
-## 5. Chained comparisons
+## 5. Chained comparisons  *(SHIPPED in v1.14.0 — the promised usability bug fix)*
 
 ```
 0 <= p <= 1                 # (0 <= p) && (p <= 1), p evaluated once

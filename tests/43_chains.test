@@ -1,0 +1,44 @@
+# Chained comparisons: same-direction, middles evaluated once, elementwise &
+1 < 2 < 3
+=> true
+1 < 2 < 2
+=> false
+3 > 2 >= 2
+=> true
+1 <= 1 < 5 <= 5
+=> true
+0 <= 0.5 <= 1
+=> true
+2 == 2 == 2
+=> true
+2 == 2 == 3
+=> false
+# arrays: elementwise band mask and counting
+let z = [-1, 0.5, 0.8, 3]; 0 < z < 1
+=> [false, true, true, false]
+let z = [-1, 0.5, 0.8, 3]; sum(0 < z < 1)
+=> 2
+# middle terms evaluate exactly once: after the chain, the stream is at draw 2
+rng(1); let a = 0 < rand() < 1; rand() == (rng(1); rand(); rand())
+=> true
+# arithmetic binds tighter than the chain
+1 + 1 < 4 * 1 < 9 - 3
+=> true
+# temps are scoped: nothing leaks
+1 < 2 < 3; _@c1
+=> !parse error
+# mixed directions are a parse error
+1 < 2 > 0
+=> !mixes directions
+# '!=' never chains
+1 != 2 != 3
+=> !does not chain
+# equality does not mix with relational
+1 == 1 < 2
+=> !mixes directions
+# the explicit form still works
+(1 < 2) & (2 > 0)
+=> true
+# four-term chain false in the middle
+1 < 5 < 3 < 10
+=> false

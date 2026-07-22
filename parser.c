@@ -564,6 +564,104 @@ static void rewrite_at_to_elem(AstNode *n)
     }
 }
 
+
+/* ---- chained comparisons: a < b < c  ==>  (let t = b; (a < t) & (t < c)) --
+ * Same-direction chains only ({<,<=} / {>,>=} / {==}); '!=' never chains.
+ * Middle terms bind to reserved temps (users cannot write '@' in a name),
+ * so each is evaluated exactly once; '&' is elementwise, so array chains
+ * like 0 < z < 1 produce elementwise masks. Pure desugar: no new AST. */
+
+static int cmp_family(enum TokenKind k)
+{
+    switch (k) {
+    case TOK_LT: case TOK_LE: return 1;   /* ascending  */
+    case TOK_GT: case TOK_GE: return 2;   /* descending */
+    case TOK_EQ:              return 3;   /* equality   */
+    default:                  return 0;   /* TOK_NE and friends: no family */
+    }
+}
+
+static AstNode *chain_ident(Parser *p, Token t, const char *name, uint32_t len)
+{
+    AstNode *n = node(p, AST_IDENT, t);
+    n->as.lit.text = name; n->as.lit.len = len;
+    return n;
+}
+
+static AstNode *parse_cmp_chain(Parser *p, AstNode *left, int lbp, Token t)
+{
+    static const char *tmps[] = { "_@c1", "_@c2", "_@c3", "_@c4",
+                                  "_@c5", "_@c6", "_@c7", "_@c8" };
+    enum TokenKind ops[9];
+    AstNode *operands[10];
+    uint32_t nops = 0;
+
+    advance(p);
+    ops[nops++] = t.kind;
+    operands[0] = left;
+    operands[1] = parse_expr(p, lbp);
+
+    while (p->cur.kind == TOK_EQ || p->cur.kind == TOK_NE ||
+           p->cur.kind == TOK_LT || p->cur.kind == TOK_LE ||
+           p->cur.kind == TOK_GT || p->cur.kind == TOK_GE) {
+        Token nxt = p->cur;
+        if (nxt.kind == TOK_NE || ops[0] == TOK_NE)
+            parse_error(p, "'!=' does not chain: 'a != b != c' does not "
+                           "mean all-distinct; write the conditions with '&'");
+        if (cmp_family(nxt.kind) != cmp_family(ops[0]))
+            parse_error(p, "comparison chain mixes directions; write "
+                           "'(a < b) & (b > c)' to mean that explicitly");
+        if (nops >= 8)
+            parse_error(p, "comparison chain too long");
+        advance(p);
+        ops[nops] = nxt.kind;
+        operands[nops + 1] = parse_expr(p, lbp);
+        nops++;
+    }
+
+    if (nops == 1) {                              /* plain binary, unchanged */
+        AstNode *n = node(p, AST_BINARY, t);
+        n->as.binary.op = ops[0];
+        n->as.binary.lhs = operands[0];
+        n->as.binary.rhs = operands[1];
+        return n;
+    }
+
+    /* middles get temps; ends are used once and stay as written */
+    AstNode *ref[10];
+    ref[0] = operands[0];
+    ref[nops] = operands[nops];
+    Vec stmts = VEC_INIT;
+    for (uint32_t i = 1; i < nops; i++) {
+        AstNode *let = node(p, AST_LET, t);
+        let->as.let.name = tmps[i - 1];
+        let->as.let.namelen = 4;
+        let->as.let.value = operands[i];
+        let->as.let.body = nullptr;
+        vec_push(p, &stmts, let);
+        ref[i] = chain_ident(p, t, tmps[i - 1], 4);
+    }
+    AstNode *acc = nullptr;
+    for (uint32_t i = 0; i < nops; i++) {
+        AstNode *cmp = node(p, AST_BINARY, t);
+        cmp->as.binary.op = ops[i];
+        cmp->as.binary.lhs = (i == 0) ? ref[0] : chain_ident(p, t, tmps[i - 1], 4);
+        cmp->as.binary.rhs = ref[i + 1];
+        if (!acc) acc = cmp;
+        else {
+            AstNode *conj = node(p, AST_BINARY, t);
+            conj->as.binary.op = TOK_AMP;
+            conj->as.binary.lhs = acc;
+            conj->as.binary.rhs = cmp;
+            acc = conj;
+        }
+    }
+    vec_push(p, &stmts, acc);
+    AstNode *blk = node(p, AST_BLOCK_EXPR, t);
+    blk->as.list = vec_seal(p, &stmts);
+    return blk;
+}
+
 static AstNode *parse_led(Parser *p, AstNode *left, int lbp)
 {
     Token t = p->cur;
@@ -609,6 +707,9 @@ static AstNode *parse_led(Parser *p, AstNode *left, int lbp)
     case TOK_COLON:
         return parse_range(p, left);
 
+    case TOK_EQ: case TOK_NE: case TOK_LT:
+    case TOK_LE: case TOK_GT: case TOK_GE:
+        return parse_cmp_chain(p, left, lbp, t);
     case TOK_TILDE_GT: {                          /* elementwise pipe: x ~> f == map(f, x) */
         advance(p);
         AstNode *n = node(p, AST_BINARY, t);
