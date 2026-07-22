@@ -5,6 +5,15 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v1.12.1: documentation refresh.** The README caught up with its own
+  language: the showcase example now leads with the elementwise pipe
+  (`[1,2,3,4] ~> (@ ^ 2) |> sum`), the intro covers the pipe family, `ans`,
+  and the Emacs mode, and the Language tour gained the three new pipes —
+  every example executed before being written down. The manual's table of
+  contents lists the Editors section, the build instructions show
+  `make -j$(nproc)`, and LESSONS.md gained §7 (the documentation lattice and
+  the recent catch ledger). No code changes; the version exists because a
+  changed tarball must not reuse a released tag.
 - **v1.11.1: incremental, parallel builds.** The Makefile compiled every
   translation unit in one monolithic command per binary — any edit rebuilt
   everything, serially, three times over. Now each .c compiles once into

@@ -14,8 +14,13 @@ refcounted values, complex numbers, logical (boolean) arrays, `for`/`while`
 loops, and a linear algebra core — matrix multiply, left/right division,
 least-squares, matrix power, `det`/`inv`, and `lu`/`qr`/`chol`/`eig`/`svd`
 decompositions (all carried out in complex, so real inputs give real results).
-It runs as a REPL with line editing, history, and tab completion, or executes
-`.nu` scripts.
+It runs as a REPL with line editing, history, tab completion, and `ans` (the
+last value you saw and didn't name), or executes `.nu` scripts. Pipelines come
+in three flavours: `|>` feeds the whole value, `~>` feeds each element
+(`x ~> f` is `map(f, x)` — the elementwise pipe oscillates), `|>>` tees the
+flowing value for debugging, and piping into a record literal fans out:
+`data |> {n = length, mu = mean}`. An Emacs mode (`editors/neutrino-mode.el`)
+provides highlighting, indentation, and an inferior REPL.
 
 It is a recreational language project, built from scratch: a zero-copy pull
 lexer, a Pratt parser into an arena, and a refcounting **bytecode VM**. Source
@@ -31,8 +36,10 @@ neutrino> let x = A \ [5; 10]
 [1; 3]
 neutrino> A * x
 [5; 10]
-neutrino> [1, 2, 3, 4] |> map((_ .^ 2), @) |> sum(@)
+neutrino> [1, 2, 3, 4] ~> (@ ^ 2) |> sum
 30
+neutrino> [2.1, 3.7, 1.4] |> {n = length, mu = mean}
+{n = 3, mu = 2.4}
 ```
 
 ---
@@ -266,7 +273,7 @@ be in range — there is no auto-growing — and the target must be a plain name
 | comparison   | `==  !=  <  <=  >  >=`                                   |
 | logical      | `&&  ||` (short-circuit, scalar), `&  |  ~`/`!` (eager / elementwise) |
 | postfix      | `'` conjugate transpose, `.'` transpose                 |
-| range / pipe | `:`  and  `\|>`                                          |
+| range / pipe | `:`  and  `\|>` `\|>>` `~>`                              |
 
 Linear algebra (square systems, partial-pivot Gaussian elimination, carried out
 in complex so real inputs return real results):
@@ -491,12 +498,26 @@ piped value can't be silently dropped:
 9  |> sqrt                  -> 3          # bare callable: f(x)
 5  |> @ + 1                 -> 6
 [1, 2, 3, 4] |> sum(@) |> sqrt(@)         -> 3.16228
-[1, 2, 3, 4] |> map((_ * 10), @) |> sum(@) -> 100
+[1, 2, 3, 4] |> map((_ * 10), @) |> sum(@) -> 100   # or: ~> (_ * 10), below
 5  |> sqrt(2)              # error: piped value unused
 ```
 
 `@` and `_` are independent placeholders: `@` is the dynamic piped value, `_`
 is a lexical section parameter; they compose freely.
+
+Three more pipes complete the family. The **elementwise pipe** `~>` feeds each
+element (`x ~> f` is `map(f, x)`; under `~>`, `@` binds the *element*). The
+**tee pipe** `|>>` is `|>` that prints the flowing value first — pipeline
+debugging in place. And piping into a record literal **fans out**, applying
+each field to the value:
+
+```
+1:5 ~> (@ ^ 2)                            -> [1, 4, 9, 16, 25]
+[1, 2, 3, 4] ~> (@ * 10) |> sum           -> 100
+[3, 1, 2] |>> sort |> max                 -> prints [3, 1, 2], then 3
+[2.1, 3.7, 1.4] |> {n = length, mu = mean, top = max}
+                                          -> {n = 3, mu = 2.4, top = 3.7}
+```
 
 ### Statements and echo suppression
 

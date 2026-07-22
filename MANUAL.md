@@ -26,6 +26,7 @@ instructions see the [README](README.md); for the honest list of sharp edges see
 14. [Data files](#14-data-files)
 15. [Output and formatting](#15-output-and-formatting)
 16. [Scripts and tools](#16-scripts-and-tools)
+— [Editors](#editors)
 17. [Builtin reference](#17-builtin-reference)
 18. [Grammar summary](#18-grammar-summary)
 
@@ -37,8 +38,8 @@ Build (a C23 compiler and `libm`; readline optional — see the README for macOS
 notes):
 
 ```sh
-make            # ./neutrino, the REPL
-make test       # golden suite + codegen goldens
+make -j$(nproc)   # ./neutrino, the REPL (parallel; plain 'make' works too)
+make test         # golden suite + codegen goldens
 ```
 
 The banner shows the version, when the binary was built, and when the

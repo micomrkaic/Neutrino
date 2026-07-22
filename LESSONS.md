@@ -184,3 +184,35 @@ decisions: the strictness doctrine meant every operation already had a
 tested refusal to replace with a behavior, and the golden suite plus
 sanitizer-and-fuzz discipline caught a use-after-free, a double-free, and
 two silent-garbage paths before any shipped. strings ledger: closed.
+
+## 7. The documentation lattice, and six catches (v1.9.0–v1.12.0)
+
+The releases from `ans` through the pipe family turned documentation from
+text into tested claims. The pattern that emerged: every claim a document
+makes should be either executed (transcripts, help examples, worked-example
+tables — all machine-verified in `make test`) or structurally audited
+(doclint checks every table in every document). When generated artifacts
+misrender, audit the generator before the renderer: the escaped-pipe saga
+had three possible homes — renderer, source, generator — and the generator
+was the origin both times.
+
+The catch ledger from this arc, each now guarded by a test:
+- A verified transcript embedded `datestr(today())`'s literal output — a
+  test designed to fail at midnight. Time-dependent output in goldens is a
+  bomb; assert monotone properties instead.
+- `run_manual.sh` had an `exec` mid-file, making two later guards dead code
+  since the day they were added. A guard that never runs is worse than no
+  guard: it certifies. Verify that verifiers fire.
+- The rewritten Makefile's mkdir rule silently became the default goal —
+  bare `make` built a directory and reported success. `.DEFAULT_GOAL` is
+  cheap insurance; also: equal mtimes read as up-to-date, so dependency
+  tests need a sleep before the touch.
+- Debugging backslash escapes through repr/JSON display layers doubled the
+  backslashes twice; two rounds were lost to phantom bugs. When the bug is
+  bytes, count bytes (`od -c`), not representations.
+- The pipe release: `@` resolves by name at runtime but parameters live in
+  stack slots (hence the `_@e` rewrite); a borrowed builtin placed in an
+  owning constant pool over-released on chunk teardown (segfault); and
+  shadow-proofing `~>` via a globals lookup failed because `let map = 7`
+  replaces the binding — immunity had to come from minting the primitive,
+  not finding it.

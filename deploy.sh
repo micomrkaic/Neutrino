@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Note on tag listing: versions past 1.9 sort wrongly as strings (v1.10 before
+# v1.9). One-time fix in this clone:  git config tag.sort version:refname
+# (and 'sort -V' for shell work on release files).
 # deploy.sh — release a Neutrino tarball to GitHub, tagged with its version.
 #   usage: ./deploy.sh ~/Downloads/neutrino.tar.gz [--no-test]
 # Steps: extract the tarball's version, untar over this repo, build and run
