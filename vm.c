@@ -540,7 +540,11 @@ Value vm_eval_program(Interp *I, AstNode *block, EnvObj *globals, bool echo)
             /* ans: the last value you saw and didn't name. Echo-coupled by
              * design — suppressed statements and load()ed scripts (echo off)
              * never touch it, so ans always matches the screen. */
-            if (s->kind != AST_LET)
+            /* let STATEMENTS name their result (no ans); a let..in
+             * EXPRESSION (body != null) is anonymous — including every
+             * where-clause, which desugars to let..in — and echoes, so it
+             * sets ans like any expression. */
+            if (s->kind != AST_LET || s->as.let.body != nullptr)
                 env_define(globals, "ans", 3, last);
         }
     }

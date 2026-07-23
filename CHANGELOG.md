@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v1.15.1: `ans` after a where clause.** A `where`-qualified expression
+  echoed its value but did not set `ans` (first user-caught semantic bug —
+  found at the calculator, naturally). Cause: where clauses desugar to
+  `let..in`, and the v1.9.0 `ans` guard excluded the AST_LET kind wholesale,
+  conflating let *statements* (named — correctly excluded) with let..in
+  *expressions* (anonymous — must set `ans`, and now do). The same fix
+  covers explicit `let x = e in body`, latent since v1.9.0. The manual's
+  verified ans transcript now exercises the interaction.
 - **v1.12.1: documentation refresh.** The README caught up with its own
   language: the showcase example now leads with the elementwise pipe
   (`[1,2,3,4] ~> (@ ^ 2) |> sum`), the intro covers the pipe family, `ans`,

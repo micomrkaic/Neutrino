@@ -126,12 +126,15 @@ neutrino> ans
 1
 neutrino> ans + 100;
 neutrino> ans
+neutrino> s * 2 where s = 50
+neutrino> ans
 neutrino> who
 ```
 
-Note the two quiet guarantees in that transcript: `ans` survived both the
+Note the quiet guarantees in that transcript: `ans` survived both the
 `let` and the suppressed statement — it can never hold something you didn't
-see. This differs from Octave, where `3 + 4;` sets `ans` silently and
+see — and a `where`-qualified expression sets it like any other, because a
+where clause is an anonymous expression, not a named binding. This differs from Octave, where `3 + 4;` sets `ans` silently and
 scripts clobber it as a side effect.
 
 ## 3. Values and types
