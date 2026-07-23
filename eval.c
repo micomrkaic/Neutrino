@@ -1292,10 +1292,9 @@ static Value bi_map(Interp *I, Value *args, uint32_t n)
     volatile size_t done = 0;
     if (setjmp(I->jmp)) array_build_abort(I, tmp, done, saved);
     for (size_t k = 0; k < nn; k++) {
-        Value e = arr_get(arr, k);
+        Value e = arr_get(arr, k);            /* borrowed from arr (see arr_get) */
         Value one[1] = { e };
         Value mapped = call_value(I, f, one, 1);
-        value_release(e);
         tmp[k] = mapped;
         done = k + 1;
     }
@@ -1443,6 +1442,9 @@ static const BuiltinDoc builtin_docs[] = {
     { "prod",  "prod(A) | prod(A, dim)","product of all elements, or along dim", "reduce" , "prod([1, 2, 3, 4])                %= 24" },
     { "save",  "save(\"file.nu\")",  "write all variables and functions as reloadable source (restore with load)", "core" , "save(\"ws.nu\")                    % then later: load(\"ws.nu\")" },
     { "body",  "body(f)",           "print the source of a user-defined function", "core" , "let cube = fn x -> x^3; body(cube)   %= fn x -> x^3" },
+    { "pwd",   "pwd",                "the current working directory, as a string", "io" , "length(pwd()) > 0                 %= true" },
+    { "cd",    "cd(\"dir\") | cd",     "change the working directory (persists, unlike !cd); bare cd goes home", "io" , "cd(\"packages\")                    % ...then load(\"dist.nu\") works\ncd(\"..\")                          % back up" },
+    { "ls",    "ls | ls(\"dir\") | ls(\"*.nu\")", "directory listing as a string array (globs supported)", "io" , "numel(ls(\"packages\")) >= 5        %= true" },
     { "load",  "load(\"file.nu\")",  "run a file in the current session; its let-bindings persist (a record of closures makes a module)", "core" , "load(\"tests/data/mathlib.nu\"); cube(3)   %= 27\nload(\"mylib.nu\"); mylib.f(2)     % record-of-closures as a namespace" },
     { "clear", "clear() | clear(\"a\", ...)", "remove all user variables, or the named ones (builtins are untouchable)", "core" , "let junk = 42; clear(\"junk\")   % junk is gone\nclear                             % bare: everything user-defined" },
     { "mem",   "mem",               "print workspace size (variables) and peak process memory", "core" , "mem                               % e.g.  workspace: 3 variables, 2.1 MB" },
@@ -3120,6 +3122,94 @@ static Value bi_strjoin(Interp *I, Value *args, uint32_t n)
 }
 
 /* fields(r): the record's field names, as a string column (composable). */
+#include <unistd.h>
+#include <dirent.h>
+#include <glob.h>
+#include <errno.h>
+
+/* pwd(): the current working directory, as a string. */
+static Value bi_pwd(Interp *I, Value *args, uint32_t n)
+{
+    (void)args; (void)n;
+    char buf[4096];
+    if (!getcwd(buf, sizeof buf))
+        runtime_error(I, "pwd: %s", strerror(errno));
+    return val_string(buf, (uint32_t)strlen(buf));
+}
+
+/* cd(dir) / cd(): change the working directory (persists, unlike !cd);
+ * with no argument, go to $HOME. Returns the new directory. */
+static Value bi_cd(Interp *I, Value *args, uint32_t n)
+{
+    const char *dst;
+    char tmp[4096];
+    if (n == 0) {
+        dst = getenv("HOME");
+        if (!dst) runtime_error(I, "cd: $HOME is not set");
+    } else {
+        StrObj *sv = want_strobj(I, args[0], "cd");
+        if (sv->len >= sizeof tmp) runtime_error(I, "cd: path too long");
+        memcpy(tmp, sv->data, sv->len); tmp[sv->len] = 0;
+        dst = tmp;
+    }
+    if (chdir(dst) != 0)
+        runtime_error(I, "cd: %s: %s", dst, strerror(errno));
+    return bi_pwd(I, nullptr, 0);
+}
+
+static int ls_cmp(const void *a, const void *b)
+{
+    return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
+
+/* ls() / ls(dir) / ls(pattern): names in a directory (dotfiles skipped),
+ * or glob matches if the argument contains a wildcard. A string array,
+ * so the listing is a value: ls("packages") ~> load. */
+static Value bi_ls(Interp *I, Value *args, uint32_t n)
+{
+    char pat[4096];
+    const char *arg = ".";
+    if (n == 1) {
+        StrObj *sv = want_strobj(I, args[0], "ls");
+        if (sv->len >= sizeof pat) runtime_error(I, "ls: path too long");
+        memcpy(pat, sv->data, sv->len); pat[sv->len] = 0;
+        arg = pat;
+    }
+    char **names = nullptr;
+    uint32_t cnt = 0, cap = 0;
+    if (strpbrk(arg, "*?[")) {
+        glob_t g;
+        int rc = glob(arg, 0, nullptr, &g);
+        if (rc != 0 && rc != GLOB_NOMATCH)
+            runtime_error(I, "ls: glob failed for %s", arg);
+        for (size_t i = 0; rc == 0 && i < g.gl_pathc; i++) {
+            if (cnt == cap) { cap = cap ? cap * 2 : 16; names = realloc(names, cap * sizeof *names); }
+            names[cnt++] = strdup(g.gl_pathv[i]);
+        }
+        if (rc == 0) globfree(&g);
+    } else {
+        DIR *d = opendir(arg);
+        if (!d) runtime_error(I, "ls: %s: %s", arg, strerror(errno));
+        struct dirent *e;
+        while ((e = readdir(d))) {
+            if (e->d_name[0] == '.') continue;
+            if (cnt == cap) { cap = cap ? cap * 2 : 16; names = realloc(names, cap * sizeof *names); }
+            names[cnt++] = strdup(e->d_name);
+        }
+        closedir(d);
+    }
+    qsort(names, cnt, sizeof *names, ls_cmp);
+    Value out = val_array(ELT_STRING, cnt, cnt ? 1 : 0);
+    for (uint32_t i = 0; i < cnt; i++) {
+        Value sv = val_string(names[i], (uint32_t)strlen(names[i]));
+        arr_set(as_arr(out), i, sv);
+        value_release(sv);
+        free(names[i]);
+    }
+    free(names);
+    return out;
+}
+
 static Value bi_fields(Interp *I, Value *args, uint32_t n)
 {
     (void)n;
@@ -5482,6 +5572,9 @@ EnvObj *globals_new(void)
     def_builtin(e, "rem",     bi_rem,     2, 2);
     def_builtin(e, "min",     bi_min,     1, 3);
     def_builtin(e, "max",     bi_max,     1, 3);
+    def_builtin(e, "pwd",   bi_pwd,   0, 0);
+    def_builtin(e, "cd",    bi_cd,    0, 1);
+    def_builtin(e, "ls",    bi_ls,    0, 1);
     def_builtin(e, "load",    bi_load,    1, 1);
     def_builtin(e, "save",    bi_save,    1, 1);
     def_builtin(e, "body",    bi_body,    1, 1);

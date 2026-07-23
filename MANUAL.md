@@ -105,6 +105,22 @@ the `end` arrives.
 and numbers in a terse 6-significant-digit format; both are configurable — see
 [Output and formatting](#13-output-and-formatting).
 
+**The working directory.** `pwd`, `cd("dir")`, and `ls` are ordinary
+builtins, so they work bare at the prompt (shell muscle memory intact) *and*
+as values: `ls` returns a string array you can pipe, and `cd` actually
+changes the interpreter's directory — which `!cd` cannot (the shell escape
+runs in a child process). Globs work: `ls("*.nu")`. Flags belong to the
+shell escape: `!ls -la`.
+
+```
+neutrino> ls("packages")
+["astro.nu"; "dist.nu"; "finance.nu"; "poly.nu"; "rmt.nu"]
+neutrino> cd("packages");
+neutrino> load("dist.nu"); norm.cdf(0, 0, 1)
+0.5
+neutrino> cd("..");
+```
+
 **`ans` — the last value you saw and didn't name.** Every echoed
 expression statement rebinds `ans`; `let` statements don't (their result has
 a name), semicolon-suppressed statements don't, and `load()`ed scripts don't
@@ -878,6 +894,9 @@ linguist learns Neutrino.
 | `readcsv(file[, opts])` | numeric CSV -> Float matrix; empty cells are nan; opts: {delim, skip} |
 | `writecsv(file, A[, opts])` | matrix -> CSV, full precision (round-trips); opts: {delim} |
 | `readtable(file[, opts])` | CSV with a header -> record of column vectors named from the header |
+| `pwd` | the current working directory, as a string |
+| `cd("dir") \| cd` | change the working directory (persists, unlike !cd); bare cd goes home |
+| `ls \| ls("dir") \| ls("*.nu")` | directory listing as a string array (globs supported) |
 
 ### Plotting
 

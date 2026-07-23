@@ -73,6 +73,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.16.0: pwd, cd, ls.** The working directory as ordinary builtins —
+  not Octave-style command syntax (that duality is a wart this language
+  exists to avoid) but plain functions with bare autocall, so shell muscle
+  memory works and the results are values: `ls` returns a string array
+  (`ls("packages") ~> length`), globs supported, and `cd("dir")` actually
+  persists — which `!cd` silently cannot, since the shell escape runs in a
+  child process. En route, `ls` surfaced a latent use-after-free: `map` over
+  string arrays over-released borrowed elements (arr_get returns strings
+  borrowed; numeric immediates made the release a no-op for years) — fixed,
+  with regression goldens covering `map`/`~>` over `fields()` and `ls()`.
 - **v1.15.0: where clauses — definitions after use.** `expr where a = 1,
   b = -3` names an expression's constants after the fact, the way
   mathematics writes them. Bindings are sequential (later sees earlier, not

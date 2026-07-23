@@ -1,0 +1,22 @@
+# pwd / cd / ls: the working directory as ordinary values
+length(pwd()) > 0
+=> true
+# cd persists and returns the new directory; roundtrip restores
+let p = pwd(); cd("tests"); let moved = pwd() != p; cd(".."); moved && (pwd() == p)
+=> true
+# ls returns a string array; the standard packages are visible
+numel(ls("packages")) >= 5
+=> true
+# globs work
+numel(ls("packages/*.nu")) >= 5
+=> true
+# a listing is a value: map over it (regression: string arrays through map)
+(ls("packages") ~> length |> min) > 5
+=> true
+map(fn s -> length(s), fields({a = 1, bb = 2}))
+=> [1; 2]
+# errors are clean
+ls("no_such_dir")
+=> !No such file
+cd("no_such_dir")
+=> !No such file
