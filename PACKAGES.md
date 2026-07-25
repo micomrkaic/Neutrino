@@ -1,8 +1,8 @@
 # The Neutrino Packages
 
 *The standard packages that ship with Neutrino: probability distributions,
-polynomials, finance, a solar almanac, and structured random matrices — all
-written in Neutrino itself.*
+polynomials, finance, a solar almanac, structured random matrices, and
+physical constants — all written in Neutrino itself.*
 
 A package is a file of `let` definitions; `load("packages/name.nu")` runs it
 in the current session and its bindings persist. Records of closures act as
@@ -325,6 +325,44 @@ neutrino> let H = goe(200); max(abs(eig(H).values))
 | `randcorr(n)` | `let C = randcorr(3); max(abs(diag(C) - 1)) < 1e-12` | `true` |
 | `randstoch(n)` | `let T = randstoch(4); max(abs(sum(T, 2) - 1)) < 1e-12` | `true` |
 | `goe(n)` | `let H = goe(150); max(abs(eig(H).values)) < 2.4` | `true` |
+
+## 6. phys.nu — physical constants
+
+`packages/phys.nu` is the CODATA 2018 constants as a record — exact where
+the 2019 SI redefinition makes them exact (`c`, `h`, `k`, `NA`, `qe`), the
+recommended values elsewhere. The transcript computes Earth's surface
+gravity from `G`, recovers the speed of light from Maxwell's relation
+`1/sqrt(eps0*mu0)`, and expresses thermal energy at room temperature in
+electron volts:
+
+```
+neutrino> load("packages/phys.nu")
+neutrino> format(6)
+neutrino> phys.c
+299792458
+neutrino> phys.hbar
+1.05457e-34
+neutrino> phys.G * 5.972e24 / 6.371e6 ^ 2
+9.81997
+neutrino> 1 / sqrt(phys.eps0 * phys.mu0)
+2.99792e+08
+neutrino> phys.k * 300 / phys.eV
+0.0258520
+```
+
+| Function | Worked example | Result |
+|---|---|---|
+| `phys.c` | `phys.c == 299792458` | `true` |
+| `phys.h` | `phys.h` | `6.62607e-34` |
+| `phys.hbar` | `abs(phys.hbar * 2 * pi - phys.h) < 1e-45` | `true` |
+| `phys.G` | `phys.G` | `6.67430e-11` |
+| `phys.k (thermal, in eV)` | `phys.k * 300 / phys.eV` | `0.0258520` |
+| `phys.NA` | `phys.NA == 6.02214076e23` | `true` |
+| `phys.R` | `phys.R` | `8.31446` |
+| `phys.qe` | `phys.qe` | `1.60218e-19` |
+| `phys.alpha` | `1 / phys.alpha` | `137.036` |
+| `phys.sigma` | `phys.sigma` | `5.67037e-08` |
+| `phys.ly / phys.au` | `phys.ly / phys.au` | `63241.1` |
 
 ## Writing your own
 

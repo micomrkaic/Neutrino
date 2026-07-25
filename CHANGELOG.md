@@ -73,6 +73,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v1.17.0: constants, and a consistently dark workbench.** Core
+  mathematical constants join the language: `pi`, `e`, `eulergamma`, `phi`,
+  `eps` (machine epsilon), `inf`, `nan` — ordinary shadowable values with a
+  new Constants section in the reference. A sixth package, `phys.nu`,
+  carries the CODATA 2018 physical constants as a record — exact where the
+  2019 SI redefinition makes them exact — with goldens that recover the
+  speed of light from Maxwell's relation 1/sqrt(eps0*mu0) and check
+  hbar·2pi = h. The browser workbench is now uniformly dark: the Plots and
+  Docs panes match the terminal and editor, and the SVG plot backend
+  emits a dark-friendly palette (light axes and labels, brighter series
+  colors).
 - **v1.16.0: pwd, cd, ls.** The working directory as ordinary builtins —
   not Octave-style command syntax (that duality is a wart this language
   exists to avoid) but plain functions with bare autocall, so shell muscle

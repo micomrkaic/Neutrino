@@ -80,6 +80,19 @@ SPECS = {
     ("goe(n)",       "let H = goe(150); max(abs(eig(H).values)) < 2.4"),
   ]),
 
+  "phys": ("load(\"packages/phys.nu\"); format(6)", [
+    ("phys.c",     "phys.c == 299792458"),
+    ("phys.h",     "phys.h"),
+    ("phys.hbar",  "abs(phys.hbar * 2 * pi - phys.h) < 1e-45"),
+    ("phys.G",     "phys.G"),
+    ("phys.k (thermal, in eV)", "phys.k * 300 / phys.eV"),
+    ("phys.NA",    "phys.NA == 6.02214076e23"),
+    ("phys.R",     "phys.R"),
+    ("phys.qe",    "phys.qe"),
+    ("phys.alpha", "1 / phys.alpha"),
+    ("phys.sigma", "phys.sigma"),
+    ("phys.ly / phys.au", "phys.ly / phys.au"),
+  ]),
 }
 
 def esc(t): return t.replace("|", "\\|")

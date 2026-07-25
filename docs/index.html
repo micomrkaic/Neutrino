@@ -66,7 +66,7 @@
     color: var(--dim); font: inherit; font-size: 12.5px; padding: 6px 16px;
     border-radius: 8px 8px 0 0; cursor: pointer; }
   #tabs button.on { color: var(--cyan); border-color: #2b3550; background: var(--bg); }
-  #plots { flex: 1; overflow-y: auto; padding: 14px; background: #fff; }
+  #plots { flex: 1; overflow-y: auto; padding: 14px; background: var(--bg); }
   #plots svg { max-width: 100%; height: auto; display: block; margin: 0 auto 14px;
                border-bottom: 1px solid #eee; }
   #plots .placeholder { color: #99a3b3; font-size: 13px; padding: 24px;
@@ -87,21 +87,21 @@
   #docbar { display: flex; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #1c2230; align-items: center; }
   #docbar select { background: #171d2b; color: var(--fg); border: 1px solid #232a3a;
     border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 12.5px; }
-  #docview { flex: 1; overflow-y: auto; padding: 22px 28px; background: #fdfdfc;
-    color: #24292f; font-family: Georgia, "Times New Roman", serif; font-size: 15px;
+  #docview { flex: 1; overflow-y: auto; padding: 22px 28px; background: var(--bg);
+    color: #c9d1d9; font-family: Georgia, "Times New Roman", serif; font-size: 15px;
     line-height: 1.55; }
-  #docview h1 { font-size: 24px; color: #0b2d5c; border-bottom: 2px solid #e3e6ea; padding-bottom: 6px; }
-  #docview h2 { font-size: 19px; color: #0b2d5c; margin-top: 28px; }
-  #docview h3 { font-size: 16px; color: #1a4a8a; margin-top: 22px; }
-  #docview pre { background: #f4f6f8; border: 1px solid #e3e6ea; border-radius: 6px;
+  #docview h1 { font-size: 24px; color: #79c0ff; border-bottom: 2px solid #21262d; padding-bottom: 6px; }
+  #docview h2 { font-size: 19px; color: #79c0ff; margin-top: 28px; }
+  #docview h3 { font-size: 16px; color: #58a6ff; margin-top: 22px; }
+  #docview pre { background: #11161f; border: 1px solid #21262d; border-radius: 6px;
     padding: 10px 14px; overflow-x: auto; font-family: ui-monospace, Menlo, Consolas, monospace;
     font-size: 13px; line-height: 1.45; color: #1b2733; }
   #docview code { background: #eef1f4; border-radius: 4px; padding: 1px 5px;
     font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; color: #0a4d68; }
   #docview pre code { background: none; padding: 0; }
   #docview table { border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
-  #docview th, #docview td { border: 1px solid #d7dce2; padding: 5px 10px; text-align: left; }
-  #docview th { background: #eef1f4; }
+  #docview th, #docview td { border: 1px solid #30363d; padding: 5px 10px; text-align: left; }
+  #docview th { background: #161b22; }
   #docview hr { border: none; border-top: 1px solid #e3e6ea; margin: 22px 0; }
   #docview li { margin: 3px 0; }
     body.dragging::after { content: ".nu files open in the editor \00b7 data files upload";

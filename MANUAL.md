@@ -114,7 +114,7 @@ shell escape: `!ls -la`.
 
 ```
 neutrino> ls("packages")
-["astro.nu"; "dist.nu"; "finance.nu"; "poly.nu"; "rmt.nu"]
+["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"]
 neutrino> cd("packages");
 neutrino> load("dist.nu"); norm.cdf(0, 0, 1)
 0.5
@@ -934,6 +934,18 @@ linguist learns Neutrino.
 | `max(A) \| max(a, b) \| max(A, [], dim)` | largest element; elementwise max; or max along dim |
 | `any(mask) \| any(mask, dim)` | true if any element is nonzero/true (overall or along dim) |
 | `all(mask) \| all(mask, dim)` | true if every element is nonzero/true (overall or along dim) |
+
+### Constants
+
+| Signature | Description |
+|---|---|
+| `pi` | 3.14159..., the circle constant |
+| `e` | 2.71828..., Euler's number |
+| `eulergamma` | 0.57722..., the Euler-Mascheroni constant |
+| `phi` | 1.61803..., the golden ratio |
+| `eps` | machine epsilon for Float (2^-52) |
+| `inf` | positive infinity (Float) |
+| `nan` | not-a-number (Float); nan never equals anything, itself included |
 
 ### Array utilities
 

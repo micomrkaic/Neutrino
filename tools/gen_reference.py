@@ -9,7 +9,7 @@ import re
 from collections import OrderedDict
 
 TITLES = {
-    "core": "Core & introspection", "io": "Data files", "solve": "Solvers",
+    "core": "Core & introspection", "const": "Constants", "io": "Data files", "solve": "Solvers",
     "plot": "Plotting", "make": "Array construction", "reduce": "Reductions",
     "array": "Array utilities", "math": "Mathematical functions",
     "linalg": "Linear algebra", "trig": "Trigonometric & hyperbolic",

@@ -1442,6 +1442,13 @@ static const BuiltinDoc builtin_docs[] = {
     { "prod",  "prod(A) | prod(A, dim)","product of all elements, or along dim", "reduce" , "prod([1, 2, 3, 4])                %= 24" },
     { "save",  "save(\"file.nu\")",  "write all variables and functions as reloadable source (restore with load)", "core" , "save(\"ws.nu\")                    % then later: load(\"ws.nu\")" },
     { "body",  "body(f)",           "print the source of a user-defined function", "core" , "let cube = fn x -> x^3; body(cube)   %= fn x -> x^3" },
+    { "pi",    "pi",   "3.14159..., the circle constant", "const" , "cos(pi)                           %= -1" },
+    { "e",     "e",    "2.71828..., Euler's number", "const" , "log(e)                            %= 1" },
+    { "eulergamma", "eulergamma", "0.57722..., the Euler-Mascheroni constant", "const" , "eulergamma < 0.58                 %= true" },
+    { "phi",   "phi",  "1.61803..., the golden ratio", "const" , "abs(phi ^ 2 - phi - 1) < 1e-12    %= true" },
+    { "eps",   "eps",  "machine epsilon for Float (2^-52)", "const" , "1 + eps > 1                       %= true" },
+    { "inf",   "inf",  "positive infinity (Float)", "const" , "inf > 1e308                       %= true" },
+    { "nan",   "nan",  "not-a-number (Float); nan never equals anything, itself included", "const" , "nan == nan                        %= false" },
     { "pwd",   "pwd",                "the current working directory, as a string", "io" , "length(pwd()) > 0                 %= true" },
     { "cd",    "cd(\"dir\") | cd",     "change the working directory (persists, unlike !cd); bare cd goes home", "io" , "cd(\"packages\")                    % ...then load(\"dist.nu\") works\ncd(\"..\")                          % back up" },
     { "ls",    "ls | ls(\"dir\") | ls(\"*.nu\")", "directory listing as a string array (globs supported)", "io" , "numel(ls(\"packages\")) >= 5        %= true" },
@@ -2395,7 +2402,7 @@ static double svg_nice_step(double span, int target)
 
 static const char *svg_palette(uint32_t s)
 {
-    static const char *pal[] = { "#1f77b4", "#d62728", "#2ca02c", "#9467bd",
+    static const char *pal[] = { "#58a6ff", "#ff7b72", "#3fb950", "#bc8cff",
                                  "#ff7f0e", "#8c564b", "#17becf", "#7f7f7f" };
     return pal[s % 8];
 }
@@ -2415,31 +2422,31 @@ static void svg_frame(FILE *o, double xmin, double xmax, double ymin, double yma
     fprintf(o, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"%d\" height=\"%d\" "
                "viewBox=\"0 0 %d %d\" font-family=\"Helvetica,Arial,sans-serif\">\n",
             SVG_W, SVG_H, SVG_W, SVG_H);
-    fprintf(o, "<rect width=\"%d\" height=\"%d\" fill=\"white\"/>\n", SVG_W, SVG_H);
+    fprintf(o, "<rect width=\"%d\" height=\"%d\" fill=\"#0d1117\"/>\n", SVG_W, SVG_H);
     fprintf(o, "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"none\" "
-               "stroke=\"#222\" stroke-width=\"1\"/>\n", SVG_ML, SVG_MT, PW, PH);
+               "stroke=\"#8b98a9\" stroke-width=\"1\"/>\n", SVG_ML, SVG_MT, PW, PH);
     double xs = svg_nice_step(xmax - xmin, 6), ys = svg_nice_step(ymax - ymin, 5);
     for (double v = ceil(xmin / xs) * xs; v <= xmax + 1e-12 * xs; v += xs) {
         double X = SVG_ML + (v - xmin) / (xmax - xmin) * PW;
-        fprintf(o, "<line x1=\"%.2f\" y1=\"%d\" x2=\"%.2f\" y2=\"%d\" stroke=\"#e4e4e4\"/>\n",
+        fprintf(o, "<line x1=\"%.2f\" y1=\"%d\" x2=\"%.2f\" y2=\"%d\" stroke=\"#1e2633\"/>\n",
                 X, SVG_MT, X, SVG_MT + PH);
-        fprintf(o, "<text x=\"%.2f\" y=\"%d\" text-anchor=\"middle\" font-size=\"12\">%g</text>\n",
+        fprintf(o, "<text x=\"%.2f\" y=\"%d\" text-anchor=\"middle\" font-size=\"12\" fill=\"#c6cdd8\">%g</text>\n",
                 X, SVG_MT + PH + 18, v);
     }
     for (double v = ceil(ymin / ys) * ys; v <= ymax + 1e-12 * ys; v += ys) {
         double Y = SVG_MT + PH - (v - ymin) / (ymax - ymin) * PH;
-        fprintf(o, "<line x1=\"%d\" y1=\"%.2f\" x2=\"%d\" y2=\"%.2f\" stroke=\"#e4e4e4\"/>\n",
+        fprintf(o, "<line x1=\"%d\" y1=\"%.2f\" x2=\"%d\" y2=\"%.2f\" stroke=\"#1e2633\"/>\n",
                 SVG_ML, Y, SVG_ML + PW, Y);
-        fprintf(o, "<text x=\"%d\" y=\"%.2f\" text-anchor=\"end\" dominant-baseline=\"middle\" "
+        fprintf(o, "<text x=\"%d\" y=\"%.2f\" text-anchor=\"end\" dominant-baseline=\"middle\" fill=\"#c6cdd8\" "
                    "font-size=\"12\">%g</text>\n", SVG_ML - 8, Y, v);
     }
     if (title) {
-        fprintf(o, "<text x=\"%d\" y=\"24\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"bold\">",
+        fprintf(o, "<text x=\"%d\" y=\"24\" text-anchor=\"middle\" font-size=\"15\" font-weight=\"bold\" fill=\"#e6edf3\">",
                 SVG_W / 2);
         svg_esc(o, title, tlen); fputs("</text>\n", o);
     }
     if (xl) {
-        fprintf(o, "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"13\">",
+        fprintf(o, "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"13\" fill=\"#c6cdd8\">",
                 SVG_ML + PW / 2, SVG_H - 12);
         svg_esc(o, xl, xllen); fputs("</text>\n", o);
     }
@@ -2553,7 +2560,7 @@ static void svg_hist_render(Interp *I, double lo, double w, uint32_t nb,
         double bw = w / xspan * PW;
         double bh = cnt[b] / yspan * PH;
         fprintf(o, "<rect x=\"%.2f\" y=\"%.2f\" width=\"%.2f\" height=\"%.2f\" "
-                   "fill=\"#1f77b4\" fill-opacity=\"0.75\" stroke=\"#0d3a5c\"/>\n",
+                   "fill=\"#58a6ff\" fill-opacity=\"0.65\" stroke=\"#79c0ff\"/>\n",
                 bx + 0.5, SVG_MT + PH - bh, bw - 1.0, bh);
     }
     fputs("</svg>\n", o);
@@ -5572,6 +5579,14 @@ EnvObj *globals_new(void)
     def_builtin(e, "rem",     bi_rem,     2, 2);
     def_builtin(e, "min",     bi_min,     1, 3);
     def_builtin(e, "max",     bi_max,     1, 3);
+    /* mathematical constants (values, not functions; shadowable like builtins) */
+    env_define(e, "pi",  2, val_float(3.14159265358979323846));
+    env_define(e, "e",   1, val_float(2.71828182845904523536));
+    env_define(e, "eulergamma", 10, val_float(0.57721566490153286061));
+    env_define(e, "phi", 3, val_float(1.61803398874989484820));
+    env_define(e, "eps", 3, val_float(2.2204460492503131e-16));
+    env_define(e, "inf", 3, val_float(INFINITY));
+    env_define(e, "nan", 3, val_float(NAN));
     def_builtin(e, "pwd",   bi_pwd,   0, 0);
     def_builtin(e, "cd",    bi_cd,    0, 1);
     def_builtin(e, "ls",    bi_ls,    0, 1);
