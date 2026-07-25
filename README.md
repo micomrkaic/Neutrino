@@ -44,6 +44,14 @@ neutrino> [2.1, 3.7, 1.4] |> {n = length, mu = mean}
 
 ---
 
+## Status
+
+Neutrino is **feature-complete and frozen at 2.x** — maintenance mode: bug
+fixes only, where a bug is a divergence between behavior and the manual. The
+design docket (DESIGN_NOTES.md) is clear; the engineering methodology is
+distilled in PLAYBOOK.md for the successor language. Packages remain open
+territory: they are written in Neutrino and add no weight to the core.
+
 ## Build
 
 Requires a C23-capable compiler (gcc 13+ / clang 16+) and `libm`.

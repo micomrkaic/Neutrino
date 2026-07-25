@@ -84,6 +84,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.0.1: the transfer document.** PLAYBOOK.md distills the project's
+  engineering constitution for the successor language: the load-bearing
+  principles (each cited to the incident that proved it), the architecture
+  worth lifting whole, the verification-lattice inventory, the release
+  rite, a trap almanac of every class of bug paid for once, a
+  lift-vs-re-derive manifest, and an honest list of debts to choose
+  differently next time. The README now records maintenance mode: Neutrino
+  is feature-complete and frozen at 2.x; bug fixes only, where a bug is a
+  divergence between behavior and the manual; packages remain open. The
+  methodology was the product; the language is its first application.
 - **v2.0.0: index-bound reductions — and the design docket closes.** Sigma
   notation, executable: `sum[k = 1:1000] 1 / k ^ 2` converges on `pi^2/6`
   at the prompt. `f[k = R] E` desugars to `R ~> (fn k -> E) |> f` — any
