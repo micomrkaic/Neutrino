@@ -690,6 +690,48 @@ static AstNode *parse_led(Parser *p, AstNode *left, int lbp)
         return n;
     }
     case TOK_LBRACK: {
+        /* Index-bound reduction: f[k = R] E  ==>  R ~> (fn k -> E) |> f
+         * — executable sigma notation, any callable reducer, body loose
+         * like a fn body. Disambiguated from indexing by the two-token
+         * peek '[' IDENT '=' (a binding-shaped index was never legal). */
+        {
+            Lexer savedlex = p->lex;
+            Token savedcur = p->cur;
+            advance(p);                               /* past '['       */
+            bool is_reduction = false;
+            if (p->cur.kind == TOK_IDENT) {
+                Token binder = p->cur;
+                advance(p);
+                if (p->cur.kind == TOK_ASSIGN) {
+                    advance(p);                       /* past '='       */
+                    AstNode *range = parse_expr(p, 0);
+                    expect(p, TOK_RBRACK, "']' after the reduction range");
+                    AstNode *body = parse_expr(p, 0); /* loose, like fn */
+                    AstNode *pn = node(p, AST_IDENT, binder);
+                    pn->as.lit.text = binder.start; pn->as.lit.len = binder.len;
+                    AstNode *lam = node(p, AST_LAMBDA, t);
+                    Vec params = VEC_INIT;
+                    vec_push(p, &params, pn);
+                    lam->as.lambda.params = vec_seal(p, &params);
+                    lam->as.lambda.body   = body;
+                    lam->as.lambda.src    = t.start;
+                    lam->as.lambda.srclen = (uint32_t)(p->cur.start - t.start);
+                    AstNode *mapped = node(p, AST_BINARY, t);
+                    mapped->as.binary.op  = TOK_TILDE_GT;
+                    mapped->as.binary.lhs = range;
+                    mapped->as.binary.rhs = lam;
+                    AstNode *red = node(p, AST_BINARY, t);
+                    red->as.binary.op  = TOK_PIPE_GT;
+                    red->as.binary.lhs = mapped;
+                    red->as.binary.rhs = left;
+                    is_reduction = true;
+                    (void)is_reduction;
+                    return red;
+                }
+            }
+            p->lex = savedlex;                        /* plain index: rewind */
+            p->cur = savedcur;
+        }
         AstNode *n = node(p, AST_INDEX, t);
         advance(p);
         n->as.call.callee = left;

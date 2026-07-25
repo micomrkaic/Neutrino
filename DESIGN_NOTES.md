@@ -1,5 +1,10 @@
 # Design notes — candidate syntax, deliberately not implemented
 
+> **v2.0.0: this docket is clear.** Every design herein has shipped or been
+> formally rejected. The notes remain as the record of how each decision was
+> made — and as the template for whatever the language wants next.
+
+
 Ideas that survived a first design discussion but are **waiting for a real
 transcript** — an actual session where one of them was missed — before any
 implementation. House policy: features earn their way in through demonstrated
@@ -41,7 +46,7 @@ VM applies fields in order. An afternoon plus goldens and a manual section.
 
 ---
 
-## 2. Index-bound reductions: executable sigma notation
+## 2. Index-bound reductions: executable sigma notation  *(SHIPPED in v2.0.0 — the last one; the docket is clear)*
 
 ```
 sum[k = 1:n] 1 / k^2

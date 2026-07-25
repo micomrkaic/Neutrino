@@ -1,0 +1,43 @@
+# Index-bound reductions: f[k = R] E  ==  R ~> (fn k -> E) |> f
+sum[k = 1:10] k
+=> 55
+let q = [0.1, 0.2]; prod[j = 1:2] (1 - q[j])
+=> 0.72
+max[i = 1:5] (i - 3) ^ 2
+=> 4
+# any callable reduces — including yours
+mean[k = 1:5] k
+=> 3
+let f = fn v -> sum(v) * 10; f[k = 1:3] k
+=> 60
+# nesting
+sum[i = 1:3] sum[j = 1:3] i * j
+=> 36
+# arrays index inside the body
+let a = [9, 8, 7]; sum[k = 1:3] a[k]
+=> 24
+# Basel, one thousand terms (note the parens: the body binds loose)
+abs((sum[k = 1:1000] 1 / k ^ 2) - pi ^ 2 / 6) < 0.001
+=> true
+# the body binds loose, like a fn body: + 1 is per-term
+sum[k = 1:3] k + 1
+=> 9
+(sum[k = 1:3] k) + 1
+=> 7
+# where inside the body is per-term; parenthesize to qualify the range
+(sum[k = 1:n] k ^ 2) where n = 3
+=> 14
+# the binder is scoped to the body
+sum[k = 1:3] k; k
+=> !undefined name
+# an outer binding of the same name is shadowed, not damaged
+let k = 100; (sum[k = 1:3] k) + k
+=> 106
+# plain indexing is untouched
+let a = [9, 8, 7]; a[2]
+=> 8
+# malformed binders fall back to index parsing or error cleanly
+sum[k = ] 1
+=> !parse error
+sum[2 + 2]
+=> !not indexable

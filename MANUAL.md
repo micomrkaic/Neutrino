@@ -333,6 +333,26 @@ neutrino> 9 |> sqrt              # bare callable: sqrt(9)
 3
 ```
 
+**Index-bound reductions.** Sigma notation, executable: `f[k = R] E`
+applies any callable `f` to the body `E` evaluated at each `k` in `R` —
+sugar for `R ~> (fn k -> E) |> f`, so `sum`, `prod`, `max`, `mean`, or your
+own function all reduce. The binder is scoped to the body; the body binds
+loose, exactly like a `fn` body, so `sum[k = 1:3] k + 1` sums `k + 1`
+per term — parenthesize the reduction to operate on its result, and
+likewise to qualify the range with a `where`:
+`(sum[k = 1:n] k ^ 2) where n = 3`.
+
+```
+neutrino> sum[k = 1:100] 1 / k ^ 2
+1.63498
+neutrino> pi ^ 2 / 6
+1.64493
+neutrino> let q = [0.1, 0.2, 0.15]; prod[j = 1:3] (1 - q[j])
+0.612
+neutrino> sum[i = 1:4] sum[j = 1:4] (i == j)
+4
+```
+
 **Where clauses.** Any expression can name its constants after the fact, the
 way mathematics writes them: `expr where a = 1, b = -3`. Bindings are
 sequential (later ones may use earlier ones — not vice versa), scoped to that
@@ -1084,6 +1104,7 @@ expr       := 'let' NAME '=' expr 'in' expr
             | expr '|>' expr | expr '|>>' expr | expr '~>' expr
             | expr relop expr relop expr ...   (* one direction; middles bound once *)
             | expr 'where' name '=' expr (',' name '=' expr)*
+            | expr '[' name '=' expr ']' expr   (* index-bound reduction *)
 postfix    := "'" | ".'" | '(' args ')' | '[' indices ']' | '.' NAME
 ```
 

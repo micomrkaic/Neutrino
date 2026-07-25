@@ -84,6 +84,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.0.0: index-bound reductions — and the design docket closes.** Sigma
+  notation, executable: `sum[k = 1:1000] 1 / k ^ 2` converges on `pi^2/6`
+  at the prompt. `f[k = R] E` desugars to `R ~> (fn k -> E) |> f` — any
+  callable reduces, the binder is scoped to the body, and the body binds
+  loose like a fn body (parenthesize the reduction to operate on its
+  result). Disambiguated from indexing by the peek `[ IDENT =`, a shape
+  that was never legal, so no existing program changes meaning; pure parser
+  desugar into the pipe machinery, no new AST, no VM changes; 16 goldens
+  and a 500-program fuzz under ASan. With this, every design in
+  DESIGN_NOTES has shipped or been formally rejected — the language its
+  notes described now exists, and the version number says so.
 - **v1.17.0: constants, and a consistently dark workbench.** Core
   mathematical constants join the language: `pi`, `e`, `eulergamma`, `phi`,
   `eps` (machine epsilon), `inf`, `nan` — ordinary shadowable values with a
