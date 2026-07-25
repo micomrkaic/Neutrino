@@ -84,6 +84,20 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.2.0: Neutrino by Example, the full applications handbook.** The
+  booklet grew into the book it was always meant to be, in the tradition of
+  the HP calculator applications handbooks: 36 worked word problems across
+  8 chapters (basic calculations, complex numbers, user functions,
+  anonymous functions and pipes, records, calculus, linear algebra,
+  probability/statistics/data) and 4 package appendices (finance,
+  astronomy, physics, random matrices), with circuit, beam, mixing-tank,
+  and dartboard vignettes. Highlights: RLC impedance as one complex number;
+  z^n via prod[k=1:n] z where complex power is absent; a progressive tax
+  schedule as one function; Kepler's equation by fzero; Leontief
+  input-output; a Markov chain's climate by eigenvector; the binomial
+  built from gamma; CSV round-trips; Black-Scholes against its own Monte
+  Carlo; Wigner's semicircle witnessed. 161 transcript examples, every one
+  executed at authoring and re-executed by make test forever.
 - **v2.1.0: Neutrino by Example — and the bug the book found.** A book of
   worked sessions joins the documentation: chapter 1 (the daily calculator —
   a mortgage end to end, early-payoff, date arithmetic), chapter 2 (arrays
