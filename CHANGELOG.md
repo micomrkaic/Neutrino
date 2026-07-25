@@ -84,6 +84,22 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.1.0: Neutrino by Example — and the bug the book found.** A book of
+  worked sessions joins the documentation: chapter 1 (the daily calculator —
+  a mortgage end to end, early-payoff, date arithmetic), chapter 2 (arrays
+  and pipelines — fan-out summaries, band counting, returns compounding by
+  sigma, Basel and e as one-liners), chapter 3 (Monte Carlo — pi by darts,
+  the CLT watched, Black-Scholes priced analytically and by 200,000-path
+  simulation, agreeing within two cents), with chapters 4-9 planned. Every
+  transcript is executed at capture and re-executed by make test; BOOK.md
+  is covered by doclint and ships in the tarball with BOOK.pdf. Writing it
+  exposed the project's gravest bug: the transcript capture harness and the
+  verifier shared an echoing sentinel that poisoned `ans`, so ans-dependent
+  manual transcripts were captured corrupted and certified green for three
+  releases — correlated verification. The sentinel is now inert
+  (print-based) in both; the manual's ans transcript is recaptured true;
+  LESSONS.md §8 and the PLAYBOOK trap almanac record the principle:
+  verifiers must not share machinery with what they check.
 - **v2.0.1: the transfer document.** PLAYBOOK.md distills the project's
   engineering constitution for the successor language: the load-bearing
   principles (each cited to the incident that proved it), the architecture

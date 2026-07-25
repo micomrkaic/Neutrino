@@ -133,18 +133,28 @@ and simply gets overwritten by your next anonymous result.
 neutrino> 3 + 4
 7
 neutrino> ans * 2
+14
 neutrino> sqrt(ans)
+3.74166
 neutrino> let named = ans
+3.74166
 neutrino> 9 * 9
-neutrino> let x = 1
 81
-neutrino> ans
+neutrino> let x = 1
 1
+neutrino> ans
+81
 neutrino> ans + 100;
 neutrino> ans
+81
 neutrino> s * 2 where s = 50
+100
 neutrino> ans
+100
 neutrino> who
+  ans          int        = 100
+  named        float      = 3.74166
+  x            int        = 1
 ```
 
 Note the quiet guarantees in that transcript: `ans` survived both the

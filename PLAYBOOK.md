@@ -174,6 +174,12 @@ Paid for once; free forever:
 - **A registration boundary set mid-registration** truncated half the
   stdlib — including `clear` itself. Boundaries go at the true end.
 - **`exec` in test scripts** makes everything after it dead code.
+- **Correlated capture and verification.** If the transcript recorder and
+  the transcript checker share a harness defect, they certify each other's
+  garbage — the manual shipped corrupted output for three releases under a
+  green check. Sentinels must be inert (`print`, never an echoing
+  expression); when observable state is added to the language, audit every
+  instrument that drives a session.
 
 ## VI. What to lift, what to re-derive
 

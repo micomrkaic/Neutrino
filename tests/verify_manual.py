@@ -23,9 +23,12 @@ for b in blocks:
             i += 1
     if not entries:
         continue
-    prog = ''.join(inp + '\n"@@S@@"\n' for inp, _ in entries)
+    # Sentinel via print(): outputs without echoing, so it cannot touch ans.
+    # (An echoing sentinel poisons ans-dependent transcripts — and worse,
+    # a capture harness sharing the same sentinel certifies the poison.)
+    prog = ''.join(inp + '\nprint("@@S@@")\n' for inp, _ in entries)
     r = subprocess.run(['./vmtest'], input=prog, capture_output=True, text=True, timeout=30)
-    parts = r.stdout.split('"@@S@@"')
+    parts = r.stdout.split('@@S@@')
     err_lines = r.stderr.splitlines()
     ei = 0
     for k, (inp, exp) in enumerate(entries):

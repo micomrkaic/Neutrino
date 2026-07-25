@@ -178,6 +178,7 @@
       <select id="doc-pick">
         <option value="/MANUAL.md">The Neutrino Manual</option>
         <option value="/PACKAGES.md">The Neutrino Packages</option>
+        <option value="/BOOK.md">Neutrino by Example</option>
         <option value="/CHANGELOG.md">Changelog</option>
         <option value="/LESSONS.md">Lessons</option>
         <option value="/DESIGN_NOTES.md">Design notes</option>
@@ -302,7 +303,7 @@
     term.appendChild(d);
     var mm = line.match(/^\s*manual(?:\s+(packages|changelog|lessons|design|readme))?\s*$/);
     if (mm) {
-      var map = { packages: '/PACKAGES.md', changelog: '/CHANGELOG.md',
+      var map = { packages: '/PACKAGES.md', book: '/BOOK.md', changelog: '/CHANGELOG.md',
                   lessons: '/LESSONS.md', design: '/DESIGN_NOTES.md', readme: '/MANUAL.md' };
       showPane('docs');
       loadDoc(mm[1] ? map[mm[1]] : '/MANUAL.md');

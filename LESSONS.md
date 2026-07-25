@@ -216,3 +216,22 @@ The catch ledger from this arc, each now guarded by a test:
   shadow-proofing `~>` via a globals lookup failed because `let map = 7`
   replaces the binding — immunity had to come from minting the primitive,
   not finding it.
+
+## 8. Correlated verification (v2.1.0)
+
+The gravest catch of the project, found by writing the book. The transcript
+*capture* harness and the transcript *verifier* shared the same session
+sentinel — a bare string expression, which echoes, and since v1.9.0 an echo
+sets `ans`. Every ans-dependent transcript was therefore captured corrupted
+(outputs missing or displaced onto neighboring lines) and then verified as
+correct, because the verifier replayed the identical poison. The manual
+shipped visibly wrong output for three releases with a green check beside
+it.
+
+The principle: **a verifier that shares machinery with the generator it
+checks can certify the shared defect.** Independence is the point of
+verification; correlation quietly converts it into agreement. The fix is an
+inert sentinel (`print(...)` outputs without echoing) — and the lasting
+rule: when capture and check must share a harness, the harness belongs on
+the trap list, and any new observable state (like `ans`) demands an audit
+of every instrument that touches a session.

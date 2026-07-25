@@ -142,7 +142,7 @@ WASM_FLAGS  = -sMODULARIZE=1 -sEXPORT_NAME=Neutrino -sALLOW_MEMORY_GROWTH=1 \
               -sEXPORTED_RUNTIME_METHODS=cwrap,ccall,UTF8ToString,stringToUTF8,lengthBytesUTF8,FS
 wasm: $(WASM_SRCS) $(HDRS) wasm_api.c version.h
 	$(EMCC) -std=gnu2x -O2 $(EMCC_C23) $(WASM_FLAGS) \
-	  --embed-file packages --embed-file MANUAL.md --embed-file PACKAGES.md \
+	  --embed-file packages --embed-file MANUAL.md --embed-file PACKAGES.md --embed-file BOOK.md \
 	  --embed-file CHANGELOG.md --embed-file LESSONS.md --embed-file DESIGN_NOTES.md \
 	  $(WASM_SRCS) -o docs/neutrino.js  # gnu2x: EM_ASM needs GNU extensions; docs+packages ride in the bundle
 	@echo "built docs/neutrino.js ($$(wc -c < docs/neutrino.js) bytes) — commit and push to update GitHub Pages"

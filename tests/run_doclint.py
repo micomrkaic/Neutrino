@@ -5,7 +5,7 @@ inside cells shatter rows into phantom columns), no unescaped pipes inside
 code spans in table rows, and balanced backticks per line."""
 import re, sys, glob
 
-DOCS = ["MANUAL.md", "PACKAGES.md", "CHANGELOG.md", "LESSONS.md", "DESIGN_NOTES.md", "PLAYBOOK.md", "KNOWN_LIMITATIONS.md"]
+DOCS = ["MANUAL.md", "PACKAGES.md", "CHANGELOG.md", "LESSONS.md", "DESIGN_NOTES.md", "PLAYBOOK.md", "KNOWN_LIMITATIONS.md", "BOOK.md"]
 
 def cells(row):
     protected = row.replace("\\|", "\x01")
