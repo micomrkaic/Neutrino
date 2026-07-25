@@ -1453,7 +1453,7 @@ static const BuiltinDoc builtin_docs[] = {
     { "cd",    "cd(\"dir\") | cd",     "change the working directory (persists, unlike !cd); bare cd goes home", "io" , "cd(\"packages\")                    % ...then load(\"dist.nu\") works\ncd(\"..\")                          % back up" },
     { "ls",    "ls | ls(\"dir\") | ls(\"*.nu\")", "directory listing as a string array (globs supported)", "io" , "numel(ls(\"packages\")) >= 5        %= true" },
     { "load",  "load(\"file.nu\")",  "run a file in the current session; its let-bindings persist (a record of closures makes a module)", "core" , "load(\"tests/data/mathlib.nu\"); cube(3)   %= 27\nload(\"mylib.nu\"); mylib.f(2)     % record-of-closures as a namespace" },
-    { "clear", "clear() | clear(\"a\", ...)", "remove all user variables, or the named ones (builtins are untouchable)", "core" , "let junk = 42; clear(\"junk\")   % junk is gone\nclear                             % bare: everything user-defined" },
+    { "clear", "clear() | clear(\"a\", ...)", "remove all user variables, or the named ones; clearing a shadow restores the standard-library original", "core" , "let junk = 42; clear(\"junk\")   % junk is gone\nclear                             % bare: everything user-defined" },
     { "mem",   "mem",               "print workspace size (variables) and peak process memory", "core" , "mem                               % e.g.  workspace: 3 variables, 2.1 MB" },
     { "tic",   "tic",               "start the wall-clock timer (monotonic)", "core" , "tic                               % starts the timer" },
     { "toc",   "toc",               "seconds elapsed since tic", "core" , "tic; let s = sum(1:1000000); toc() < 60   %= true" },
@@ -1749,8 +1749,7 @@ static Value bi_save(Interp *I, Value *args, uint32_t n)
     fputs("# neutrino workspace (reload with load)\n", f);
     EnvObj *g = I->globals;
     uint32_t saved = 0;
-    for (uint32_t i = 0; g && i < g->count; i++) {
-        if (g->vals[i].kind == VAL_BUILTIN) continue;
+    for (uint32_t i = g ? g->n_protected : 0; g && i < g->count; i++) {
         fprintf(f, "let %.*s = ", (int)g->namelens[i], g->names[i]);
         char nm[128];
         snprintf(nm, sizeof nm, "%.*s", (int)g->namelens[i], g->names[i]);
@@ -3338,6 +3337,7 @@ static Value who_impl(Interp *I, enum WhoKind kind, bool sorted)
         sel = malloc(g->count * sizeof *sel);
         if (!sel) runtime_error(I, "out of memory");
         for (uint32_t i = 0; i < g->count; i++) {
+        if (i < g->n_protected) continue;   /* standard library: not workspace */
             ValueKind k = g->vals[i].kind;
             if (k == VAL_BUILTIN) continue;                      /* user bindings only */
             bool take = kind == W_ALL
@@ -3366,14 +3366,9 @@ static Value bi_clear(Interp *I, Value *args, uint32_t n)
     EnvObj *g = I->globals;
     if (!g) return val_null();
     if (n == 0) {                                       /* clear everything user-defined */
-        uint32_t w = 0;
-        for (uint32_t i = 0; i < g->count; i++) {
-            if (g->vals[i].kind == VAL_BUILTIN) {       /* keep builtins, compact in place */
-                g->names[w] = g->names[i]; g->namelens[w] = g->namelens[i];
-                g->vals[w] = g->vals[i]; w++;
-            } else value_release(g->vals[i]);
-        }
-        g->count = w;
+        for (uint32_t i = g->n_protected; i < g->count; i++)
+            value_release(g->vals[i]);
+        g->count = g->n_protected;                      /* shadows removed: originals resurface */
         return val_null();
     }
     for (uint32_t a = 0; a < n; a++) {
@@ -3381,8 +3376,7 @@ static Value bi_clear(Interp *I, Value *args, uint32_t n)
             runtime_error(I, "clear: expected variable name strings, e.g. clear(\"a\")");
         StrObj *s = as_str(args[a]);
         bool found = false;
-        for (uint32_t i = 0; i < g->count; i++) {
-            if (g->vals[i].kind == VAL_BUILTIN) continue;
+        for (uint32_t i = g->n_protected; i < g->count; i++) {
             if (g->namelens[i] == s->len && memcmp(g->names[i], s->data, s->len) == 0) {
                 value_release(g->vals[i]);
                 g->names[i] = g->names[g->count - 1];   /* swap-remove */
@@ -5663,6 +5657,7 @@ EnvObj *globals_new(void)
     def_builtin(e, "plot",  bi_plot,  1, 3);
     def_builtin(e, "hist",  bi_hist,  1, 3);
     def_builtin(e, "format",bi_format,0, 1);
+    e->n_protected = e->count;   /* everything above is the standard library */
     return e;
 }
 

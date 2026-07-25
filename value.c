@@ -298,7 +298,10 @@ static void env_free(EnvObj *e)
 
 void env_define(EnvObj *e, const char *name, uint32_t len, Value v)
 {
-    for (uint32_t i = 0; i < e->count; i++) {           /* replace in current frame */
+    /* Replace an existing binding in this frame — but never a protected
+     * (standard-library) slot: shadowing those APPENDS, so `clear` can
+     * remove the shadow and the original survives underneath. */
+    for (uint32_t i = e->n_protected; i < e->count; i++) {
         if (e->namelens[i] == len && memcmp(e->names[i], name, len) == 0) {
             value_release(e->vals[i]);
             e->vals[i] = value_retain(v);
@@ -321,9 +324,9 @@ void env_define(EnvObj *e, const char *name, uint32_t len, Value v)
 bool env_lookup(EnvObj *e, const char *name, uint32_t len, Value *out)
 {
     for (; e; e = e->parent)
-        for (uint32_t i = 0; i < e->count; i++)
-            if (e->namelens[i] == len && memcmp(e->names[i], name, len) == 0) {
-                *out = value_retain(e->vals[i]);
+        for (uint32_t i = e->count; i > 0; i--)          /* newest binding wins */
+            if (e->namelens[i - 1] == len && memcmp(e->names[i - 1], name, len) == 0) {
+                *out = value_retain(e->vals[i - 1]);
                 return true;
             }
     return false;

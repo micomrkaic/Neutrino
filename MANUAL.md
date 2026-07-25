@@ -848,7 +848,7 @@ linguist learns Neutrino.
 | `save("file.nu")` | write all variables and functions as reloadable source (restore with load) |
 | `body(f)` | print the source of a user-defined function |
 | `load("file.nu")` | run a file in the current session; its let-bindings persist (a record of closures makes a module) |
-| `clear() \| clear("a", ...)` | remove all user variables, or the named ones (builtins are untouchable) |
+| `clear() \| clear("a", ...)` | remove all user variables, or the named ones; clearing a shadow restores the standard-library original |
 | `mem` | print workspace size (variables) and peak process memory |
 | `tic` | start the wall-clock timer (monotonic) |
 | `toc` | seconds elapsed since tic |

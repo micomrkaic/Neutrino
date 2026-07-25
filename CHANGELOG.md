@@ -5,6 +5,17 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v1.17.1: the standard library is not the workspace.** The new constants
+  appeared in `who` as ordinary variables — and worse, `clear()` deleted
+  them (and always had a latent sibling: clearing a shadowed builtin
+  destroyed the builtin forever). The environment now records a protection
+  boundary: startup registrations — builtins and constants alike — are the
+  standard library. `who` shows only your bindings; shadowing a stdlib name
+  appends rather than overwrites (lookup takes the newest), so
+  `clear("pi")` or a bare `clear()` removes the shadow and the original
+  resurfaces; clearing an unshadowed stdlib name is an error, not a
+  deletion; `save` writes only your workspace. Six new goldens including
+  both resurrection paths.
 - **v1.15.1: `ans` after a where clause.** A `where`-qualified expression
   echoed its value but did not set `ans` (first user-caught semantic bug —
   found at the calculator, naturally). Cause: where clauses desugar to

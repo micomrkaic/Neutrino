@@ -30,3 +30,21 @@ load("packages/phys.nu"); abs(phys.hbar * 2 * pi - phys.h) < 1e-45
 # Maxwell's relation from the constants themselves
 load("packages/phys.nu"); abs(1 / sqrt(phys.eps0 * phys.mu0) - phys.c) / phys.c < 1e-9
 => true
+# constants are standard library: invisible to who, immune to clear
+who
+=> (no variables defined)
+# shadowing appends: the shadow is a real workspace variable
+let pi = 3; who
+=>   pi           int        = 3
+# clearing a shadow resurrects the original — for constants
+let pi = 3; clear("pi"); pi + 0
+=> 3.14159
+# ...and for builtins (this fixes a latent wart: shadowed builtins used to die)
+let map = 7; clear("map"); map(fn x -> x * 3, [9])
+=> [27]
+# bare clear removes shadows and user vars; the standard library resurfaces
+let pi = 3; let a = 1; clear(); cos(pi)
+=> -1
+# clearing an unshadowed stdlib name is an error, not a deletion
+clear("pi")
+=> !no such variable
