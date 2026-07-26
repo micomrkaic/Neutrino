@@ -108,6 +108,18 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.10.0: keep — the complement of clear, and the one sanctioned
+  post-freeze builtin.** keep("a", "b") removes every user variable except
+  the named ones. The pure-package route was probed first and is honestly
+  impossible: whov/whos print but return nothing, so no .nu code can
+  enumerate names — the composition of who's iteration and clear's removal
+  exists only at the C level, where keep is twenty lines reusing both.
+  Same contract as clear throughout: multiple names, strict about unknown
+  ones, the standard library untouched (keep("pi") is an error), ans
+  dropped unless kept, and dropping a shadow resurrects the original
+  builtin. Recorded in the README as the explicit owner-sanctioned
+  exception to the freeze; 8 goldens, manual, reference, Emacs mode, and
+  the book's index all regenerated (155 names).
 - **v2.9.0: the book gets its plates.** Ten hand-drawn vignettes in the
   old-HP-handbook style, one heading each of chapters 1-10 (the dinner
   bill, the type zoo, ribbon scissors, the Argand plane over an RLC

@@ -1454,6 +1454,7 @@ static const BuiltinDoc builtin_docs[] = {
     { "ls",    "ls | ls(\"dir\") | ls(\"*.nu\")", "directory listing as a string array (globs supported)", "io" , "numel(ls(\"packages\")) >= 5        %= true" },
     { "load",  "load(\"file.nu\")",  "run a file in the current session; its let-bindings persist (a record of closures makes a module)", "core" , "load(\"tests/data/mathlib.nu\"); cube(3)   %= 27\nload(\"mylib.nu\"); mylib.f(2)     % record-of-closures as a namespace" },
     { "clear", "clear() | clear(\"a\", ...)", "remove all user variables, or the named ones; clearing a shadow restores the standard-library original", "core" , "let junk = 42; clear(\"junk\")   % junk is gone\nclear                             % bare: everything user-defined" },
+    { "keep",  "keep(\"a\", \"b\", ...)", "remove all user variables except the named ones (the complement of clear)", "core" , "let a = 1; let b = 2; keep(\"a\")     % b is gone, a survives" },
     { "mem",   "mem",               "print workspace size (variables) and peak process memory", "core" , "mem                               % e.g.  workspace: 3 variables, 2.1 MB" },
     { "tic",   "tic",               "start the wall-clock timer (monotonic)", "core" , "tic                               % starts the timer" },
     { "toc",   "toc",               "seconds elapsed since tic", "core" , "tic; let s = sum(1:1000000); toc() < 60   %= true" },
@@ -3363,6 +3364,40 @@ static Value who_impl(Interp *I, enum WhoKind kind, bool sorted)
 
 /* clear() removes all user variables; clear("a", "b") removes those named.
  * Builtin bindings are invisible to clear, exactly as they are to who. */
+/* keep("a", "b", ...): remove every user variable EXCEPT the named ones —
+ * the complement of clear, composed from the same machinery (who's
+ * iteration over the user region, clear's removal). Standard-library
+ * slots are untouched, exactly as with clear. */
+static Value bi_keep(Interp *I, Value *args, uint32_t n)
+{
+    EnvObj *g = I->globals;
+    for (uint32_t k = 0; k < n; k++) {              /* validate all names first */
+        if (args[k].kind != VAL_STRING)
+            runtime_error(I, "keep: expected variable names as strings");
+        StrObj *s = as_str(args[k]);
+        bool found = false;
+        for (uint32_t i = g->n_protected; i < g->count; i++)
+            if (g->namelens[i] == s->len && memcmp(g->names[i], s->data, s->len) == 0)
+                { found = true; break; }
+        if (!found)
+            runtime_error(I, "keep: no such variable '%.*s'", (int)s->len, s->data);
+    }
+    uint32_t w = g->n_protected;
+    for (uint32_t i = g->n_protected; i < g->count; i++) {
+        bool kept = false;
+        for (uint32_t k = 0; k < n && !kept; k++) {
+            StrObj *s = as_str(args[k]);
+            kept = (g->namelens[i] == s->len && memcmp(g->names[i], s->data, s->len) == 0);
+        }
+        if (kept) {
+            g->names[w] = g->names[i]; g->namelens[w] = g->namelens[i];
+            g->vals[w] = g->vals[i]; w++;
+        } else value_release(g->vals[i]);
+    }
+    g->count = w;
+    return val_null();
+}
+
 static Value bi_clear(Interp *I, Value *args, uint32_t n)
 {
     EnvObj *g = I->globals;
@@ -5590,6 +5625,7 @@ EnvObj *globals_new(void)
     def_builtin(e, "save",    bi_save,    1, 1);
     def_builtin(e, "body",    bi_body,    1, 1);
     def_builtin(e, "clear",   bi_clear,   0, UINT32_MAX);
+    def_builtin(e, "keep" ,   bi_keep ,   1, UINT32_MAX);
     def_builtin(e, "mem",     bi_mem,     0, 0);
     def_builtin(e, "tic",     bi_tic,     0, 0);
     def_builtin(e, "toc",     bi_toc,     0, 0);

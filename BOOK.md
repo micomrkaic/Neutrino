@@ -1455,6 +1455,7 @@ language.
 | `isfinite` | `isfinite(x)` | elementwise test for a finite value -> logical | test |
 | `isinf` | `isinf(x)` | elementwise test for +/-Inf -> logical | test |
 | `isnan` | `isnan(x)` | elementwise test for NaN -> logical | test |
+| `keep` | `keep("a", "b", ...)` | remove all user variables except the named ones (the complement of clear) | core |
 | `kron` | `kron(A, B)` | Kronecker product: (m x n) kron (p x q) -> (mp x nq) | linear algebra |
 | `lbeta` | `lbeta(a, b)` | log of the beta function | math |
 | `length` | `length(x)` | longest dimension of x (0 if empty) | core |
@@ -1540,7 +1541,7 @@ language.
 | `writecsv` | `writecsv(file, A[, opts])` | matrix -> CSV, full precision (round-trips); opts: {delim} | files |
 | `zeros` | `zeros(r, c)` | r-by-c matrix of zeros | arrays |
 
-*153 names; the same table drives `help`, tab completion, the reference, and the Emacs mode.*
+*154 names; the same table drives `help`, tab completion, the reference, and the Emacs mode.*
 <!-- INDEX:END -->
 
 ---

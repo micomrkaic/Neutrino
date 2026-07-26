@@ -72,6 +72,7 @@ apply to scripts — they are REPL features.
 | `whov` / `whof` / `whor` / `whos` | shorthands: vars, functions, records, everything-sorted |
 | `version` | the interpreter version, as a string |
 | `clear()` / `clear("a", ...)` | remove all user variables / the named ones (builtins are safe) |
+| `keep("a", ...)` | remove all user variables *except* the named ones (the complement of `clear`) |
 | `mem` | workspace size and peak process memory |
 | `format …` | number display: `format long`, `format short e`, `format(8)`, `format` to show |
 | `pretty on\|off` | aligned multi-line matrix display (default on in the REPL) |
@@ -80,6 +81,17 @@ apply to scripts — they are REPL features.
 | `more on\|off` | page long output through `$PAGER` (default off) |
 | `!cmd` | run a shell command (`!ls`, `!git status`) |
 | `dis(f)` | disassemble a function's bytecode |
+
+`keep` names what survives; everything else goes, standard library
+untouched:
+
+```
+neutrino> let rate = 0.0575; let n = 360; let scratch = 99; let tmp = [1, 2, 3];
+neutrino> keep("rate", "n"); who
+  rate         float      = 0.0575
+  n            int        = 360
+```
+
 
 Every builtin's help includes executable examples with their actual output —
 the examples are machine-verified against the interpreter, like this manual:
@@ -885,6 +897,7 @@ linguist learns Neutrino.
 | `body(f)` | print the source of a user-defined function |
 | `load("file.nu")` | run a file in the current session; its let-bindings persist (a record of closures makes a module) |
 | `clear() \| clear("a", ...)` | remove all user variables, or the named ones; clearing a shadow restores the standard-library original |
+| `keep("a", "b", ...)` | remove all user variables except the named ones (the complement of clear) |
 | `mem` | print workspace size (variables) and peak process memory |
 | `tic` | start the wall-clock timer (monotonic) |
 | `toc` | seconds elapsed since tic |

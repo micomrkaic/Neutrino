@@ -1,0 +1,21 @@
+# keep: the complement of clear
+let a = 1; let b = 2; let c = 3; keep("a", "c"); a + c
+=> 4
+let a = 1; let b = 2; keep("a"); b
+=> !undefined name
+# ans is a user variable: dropped unless kept
+let a = 1; 5 + 5; keep("a"); ans
+=> !undefined name
+# strict about names, like clear
+let a = 1; keep("zzz")
+=> !no such variable
+let a = 1; keep(7)
+=> !expected variable names
+# the standard library is not the workspace
+keep("pi")
+=> !no such variable
+# keeping a shadow keeps the shadow; dropping it resurrects the original
+let map = 7; let x = 1; keep("map"); map
+=> 7
+let map = 7; let x = 1; keep("x"); map(fn t -> t * 2, [5])
+=> [10]

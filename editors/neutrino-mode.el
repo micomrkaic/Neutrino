@@ -131,6 +131,7 @@
     "isfinite"
     "isinf"
     "isnan"
+    "keep"
     "kron"
     "lbeta"
     "length"
