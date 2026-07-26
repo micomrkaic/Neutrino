@@ -688,9 +688,15 @@ integer variates, scalar or matrix-shaped (`rand(3)`, `randn(2, 4)`).
 
 ## 13. Plotting
 
-Plotting is delegated to **gnuplot**, out of process — a soft dependency: the
-language works without it, and `plot` reports cleanly if it is missing
-(`plot: gnuplot failed (exit 127) — is gnuplot installed?`).
+Plotting has three backends. **Natively** the default is **gnuplot**, out of
+process — a soft dependency: the language works without it, and `plot`
+reports cleanly if it is missing (`plot: gnuplot failed (exit 127) — is
+gnuplot installed?`). Setting `NEUTRINO_PLOT_TERM=ascii` renders
+deterministic text plots into the terminal instead, and
+`NEUTRINO_PLOT_TERM=svg` writes standalone `plot_N.svg` files (dark
+palette). In the **browser** the default is the SVG backend, rendered into
+the workbench's Plots pane. For scatter plots, `packages/scatter.nu` wraps
+the `style = "points"` path every backend honors.
 
 `plot(y)` plots a vector against its index; `plot(x, y)` plots pairs; if `y` is
 a **matrix**, each column is a separate series. An optional trailing argument is

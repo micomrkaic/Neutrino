@@ -27,14 +27,19 @@ for b in blocks:
     # (An echoing sentinel poisons ans-dependent transcripts — and worse,
     # a capture harness sharing the same sentinel certifies the poison.)
     prog = ''.join(inp + '\nprint("@@S@@")\n' for inp, _ in entries)
-    r = subprocess.run(['./vmtest'], input=prog, capture_output=True, text=True, timeout=30)
+    # Deterministic plotting in verified transcripts: the ascii backend has a
+    # fixed canvas, so seeded plots are exact text (browser users see SVG).
+    env = dict(os.environ, NEUTRINO_PLOT_TERM='ascii')
+    r = subprocess.run(['./vmtest'], input=prog, capture_output=True, text=True, timeout=30, env=env)
     parts = r.stdout.split('@@S@@')
     err_lines = r.stderr.splitlines()
     ei = 0
     for k, (inp, exp) in enumerate(entries):
         total += 1
-        got = parts[k].strip().strip('"').strip() if k < len(parts) else '<missing>'
-        exp_clean = '\n'.join(re.sub(r'\s+#.*$', '', l).rstrip() for l in exp.split('\n')).rstrip()
+        def norm_ws(t):                    # symmetric: rstrip lines, strip block
+            return '\n'.join(l.rstrip() for l in t.split('\n')).strip()
+        got = norm_ws(parts[k]).strip('"').strip() if k < len(parts) else '<missing>'
+        exp_clean = norm_ws('\n'.join(re.sub(r'\s+#.*$', '', l) for l in exp.split('\n')))
         if exp_clean.startswith('error:'):
             got = (re.sub(r'^\s*(?:parse )?error at \d+:\d+: ', 'error: ', err_lines[ei])
                    if ei < len(err_lines) else got)

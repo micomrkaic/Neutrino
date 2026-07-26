@@ -25,6 +25,7 @@ Neutrino itself. This book is about *using* the thing.
 6. Calculus
 7. Linear algebra
 8. Probability, statistics, and data
+9. Plotting
 Appendix A. Finance (finance.nu)
 Appendix B. Astronomy (astro.nu)
 Appendix C. Physics (phys.nu)
@@ -584,6 +585,111 @@ neutrino> sum(-1.96 < z < 1.96) / 500
 
 **Discussion.** 94.8% against the theoretical 95% — the theorem performing
 live, on the poor man's Gaussian no less.
+
+---
+
+## 9. Plotting
+
+Neutrino plots through three backends, chosen by environment: in the
+**browser** the default is SVG — dark-themed, rendered into the Plots pane
+and downloadable; **natively** the default is gnuplot (a soft dependency:
+its absence is a clean error), while `NEUTRINO_PLOT_TERM=svg` writes
+`plot_N.svg` files and `NEUTRINO_PLOT_TERM=ascii` renders into the
+terminal. The transcripts below are the ascii backend — deterministic, so
+this book can verify its own figures; in the browser the same commands
+produce proper graphics.
+
+**Problem 9.1 — A function, seen.** One period-ish of the sine.
+
+```
+neutrino> plot(0:0.5:6, sin(0:0.5:6), {title = "sin(x)"})
+  sin(x)
+    0.997 |                *
+    0.881 |           *         *
+    0.765 |
+    0.649 |                          *
+    0.533 |     *
+    0.417 |
+      0.3 |
+    0.184 |                                *
+   0.0681 |
+  -0.0481 |*
+   -0.164 |
+    -0.28 |                                                               *
+   -0.397 |                                     *
+   -0.513 |
+   -0.629 |
+   -0.745 |                                          *               *
+   -0.861 |
+   -0.978 |                                               *     *
+          +----------------------------------------------------------------
+           0                                                              6
+```
+
+**Discussion.** `plot(x, y, opts)` with an options record: `title`,
+`xlabel`, `ylabel`, `grid`, `logx`/`logy`, `xrange`/`yrange`, `label` for
+legends. A trailing style string works too — `plot(x, y, "points")`.
+Matrix `y`: each column its own series.
+
+**Problem 9.2 — The shape of randn.** Four hundred draws, twelve bins.
+
+```
+neutrino> rng(9); hist(randn(1, 400), 12, {title = "400 draws of randn"})
+  400 draws of randn
+    -2.98 | 1
+    -2.42 |# 3
+    -1.86 |######## 17
+     -1.3 |################## 38
+   -0.742 |#################################### 75
+   -0.183 |############################################ 92
+    0.376 |############################### 64
+    0.935 |########################### 57
+     1.49 |################# 35
+     2.05 |####### 14
+     2.61 | 1
+     3.17 |# 3
+```
+
+**Discussion.** The bell emerges by bin count alone. `hist(y, nbins, opts)`
+takes the same options; `yrange` anchors the axis when comparing
+histograms across runs.
+
+**Problem 9.3 — A scatter with the package.** Noisy line data through
+scatter.nu (Appendix and PACKAGES.md §7): pure Neutrino over the frozen
+`style = "points"` path.
+
+```
+neutrino> load("packages/scatter.nu")
+neutrino> rng(4); let x = rand(1, 40); let noise = randn(1, 40) * 0.15;
+neutrino> scatter_titled(x, 2 * x + noise, "y = 2x + noise")
+  y = 2x + noise
+     2.16 |                                                           *
+     2.02 |
+     1.87 |                                                         *     *
+     1.73 |                                                      *      *
+     1.58 |                                              * *
+     1.43 |                                     *    *     *
+     1.29 |                                         * *
+     1.14 |                            *     **   *
+    0.995 |                           *  * *       *
+    0.849 |                     *    *    *
+    0.702 |                     *        *
+    0.556 |         *   *  *   *   *
+     0.41 |
+    0.264 |      *  *
+    0.118 |* *
+  -0.0281 |*
+   -0.174 |
+    -0.32 | *
+          +----------------------------------------------------------------
+           0.02605                                                   0.9776
+```
+
+**Discussion.** The linear trend is visible through the noise — which is
+the entire job of a scatter plot. `jitter(x, amount)` from the same
+package spreads overplotted values. Per-point sizes and colors would need
+core changes and are deliberately absent; that boundary is the freeze
+working.
 
 ---
 

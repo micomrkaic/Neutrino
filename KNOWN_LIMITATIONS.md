@@ -99,3 +99,7 @@ compiled.
   `randi` produce the same stream until you call `rng(seed)`. This is intentional
   — reproducibility by default — but means you must reseed (e.g. `rng(time)` once
   a time source exists, or any distinct integer) if you want different runs.
+- **Plotting: no per-point sizes or colors.** The plot backends draw each
+  series in one style; bubble charts and per-point color maps would need
+  backend changes and are deferred to the successor language.
+  `packages/scatter.nu` covers plain scatter via `style = "points"`.

@@ -91,6 +91,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.5.0: the book learns to draw, and the papers catch up.** Chapter 9
+  (Plotting) joins Neutrino by Example with live figures: the transcript
+  verifier now pins NEUTRINO_PLOT_TERM=ascii, and the ascii backend's
+  fixed canvas makes seeded plots exact text — so the book verifies its
+  own sine curve, randn histogram, and scatter.nu scatter, while browser
+  users get the same commands as SVG. The manual's plotting section, which
+  still claimed gnuplot was the only backend, now states the three-backend
+  truth (native gnuplot default, TERM=ascii/svg overrides, browser SVG
+  default) and points to scatter.nu; the README gains a Packages section
+  naming all seven; KNOWN_LIMITATIONS records the per-point size/color
+  boundary that separates package territory from the successor's.
 - **v2.4.0: scatter.nu — the first post-freeze package.** Scatter plots
   without touching the core, proving the maintenance-mode contract: the
   frozen plot() already honors style = "points" in every backend (SVG

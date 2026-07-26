@@ -52,6 +52,16 @@ design docket (DESIGN_NOTES.md) is clear; the engineering methodology is
 distilled in PLAYBOOK.md for the successor language. Packages remain open
 territory: they are written in Neutrino and add no weight to the core.
 
+## Packages
+
+Seven standard packages, all written in Neutrino itself (see PACKAGES.md;
+worked problems in BOOK.md): **dist** (probability distributions), **poly**
+(polynomials, fitting, exact calculus), **finance** (TVM, bonds, cash
+flows, dates), **astro** (sun, moon, and places), **rmt** (structured
+random matrices), **phys** (CODATA constants), and **scatter** (scatter
+plots over the frozen style = "points" path — the first post-freeze
+package, core untouched).
+
 ## Build
 
 Requires a C23-capable compiler (gcc 13+ / clang 16+) and `libm`.
