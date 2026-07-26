@@ -91,6 +91,18 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.8.0: calculus one-liners — the Fourier machine.** Three problems
+  join the Calculus chapter: 10.5 defines Fourier coefficients for any
+  function in two lines (the square wave's spectrum 4/pi(1, 0, 1/3, ...)
+  recovered with even terms at quadrature-zero, then resynthesized from
+  forty terms of its own spectrum by sigma, Gibbs wiggle honestly
+  reported); 10.6 builds the derivative as an operator — d(f) returns a
+  function — and composes it inside an integrand for arc length of
+  arbitrary f; 10.7 is a gallery of famous integrals: Gamma(5) = 24, the
+  Gaussian integral squared giving pi (the substitution that dodges the
+  singularity gam(0.5) honestly fails on), the lazily-converging Wallis
+  product (parenthesized past the loose-body where trap Chapter 14
+  documents), and the quarter circle. 267 verified transcripts.
 - **v2.7.0: the book finds its final shape.** Reordered for logical flow —
   types (2) and strings (3) now follow basic calculations, before complex
   numbers (4) — and two chapters join: 5 (Matrices — the construction kit

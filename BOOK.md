@@ -749,6 +749,85 @@ neutrino> integral(fn x -> polyval(p, x), 0, 2)
 p'(2) = 4 exactly, and ∫₀² p dx = −4/3 by both routes. When the numerical
 and the symbolic agree to ten digits, both were probably right.
 
+**Problem 10.5 — Fourier coefficients for any function.** Two one-line
+definitions turn `integral` into a Fourier analyzer:
+
+```
+neutrino> format(4)
+neutrino> let fa = fn f, k -> integral(fn x -> f(x) * cos(k * x), -pi, pi) / pi
+<fn/2>
+neutrino> let fb = fn f, k -> integral(fn x -> f(x) * sin(k * x), -pi, pi) / pi
+<fn/2>
+neutrino> let sq = fn x -> pick(x > 0, 1, -1);
+neutrino> 1:5 ~> (fn k -> fb(sq, k))
+[1.273, 9.797e-17, 0.4244, -5.007e-16, 0.2546]
+neutrino> 4 / pi * [1, 0, 1/3, 0, 1/5]
+[1.273, 0.000, 0.4244, 0.000, 0.2546]
+neutrino> (sum[k = 1:n] fb(sq, k) * sin(k * x)) where n = 40, x = 1
+1.012
+```
+
+**Discussion.** `fb(f, k)` is the textbook formula verbatim:
+(1/π)∫f(x)sin(kx)dx. Fed the square wave, it recovers the classic
+spectrum 4/π · (1, 0, 1/3, 0, 1/5, ...) — the even coefficients come back
+as ~1e-16, which is quadrature telling you "zero" as precisely as floats
+can say it. The last line *resynthesizes* the wave from forty terms of
+its own spectrum via a sigma, landing near 1 at x = 1 (the wiggle is
+Gibbs' phenomenon, honestly reported). Analysis and synthesis, three
+lines total, any integrable `f` you can write.
+
+**Problem 10.6 — The derivative as an operator.** `d` takes a function
+and returns its derivative — a function eating a function, producing a
+function:
+
+```
+neutrino> format(4)
+neutrino> let d = fn f -> fn x -> (f(x + h) - f(x - h)) / (2 * h) where h = 1e-6
+<fn/1>
+neutrino> d(sin)(0)
+1.000
+neutrino> d(fn x -> x ^ 3)(2)
+12.00
+neutrino> let arclen = fn f, a, b -> integral(fn x -> sqrt(1 + d(f)(x) ^ 2), a, b)
+<fn/3>
+neutrino> arclen(sin, 0, 2 * pi)
+7.640
+neutrino> arclen(fn x -> x, 0, 1)
+1.414
+```
+
+**Discussion.** The central difference lives in a `where` clause bound
+per call; `d(sin)` *is* a function, immediately applicable. The payoff is
+composition: `arclen` places `d(f)` inside an integrand, so
+∫√(1 + f′²) works for any `f` — sine's arc over one period is 7.6404,
+and the line y = x reports √2 as a sanity check. Operators on functions
+need no special machinery, because functions were never special.
+
+**Problem 10.7 — A gallery of famous integrals.** The factorial, and
+three roads to π:
+
+```
+neutrino> format(6)
+neutrino> let gam = fn s -> integral(fn t -> t ^ (s - 1) * exp(-t), 0, 60); gam(5)
+24.0000
+neutrino> (2 * integral(fn u -> exp(-u ^ 2), 0, 10)) ^ 2
+3.14159
+neutrino> (2 * prod[k = 1:n] 4 * k ^ 2 / (4 * k ^ 2 - 1)) where n = 10000
+3.14151
+neutrino> 4 * integral(fn x -> sqrt(1 - x ^ 2), 0, 1)
+3.14159
+```
+
+**Discussion.** Γ(5) = 4! = 24 from Euler's integral (truncated at 60,
+where the integrand is long dead); the Gaussian integral squared gives π
+by the polar-coordinates miracle — and note the substitution dodged the
+t^(−1/2) singularity that makes `gam(0.5)` fail honestly; the Wallis
+product grinds to 3.14151 after ten thousand factors (its convergence is
+famously lazy — note the parentheses, since a bare `where` would bind
+inside the loose reduction body, the very trap Chapter 14 documents); and
+the quarter circle delivers π to machine quadrature. Four lines, three
+centuries of analysis.
+
 ---
 
 ## 11. Linear algebra
