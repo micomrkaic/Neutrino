@@ -18,17 +18,19 @@ Neutrino itself. This book is about *using* the thing.
 ## Contents
 
 1. Basic calculations
-2. Complex numbers
-3. Writing your own functions
-4. Anonymous functions and pipes
-5. Records
-6. Calculus
-7. Linear algebra
-8. Probability, statistics, and data
-9. Plotting
-10. Values and types
-11. Strings
-12. The Neutrino idiom — combinations of the unique syntax
+2. Values and types
+3. Strings
+4. Complex numbers
+5. Matrices
+6. Reading and writing data
+7. Writing your own functions
+8. Anonymous functions and pipes
+9. Records
+10. Calculus
+11. Linear algebra
+12. Probability, statistics, and data
+13. Plotting
+14. The Neutrino idiom — combinations of the unique syntax
 Appendix A. Finance (finance.nu)
 Appendix B. Astronomy (astro.nu)
 Appendix C. Physics (phys.nu)
@@ -108,12 +110,166 @@ every element. Write the function once; the array case is free.
 
 ---
 
-## 2. Complex numbers
+## 2. Values and types
+
+Everything is a value: numbers, strings, arrays, records, functions —
+anything can sit in a variable, ride a pipe, or live in a record field.
+`who` is the type oracle: it shows every binding with its kind.
+
+**Problem 2.1 — The type zoo.** One of everything, then ask the workspace.
+
+```
+neutrino> let n = 42; let x = 2.5; let ok = true; let s = "helium";
+neutrino> let v = [1.5, 2.5]; let M = [1, 2; 3, 4]; let z = 3 + 4i;
+neutrino> let r = {name = "boron", Z = 5}; let f = fn t -> t ^ 2;
+neutrino> who
+  n            int        = 42
+  x            float      = 2.5
+  ok           bool       = true
+  s            string     (6 chars)
+  v            array      1x2 Float
+  M            array      2x2 Int
+  z            complex    = 3+4i
+  r            record     (2 fields)
+  f            function   (1 param)
+```
+
+**Discussion.** Nine kinds cover the language: `int`, `float`, `bool`,
+`string`, `complex`, arrays (with element type and shape shown), records,
+functions, and `null` (the silent value — suppressed statements and
+`print` return it). There is no separate matrix type: a matrix is an
+array with two dimensions in play.
+
+**Problem 2.2 — How numbers behave.**
+
+```
+neutrino> 7 / 2
+3.5
+neutrino> 2 ^ 10
+1024
+neutrino> 2 ^ 0.5
+1.41421
+neutrino> floor(7 / 2)
+3
+neutrino> [1, 5, 2, 8] > 3
+[false, true, false, true]
+neutrino> sum([1, 5, 2, 8] > 3)
+2
+neutrino> pick(true, 10, 20)
+10
+```
+
+**Discussion.** Division is true division (`7 / 2` is 3.5 — use `floor`
+for the integer part); integer powers of integers stay exact; a
+fractional power promotes to float. Comparisons yield booleans, and
+boolean *masks* count under reductions — `sum(x > 3)` is the idiom — but
+Bool refuses ordinary arithmetic (`1 + true` is a type error, on
+purpose); `pick(mask, a, b)` is the explicit bridge.
+
+**Problem 2.3 — Floating-point honesty.**
+
+```
+neutrino> 0.1 + 0.2 == 0.3
+false
+neutrino> abs(0.1 + 0.2 - 0.3) < eps * 4
+true
+neutrino> 1 / 0
+inf
+neutrino> -1 / 0
+-inf
+neutrino> 0 / 0
+nan
+neutrino> nan == nan
+false
+```
+
+**Discussion.** `0.1 + 0.2` is not `0.3` in any IEEE language; the honest
+comparison is against `eps`. Division by zero yields `inf`/`-inf`, `0/0`
+is `nan`, and `nan` equals nothing — not even itself. The constants are
+built in so these facts are one keystroke from checkable.
+
+---
+
+## 3. Strings
+
+A dozen builtins cover practical text: `upper lower trim`, the predicates
+`contains startswith endswith`, `strrep` for replacement, `strsplit` and
+`strjoin`, conversions `str` and `num`, and `fmt` for templates. `+`
+concatenates; `length` counts.
+
+**Problem 3.1 — Cleanup and assembly.**
+
+```
+neutrino> let name = "  Neutrino  ";
+neutrino> trim(name)
+"Neutrino"
+neutrino> upper(ans)
+"NEUTRINO"
+neutrino> length(trim(name))
+8
+neutrino> "version " + str(2.5) + ", " + str(153) + " builtins"
+"version 2.5, 153 builtins"
+```
+
+**Discussion.** `str` renders any value with the same text the REPL
+shows, so building messages is concatenation.
+
+**Problem 3.2 — Formatted reporting.** `fmt` uses `{}` placeholders,
+with `{:.2f}`-style precision control:
+
+```
+neutrino> fmt("pmt = {:.2f} at i = {:.4f}", -1984.153, 0.0575 / 12)
+"pmt = -1984.15 at i = 0.0048"
+neutrino> fmt("{} of {} lots pass", 18, 20)
+"18 of 20 lots pass"
+```
+
+**Discussion.** The template mini-language covers the report-writing
+cases; for full layout control, build pieces with `str` and concatenate.
+
+**Problem 3.3 — Parsing a data line.** Split a CSV record, take a field
+numeric, reassemble with a different separator.
+
+```
+neutrino> let csvline = "2026-07-25,close,187.44";
+neutrino> let parts = strsplit(csvline, ",")
+["2026-07-25", "close", "187.44"]
+neutrino> num(parts[3])
+187.44
+neutrino> strjoin(parts, " | ")
+"2026-07-25 | close | 187.44"
+neutrino> strrep(csvline, ",", ";")
+"2026-07-25;close;187.44"
+```
+
+**Discussion.** `strsplit` returns a string array (fields index from 1);
+`num` is the string-to-number bridge. For whole files, `readcsv` and
+`readtable` do this at scale — this is the hand tool.
+
+**Problem 3.4 — Predicates over listings.** Strings are values, so
+string functions ride the pipes like everything else:
+
+```
+neutrino> ls("packages")
+["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"]
+neutrino> ans ~> (fn f -> endswith(f, ".nu")) |> all
+true
+neutrino> ls("packages") ~> (fn f -> contains(f, "s")) |> sum
+4
+```
+
+**Discussion.** A directory listing maps under `~>` through `endswith`,
+and `all`/`sum` reduce the answers. Text processing and array processing
+are the same processing.
+
+---
+
+## 4. Complex numbers
 
 Complex values are ordinary numbers here: `3 + 4i` is a literal, and
 `abs`, `angle`, `conj`, `real`, `imag` do what mathematics says.
 
-**Problem 2.1 — Impedance of a series RLC circuit.**
+**Problem 4.1 — Impedance of a series RLC circuit.**
 
 ```
       R = 100 ohm    L = 0.25 H     C = 20 uF
@@ -141,7 +297,7 @@ neutrino> 230 / abs(Z)
 Its magnitude divides the voltage (about 1.5 A), its angle is the phase
 (about −49°: capacitive, current leads). No phasor diagrams were harmed.
 
-**Problem 2.2 — Fifth roots of unity.** Let z = e^(2πi/5). Verify z⁵ = 1,
+**Problem 4.2 — Fifth roots of unity.** Let z = e^(2πi/5). Verify z⁵ = 1,
 that the five roots sum to zero, and find the side length of the inscribed
 pentagon.
 
@@ -164,7 +320,7 @@ index-bound reduction supplies it with a certain wit: `prod[k = 1:n] z`
 *is* zⁿ. The geometric sum vanishes to rounding, and |z − 1| ≈ 1.176 is
 the unit pentagon's side.
 
-**Problem 2.3 — Rotation as multiplication.** Rotate the point (3, 2) by
+**Problem 4.3 — Rotation as multiplication.** Rotate the point (3, 2) by
 60° about the origin.
 
 ```
@@ -182,12 +338,201 @@ as `abs` confirms.
 
 ---
 
-## 3. Writing your own functions
+## 5. Matrices
+
+Arrays with two dimensions in play — the native material of the language.
+This chapter is the mechanics: building, indexing, computing, and
+printing; the *applications* (solving, decomposing, fitting) get their
+own chapter later.
+
+**Problem 5.1 — The construction kit.** Literals row by row; the factory
+functions; reshaping a range; tiling; and building big matrices from
+blocks:
+
+```
+neutrino> let A = [1, 2; 3, 4]
+[1, 2; 3, 4]
+neutrino> zeros(2, 3)
+[0, 0, 0; 0, 0, 0]
+neutrino> eye(3)
+[1, 0, 0; 0, 1, 0; 0, 0, 1]
+neutrino> diag([5, 6, 7])
+[5, 0, 0; 0, 6, 0; 0, 0, 7]
+neutrino> reshape(1:6, 2, 3)
+[1, 2, 3; 4, 5, 6]
+neutrino> repmat([1, 0], 2, 2)
+[1, 0, 1, 0; 1, 0, 1, 0]
+neutrino> let B = eye(2); [A; B]
+[1, 2; 3, 4; 1, 0; 0, 1]
+neutrino> [A, A]
+[1, 2, 1, 2; 3, 4, 3, 4]
+```
+
+**Discussion.** `[1, 2; 3, 4]` — commas separate columns, semicolons end
+rows. `zeros`, `ones`, `eye`, `diag`, `reshape`, `repmat` cover the
+factories, and block notation `[A; B]` / `[A, A]` glues matrices like
+elements: the eye stacked under A, A beside itself.
+
+**Problem 5.2 — Getting at the elements.** Scalar picks, row and column
+slices, assignment in place, and logical selection:
+
+```
+neutrino> let A = reshape(1:12, 3, 4)
+[1, 2, 3, 4; 5, 6, 7, 8; 9, 10, 11, 12]
+neutrino> A[2, 3]
+7
+neutrino> A[2, :]
+[5, 6, 7, 8]
+neutrino> A[:, 4]
+[4; 8; 12]
+neutrino> A[1, 1] = 100; A
+[100, 2, 3, 4; 5, 6, 7, 8; 9, 10, 11, 12]
+neutrino> let v = [10, 20, 30, 40]; v[v > 15]
+[20, 30, 40]
+```
+
+**Discussion.** Indices are 1-based; `:` takes a whole row or column;
+`A[i, j] = v` updates in place. The last line is the workhorse idiom of
+data cleaning: a boolean mask *is* an index — `v[v > 15]` keeps what
+passes.
+
+**Problem 5.3 — Two multiplications.** The single most important
+distinction in any matrix language:
+
+```
+neutrino> let A = [1, 2; 3, 4]; let B = [0, 1; 1, 0];
+neutrino> A + B
+[1, 3; 4, 4]
+neutrino> A * B
+[2, 1; 4, 3]
+neutrino> A .* B
+[0, 2; 3, 0]
+neutrino> A ^ 2
+[7, 10; 15, 22]
+neutrino> A .^ 2
+[1, 4; 9, 16]
+neutrino> A * 10 + 1
+[11, 21; 31, 41]
+neutrino> A.'
+[1, 3; 2, 4]
+```
+
+**Discussion.** `*` and `^` are *matrix* operations (true product, matrix
+power); the dotted forms `.*` and `.^` work element by element. Mixing
+them up is the classic error of the genre — this book's own Monte Carlo
+chapter was drafted with `x ^ 2` on a vector and corrected by the
+interpreter. Scalars broadcast (`A * 10 + 1`), and `.'` transposes.
+
+**Problem 5.4 — What you see.** Display precision, shape, and the
+workspace view:
+
+```
+neutrino> let A = [1/3, 2/3; 1, 4/3];
+neutrino> A
+[0.333333, 0.666667; 1, 1.33333]
+neutrino> format(10); A
+[0.3333333333, 0.6666666667; 1.000000000, 1.333333333]
+neutrino> format(6);
+neutrino> size(A)
+[2, 2]
+neutrino> numel(A)
+4
+neutrino> let big = rand(50, 50); size(big)
+[50, 50]
+neutrino> who
+  A            array      2x2 Float
+  ans          array      1x2 Int
+  big          array      50x50 Float
+```
+
+**Discussion.** `format(n)` sets displayed significant digits without
+touching the stored values — the 10-digit view and the 6-digit view are
+the same matrix. `size` and `numel` report shape; a 50×50 matrix echoes
+compactly, and `who` shows every array's shape and element type at a
+glance.
+
+---
+
+## 6. Reading and writing data
+
+Numbers rarely start life at the prompt. `writecsv`/`readcsv` move plain
+numeric matrices; `readtable` reads a headered CSV into a record of named
+columns; `save`/`load` persist the workspace itself.
+
+**Problem 6.1 — Round-trip through a file.** Simulate two related process
+yields, write them to CSV, read them back, and correlate:
+
+```
+neutrino> format(4)
+neutrino> rng(5)
+neutrino> let yield_data = [10 + randn(1, 6) * 0.5; 12 + randn(1, 6) * 0.5].';
+neutrino> writecsv("/tmp/yield.csv", yield_data)
+neutrino> let back = readcsv("/tmp/yield.csv");
+neutrino> size(back)
+[6, 2]
+neutrino> mean(back, 1)
+[9.707, 11.94]
+neutrino> corr(back[:, 1], back[:, 2])
+-0.4076
+```
+
+**Discussion.** `writecsv` writes full precision, so the round trip is
+exact. Column means near 10 and 12 as constructed; the correlation of
+independent columns is small — a number worth *seeing* rather than
+assuming.
+
+**Problem 6.2 — A table with names.** The repository ships a week of
+weather in `tests/data/weather.csv` (columns `day,temp,rain`). `readtable`
+turns the header into field names:
+
+```
+neutrino> let w = readtable("tests/data/weather.csv")
+{day = [1; 2; 3; 4; 5; 6; 7], temp = [21.5; 19.8; 23.1; 22.4; 24; 20.6; 22.9], rain = [0; 4.2; 0; 1.1; 0; 7.8; 0.4]}
+neutrino> mean(w.temp)
+22.0429
+neutrino> sum(w.rain > 0)
+4
+neutrino> w.temp[find(w.rain == 0)]
+[21.5; 23.1; 24]
+neutrino> w.temp |> {hi = max, lo = min, mu = mean}
+{hi = 24, lo = 19.8, mu = 22.0429}
+```
+
+**Discussion.** A table is a record of column vectors, so every array
+tool applies by name: the mean temperature, the count of rainy days, the
+temperatures of the dry ones (`find` on one column indexing another), and
+a fan-out summary of a column. This is the daily grammar of small data
+analysis.
+
+**Problem 6.3 — Saving your case.** Rates and goals you'll want next
+week, preserved and restored:
+
+```
+neutrino> let rate = 0.0575; let horizon = 30; let goal = 250000;
+neutrino> save("/tmp/mycase.nu")
+neutrino> clear(); who
+(no variables defined)
+neutrino> load("/tmp/mycase.nu"); who
+  rate         float      = 0.0575
+  horizon      int        = 30
+  goal         int        = 250000
+neutrino> goal / horizon
+8333.33
+```
+
+**Discussion.** `save` writes the workspace as an ordinary Neutrino
+script — human-readable, editable, version-controllable — and `load`
+replays it. `clear()` proves the round trip: three variables gone, three
+variables back. The standard library never travels; only your names do.
+
+---
+
+## 7. Writing your own functions
 
 `fn` makes a function; `let` names it; recursion works; `body` shows the
 source of what you defined.
 
-**Problem 3.1 — A progressive tax.** 10% to 11,000; 12% to 44,725; 22%
+**Problem 7.1 — A progressive tax.** 10% to 11,000; 12% to 44,725; 22%
 above. Compute the tax at three incomes.
 
 ```
@@ -206,7 +551,7 @@ neutrino> tax(60000)
 functions are expressions here, so the whole schedule is a single
 definition you can read back later with `body(tax)`.
 
-**Problem 3.2 — Euclid, verbatim.** The greatest common divisor, as written
+**Problem 7.2 — Euclid, verbatim.** The greatest common divisor, as written
 around 300 BC.
 
 ```
@@ -221,7 +566,7 @@ neutrino> gcd(35, 64)
 **Discussion.** Recursion needs no ceremony: the function calls its own
 name. `gcd(35, 64) = 1` — coprime, as any piano tuner suspects.
 
-**Problem 3.3 — Body mass index, with provenance.**
+**Problem 7.3 — Body mass index, with provenance.**
 
 ```
 neutrino> format(3)
@@ -238,14 +583,14 @@ from now, you can ask your session what exactly this `bmi` computes.
 
 ---
 
-## 4. Anonymous functions and pipes
+## 8. Anonymous functions and pipes
 
 The pipe family is the language's syntax for *thought order*: data first,
 then what happens to it. `|>` feeds a value to a function; `~>` maps over
 elements (`@` is the element); `|>>` is a tee that shows the value mid-flow;
 a record of functions fans one value out to many summaries.
 
-**Problem 4.1 — The pipe family on one array.**
+**Problem 8.1 — The pipe family on one array.**
 
 ```
 neutrino> format(4)
@@ -265,7 +610,7 @@ neutrino> x |> {n = length, mu = mean, rng = fn v -> max(v) - min(v)}
 compose yourself, returning a record. Any function — named, builtin, or
 anonymous — can ride in the fan-out.
 
-**Problem 4.2 — Weekly payroll with overtime.** 22/hour to 40 hours, time
+**Problem 8.2 — Weekly payroll with overtime.** 22/hour to 40 hours, time
 and a half beyond. Five employees' hours; total the week's wages.
 
 ```
@@ -282,13 +627,13 @@ per employee; `|> sum` closes the week: 4,592.75. One line per idea.
 
 ---
 
-## 5. Records
+## 9. Records
 
 Records collect named values: `{sku = "M8x40", price = 0.42}`. Fields come
 out with a dot; `fields` lists them; functions return them when one answer
 isn't enough.
 
-**Problem 5.1 — A parts bin.**
+**Problem 9.1 — A parts bin.**
 
 ```
 neutrino> format(2)
@@ -306,7 +651,7 @@ neutrino> let bolt = {sku = bolt.sku, price = bolt.price * 1.06, stock = bolt.st
 immutable values — a "price increase" builds the updated record explicitly,
 which is exactly the audit trail you want in anything touching money.
 
-**Problem 5.2 — A measurement report.** Four hundred sensor readings, one
+**Problem 9.2 — A measurement report.** Four hundred sensor readings, one
 structured summary.
 
 ```
@@ -324,12 +669,12 @@ the fan-out doesn't care who wrote its entries.
 
 ---
 
-## 6. Calculus
+## 10. Calculus
 
 `integral` (adaptive Simpson), `fzero` (Brent root-finding), `fminbnd`
 (bounded minimization), and poly.nu's exact polynomial calculus.
 
-**Problem 6.1 — Work against gravity.** Lifting 4000 N to 400 km, gravity
+**Problem 10.1 — Work against gravity.** Lifting 4000 N to 400 km, gravity
 fading with altitude as 1/(1 + h/R)²; h in km, R = 6371 km.
 
 ```
@@ -342,7 +687,7 @@ neutrino> integral(fn x -> 4000 / (1 + x / 6371) ^ 2, 0, 400)
 integrand is written exactly as the physics reads; `integral`'s default
 tolerance (1e-10) is far below engineering need.
 
-**Problem 6.2 — Where does the beam bend most?**
+**Problem 10.2 — Where does the beam bend most?**
 
 ```
   |=================o     load P at the tip
@@ -366,7 +711,7 @@ neutrino> fminbnd(fn x -> -defl(x), 0, 4)
 `fminbnd` of the *negated* function confirms the extremum sits at the
 boundary, which is the standard trick for maximization.
 
-**Problem 6.3 — Kepler's equation.** M = E − e·sin E cannot be inverted in
+**Problem 10.3 — Kepler's equation.** M = E − e·sin E cannot be inverted in
 closed form. For M = 1.5, e = 0.4, find the eccentric anomaly.
 
 ```
@@ -382,7 +727,7 @@ neutrino> E - ecc * sin(E)
 bracketing: E ≈ 1.882 rad, and substituting back recovers M exactly. Every
 orbit propagator on Earth does this daily.
 
-**Problem 6.4 — Exact vs numerical.** For p(x) = x³ − 2x², compare the
+**Problem 10.4 — Exact vs numerical.** For p(x) = x³ − 2x², compare the
 exact integral (via `polyint`) with adaptive quadrature.
 
 ```
@@ -406,12 +751,12 @@ and the symbolic agree to ten digits, both were probably right.
 
 ---
 
-## 7. Linear algebra
+## 11. Linear algebra
 
 Matrices are the native tongue: `\` solves systems, `eig`, `lu`, `qr`,
 `svd`, `chol` decompose, and poly.nu's `polyfit` does least squares.
 
-**Problem 7.1 — The mixing problem.**
+**Problem 11.1 — The mixing problem.**
 
 ```
    [10% acid]      [25% acid]
@@ -435,7 +780,7 @@ neutrino> A * ans
 40 L of the weak, 160 L of the strong. `A \ b` is the solver; multiplying
 back is the check, and checking is free.
 
-**Problem 7.2 — Leontief input-output.** Sector 1 uses 0.2 of its own
+**Problem 11.2 — Leontief input-output.** Sector 1 uses 0.2 of its own
 output and 0.3 of sector 2's per unit; sector 2 uses 0.4 and 0.1. Final
 demand is (100, 150). What gross output meets it?
 
@@ -452,7 +797,7 @@ neutrino> (eye(2) - A) * x
 that way. Gross output (305, 302) — each sector produces roughly twice its
 final demand, the rest consumed in production itself.
 
-**Problem 7.3 — Calibrating a sensor.** Six readings against a reference;
+**Problem 11.3 — Calibrating a sensor.** Six readings against a reference;
 fit a line, predict the next point.
 
 ```
@@ -468,7 +813,7 @@ neutrino> polyval(c, 6)
 2.00, and the t = 6 prediction is 14.2. For higher-degree fits change one
 digit.
 
-**Problem 7.4 — Where does the weather settle?** A Markov chain: sunny
+**Problem 11.4 — Where does the weather settle?** A Markov chain: sunny
 stays sunny 0.9, rain turns sunny 0.3. The long-run climate is the
 eigenvector of Pᵀ at eigenvalue 1.
 
@@ -489,12 +834,12 @@ linear algebra is in the core.
 
 ---
 
-## 8. Probability, statistics, and data
+## 12. Probability, statistics, and data
 
 dist.nu supplies the distributions; `writecsv`/`readcsv` move data in and
 out; seeded `rng` makes every simulation a repeatable experiment.
 
-**Problem 8.1 — Acceptance sampling.** A lot ships if a 20-piece sample
+**Problem 12.1 — Acceptance sampling.** A lot ships if a 20-piece sample
 shows at most 2 defectives. At a true 5% defect rate, how often does a lot
 fail? The binomial probability, from first principles:
 
@@ -514,7 +859,7 @@ neutrino> p_defect(0)
 line. About 7.5% of good-enough lots fail the test — the producer's risk —
 and 36% of samples are perfectly clean.
 
-**Problem 8.2 — A confidence interval by hand.** Eight fill-weight
+**Problem 12.2 — A confidence interval by hand.** Eight fill-weight
 measurements; a 95% interval for the mean.
 
 ```
@@ -529,29 +874,7 @@ neutrino> mean(x) + [-1.96, 1.96] * se
 producing both ends at once: the machine fills between 11.88 and 12.22 g
 with 95% confidence.
 
-**Problem 8.3 — Round-trip through a file.** Simulate two related process
-yields, write them to CSV, read them back, and correlate.
-
-```
-neutrino> format(4)
-neutrino> rng(5)
-neutrino> let yield_data = [10 + randn(1, 6) * 0.5; 12 + randn(1, 6) * 0.5].';
-neutrino> writecsv("/tmp/yield.csv", yield_data)
-neutrino> let back = readcsv("/tmp/yield.csv");
-neutrino> size(back)
-[6, 2]
-neutrino> mean(back, 1)
-[9.707, 11.94]
-neutrino> corr(back[:, 1], back[:, 2])
--0.4076
-```
-
-**Discussion.** `writecsv` writes full precision, so the round trip is
-exact. Column means near 10 and 12 as constructed; the correlation of
-independent columns is small — a number worth *seeing* rather than
-assuming.
-
-**Problem 8.4 — Pi by Monte Carlo.**
+**Problem 12.3 — Pi by Monte Carlo.**
 
 ```
     +-----------+
@@ -575,7 +898,7 @@ neutrino> pi
 **Discussion.** 3.1387 from 10⁵ darts — the error of this estimator shrinks
 as 1/sqrt(n): expect the second decimal, budget for the fourth.
 
-**Problem 8.5 — The Central Limit Theorem, watched.** Means of twelve
+**Problem 12.4 — The Central Limit Theorem, watched.** Means of twelve
 uniforms, standardized; how many of 500 land within ±1.96?
 
 ```
@@ -591,7 +914,7 @@ live, on the poor man's Gaussian no less.
 
 ---
 
-## 9. Plotting
+## 13. Plotting
 
 Neutrino plots through three backends, chosen by environment: in the
 **browser** the default is SVG — dark-themed, rendered into the Plots pane
@@ -602,7 +925,7 @@ terminal. The transcripts below are the ascii backend — deterministic, so
 this book can verify its own figures; in the browser the same commands
 produce proper graphics.
 
-**Problem 9.1 — A function, seen.** One period-ish of the sine.
+**Problem 13.1 — A function, seen.** One period-ish of the sine.
 
 ```
 neutrino> plot(0:0.5:6, sin(0:0.5:6), {title = "sin(x)"})
@@ -634,7 +957,7 @@ neutrino> plot(0:0.5:6, sin(0:0.5:6), {title = "sin(x)"})
 legends. A trailing style string works too — `plot(x, y, "points")`.
 Matrix `y`: each column its own series.
 
-**Problem 9.2 — The shape of randn.** Four hundred draws, twelve bins.
+**Problem 13.2 — The shape of randn.** Four hundred draws, twelve bins.
 
 ```
 neutrino> rng(9); hist(randn(1, 400), 12, {title = "400 draws of randn"})
@@ -657,7 +980,7 @@ neutrino> rng(9); hist(randn(1, 400), 12, {title = "400 draws of randn"})
 takes the same options; `yrange` anchors the axis when comparing
 histograms across runs.
 
-**Problem 9.3 — A scatter with the package.** Noisy line data through
+**Problem 13.3 — A scatter with the package.** Noisy line data through
 scatter.nu (Appendix and PACKAGES.md §7): pure Neutrino over the frozen
 `style = "points"` path.
 
@@ -696,168 +1019,14 @@ working.
 
 ---
 
-## 10. Values and types
-
-Everything is a value: numbers, strings, arrays, records, functions —
-anything can sit in a variable, ride a pipe, or live in a record field.
-`who` is the type oracle: it shows every binding with its kind.
-
-**Problem 10.1 — The type zoo.** One of everything, then ask the workspace.
-
-```
-neutrino> let n = 42; let x = 2.5; let ok = true; let s = "helium";
-neutrino> let v = [1.5, 2.5]; let M = [1, 2; 3, 4]; let z = 3 + 4i;
-neutrino> let r = {name = "boron", Z = 5}; let f = fn t -> t ^ 2;
-neutrino> who
-  n            int        = 42
-  x            float      = 2.5
-  ok           bool       = true
-  s            string     (6 chars)
-  v            array      1x2 Float
-  M            array      2x2 Int
-  z            complex    = 3+4i
-  r            record     (2 fields)
-  f            function   (1 param)
-```
-
-**Discussion.** Nine kinds cover the language: `int`, `float`, `bool`,
-`string`, `complex`, arrays (with element type and shape shown), records,
-functions, and `null` (the silent value — suppressed statements and
-`print` return it). There is no separate matrix type: a matrix is an
-array with two dimensions in play.
-
-**Problem 10.2 — How numbers behave.**
-
-```
-neutrino> 7 / 2
-3.5
-neutrino> 2 ^ 10
-1024
-neutrino> 2 ^ 0.5
-1.41421
-neutrino> floor(7 / 2)
-3
-neutrino> [1, 5, 2, 8] > 3
-[false, true, false, true]
-neutrino> sum([1, 5, 2, 8] > 3)
-2
-neutrino> pick(true, 10, 20)
-10
-```
-
-**Discussion.** Division is true division (`7 / 2` is 3.5 — use `floor`
-for the integer part); integer powers of integers stay exact; a
-fractional power promotes to float. Comparisons yield booleans, and
-boolean *masks* count under reductions — `sum(x > 3)` is the idiom — but
-Bool refuses ordinary arithmetic (`1 + true` is a type error, on
-purpose); `pick(mask, a, b)` is the explicit bridge.
-
-**Problem 10.3 — Floating-point honesty.**
-
-```
-neutrino> 0.1 + 0.2 == 0.3
-false
-neutrino> abs(0.1 + 0.2 - 0.3) < eps * 4
-true
-neutrino> 1 / 0
-inf
-neutrino> -1 / 0
--inf
-neutrino> 0 / 0
-nan
-neutrino> nan == nan
-false
-```
-
-**Discussion.** `0.1 + 0.2` is not `0.3` in any IEEE language; the honest
-comparison is against `eps`. Division by zero yields `inf`/`-inf`, `0/0`
-is `nan`, and `nan` equals nothing — not even itself. The constants are
-built in so these facts are one keystroke from checkable.
-
----
-
-## 11. Strings
-
-A dozen builtins cover practical text: `upper lower trim`, the predicates
-`contains startswith endswith`, `strrep` for replacement, `strsplit` and
-`strjoin`, conversions `str` and `num`, and `fmt` for templates. `+`
-concatenates; `length` counts.
-
-**Problem 11.1 — Cleanup and assembly.**
-
-```
-neutrino> let name = "  Neutrino  ";
-neutrino> trim(name)
-"Neutrino"
-neutrino> upper(ans)
-"NEUTRINO"
-neutrino> length(trim(name))
-8
-neutrino> "version " + str(2.5) + ", " + str(153) + " builtins"
-"version 2.5, 153 builtins"
-```
-
-**Discussion.** `str` renders any value with the same text the REPL
-shows, so building messages is concatenation.
-
-**Problem 11.2 — Formatted reporting.** `fmt` uses `{}` placeholders,
-with `{:.2f}`-style precision control:
-
-```
-neutrino> fmt("pmt = {:.2f} at i = {:.4f}", -1984.153, 0.0575 / 12)
-"pmt = -1984.15 at i = 0.0048"
-neutrino> fmt("{} of {} lots pass", 18, 20)
-"18 of 20 lots pass"
-```
-
-**Discussion.** The template mini-language covers the report-writing
-cases; for full layout control, build pieces with `str` and concatenate.
-
-**Problem 11.3 — Parsing a data line.** Split a CSV record, take a field
-numeric, reassemble with a different separator.
-
-```
-neutrino> let csvline = "2026-07-25,close,187.44";
-neutrino> let parts = strsplit(csvline, ",")
-["2026-07-25", "close", "187.44"]
-neutrino> num(parts[3])
-187.44
-neutrino> strjoin(parts, " | ")
-"2026-07-25 | close | 187.44"
-neutrino> strrep(csvline, ",", ";")
-"2026-07-25;close;187.44"
-```
-
-**Discussion.** `strsplit` returns a string array (fields index from 1);
-`num` is the string-to-number bridge. For whole files, `readcsv` and
-`readtable` do this at scale — this is the hand tool.
-
-**Problem 11.4 — Predicates over listings.** Strings are values, so
-string functions ride the pipes like everything else:
-
-```
-neutrino> ls("packages")
-["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"]
-neutrino> ans ~> (fn f -> endswith(f, ".nu")) |> all
-true
-neutrino> ls("packages") ~> (fn f -> contains(f, "s")) |> sum
-4
-```
-
-**Discussion.** A directory listing maps under `~>` through `endswith`,
-and `all`/`sum` reduce the answers. Text processing and array processing
-are the same processing.
-
----
-
-## 12. The Neutrino idiom
+## 14. The Neutrino idiom
 
 The unique syntax — lambdas, `where`, index-bound reductions, and the
 pipe family — was designed to *combine*. This chapter is about the
 combinations: the sentences, not the words. It is the most important
 chapter in the book.
 
-**Problem 12.1 — Functions as ordinary values.** Pass them, return them,
+**Problem 14.1 — Functions as ordinary values.** Pass them, return them,
 map them:
 
 ```
@@ -876,7 +1045,7 @@ neutrino> [1, 2, 3] ~> make_pow(2)
 rides `~>` immediately. No special syntax marks higher-order use, because
 functions were never special.
 
-**Problem 12.2 — `where`: the blackboard's word order.** State the
+**Problem 14.2 — `where`: the blackboard's word order.** State the
 formula first, the constants after — and let later bindings use earlier
 ones:
 
@@ -895,7 +1064,7 @@ discriminant `d` is defined *from* `a`, `b`, `c` in the same clause
 once. The third line qualifies a whole pipeline at its end — `where`
 binds loosest of all, by design.
 
-**Problem 12.3 — Sigma notation, working.**
+**Problem 14.3 — Sigma notation, working.**
 
 ```
 neutrino> (sum[k = 1:n] 1 / k ^ 2) where n = 100000
@@ -913,7 +1082,7 @@ neutrino> let dot_ = fn u, v -> sum[k = 1:length(u)] u[k] * v[k]; dot_([1, 2, 3]
 explicit); and a dot product *defined* in sigma notation — the definition
 reads as the mathematics because it is the mathematics.
 
-**Problem 12.4 — The grand combinations.** Everything at once:
+**Problem 14.4 — The grand combinations.** Everything at once:
 
 ```
 neutrino> rng(1); A |> {a = det, b = inv} where A = eig(rand(2)).vectors

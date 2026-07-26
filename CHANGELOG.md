@@ -91,6 +91,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.7.0: the book finds its final shape.** Reordered for logical flow —
+  types (2) and strings (3) now follow basic calculations, before complex
+  numbers (4) — and two chapters join: 5 (Matrices — the construction kit
+  with block notation, indexing and in-place assignment, mask selection,
+  the matrix-vs-elementwise distinction that bit this book's own Monte
+  Carlo draft, and display/shape mechanics) and 6 (Reading and writing
+  data — the CSV round trip relocated from statistics, readtable on a
+  shipped sample table in tests/data/weather.csv as a record of named
+  columns, and save/clear/load proving workspace persistence). Fourteen
+  chapters, five appendices, 50 numbered problems plus nine in the
+  appendices, 271 verified transcripts.
 - **v2.6.0: the book's reference half — types, strings, and the idiom
   chapter.** Three chapters join Neutrino by Example: 10 (Values and
   types — the type zoo via who, numeric promotion, Bool's deliberate
