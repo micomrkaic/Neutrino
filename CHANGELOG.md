@@ -5,6 +5,13 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.9.2: HP-handbook blue.** The plates' near-black background read as
+  severity on paper; re-inked on deep navy blue (#1a3a6a) — the classic HP
+  applications-handbook cover color, which is also now the background of
+  brand/banner.svg and of the newly rendered brand/logo.png (detector and
+  wordmark drawn at high resolution in the terminal palette). The book's
+  frontispiece is the logo image rather than an ASCII code block, sized
+  for the page.
 - **v2.9.1: the plates, printed right.** The vignette sources carry an
   alpha channel with a soft halo; v2.9.0's grayscale conversion dropped
   the alpha instead of compositing, shipping murky near-unreadable plates

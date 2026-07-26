@@ -3,14 +3,7 @@
 *A book of worked problems — practical computing with a small array
 language.*
 
-```
- ╭─╴   ╶─╮     _   _            _        _
-   ▪ ▪ ▪      | \ | | ___ _   _| |_ _ __(_)_ __   ___
- · ▪ ◉ ▪ ·    |  \| |/ _ \ | | | __| '__| | '_ \ / _ \
-   ▪ ▪ ▪      | |\  |  __/ |_| | |_| |  | | | | | (_) |
- ╰─╴   ╶─╯    |_| \_|\___|\__,_|\__|_|  |_|_| |_|\___/
-              a small functional array language
-```
+![](logo.png)
 
 
 This book is written in the tradition of the calculator applications
