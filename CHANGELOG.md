@@ -5,6 +5,27 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.10.2: the Mac reads the book more strictly.** Four book transcripts
+  failed on macOS, exposing two defects. (1) The fifth-roots-of-unity
+  problem displayed the raw ~1e-16 residuals of mathematical zeros —
+  asserting rounding noise, whose last digits differ between platforms'
+  complex math libraries; both identities are now asserted below tolerance
+  instead, and the discussion says why. (2) A genuine bug Linux's
+  determinism had certified: the Markov problem took eigenvector column 1
+  blindly — the 0.6 eigenvalue's vector, which sums to ~0 — so the
+  'stationary distribution' printed ±1e15 garbage while the prose claimed
+  75/25; deterministic garbage verifies, and only macOS's different
+  garbage broke the spell. The transcript now selects the eigenvalue-1
+  column with find (never assume eigenvalue ordering), prints [0.75; 0.25],
+  and the discussion records the lesson with the first printing named.
+- **v2.10.1: macOS build fix (first report from a real clone).** eval.c
+  failed on Apple Clang: 'no member named ru_maxrss in struct rusage'.
+  Cause: Darwin clamps header visibility to the requested standard, so our
+  _XOPEN_SOURCE 700 *hid* the BSD extension fields of struct rusage that
+  the mem builtin reads — glibc doesn't guard struct members, which is why
+  Linux never noticed. Fix: define _DARWIN_C_SOURCE alongside, restoring
+  full visibility on macOS and inert elsewhere. Reported by the author
+  from his own Mac — the maintenance contract operating as designed.
 - **v2.9.2: HP-handbook blue.** The plates' near-black background read as
   severity on paper; re-inked on deep navy blue (#1a3a6a) — the classic HP
   applications-handbook cover color, which is also now the background of

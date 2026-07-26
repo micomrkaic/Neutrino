@@ -318,18 +318,20 @@ neutrino> let z = exp(2i * pi / 5)
 0.3090+0.9511i
 neutrino> let zpow = fn n -> prod[k = 1:n] z
 <fn/1>
-neutrino> zpow(5)
-1.000-2.220e-16i
-neutrino> sum[k = 0:4] zpow(k)
--5.551e-17-1.110e-16i
+neutrino> abs(zpow(5) - 1) < 1e-12
+true
+neutrino> abs(sum[k = 0:4] zpow(k)) < 1e-12
+true
 neutrino> abs(z - 1)
 1.176
 ```
 
 **Discussion.** Complex `^` is deliberately absent from the core, and the
 index-bound reduction supplies it with a certain wit: `prod[k = 1:n] z`
-*is* zⁿ. The geometric sum vanishes to rounding, and |z − 1| ≈ 1.176 is
-the unit pentagon's side.
+*is* zⁿ. Both classical identities — z⁵ = 1 and the vanishing sum of the
+five roots — are asserted below tolerance rather than displayed, because
+their residuals are pure rounding noise whose last digits differ between
+platforms' math libraries; |z − 1| ≈ 1.176 is the unit pentagon's side.
 
 **Problem 4.3 — Rotation as multiplication.** Rotate the point (3, 2) by
 60° about the origin.
@@ -924,15 +926,21 @@ neutrino> format(4)
 neutrino> let P = [0.9, 0.1; 0.3, 0.7];
 neutrino> let r = eig(P.')
 {values = [0.6000; 1.000], vectors = [-0.7071, 0.9487; 0.7071, 0.3162]}
-neutrino> let v = r.vectors[:, 1]; let s = v / sum(v)
-[-3.185e+15; 3.185e+15]
+neutrino> let idx = find(abs(r.values - 1) < 1e-9)[1]
+2
+neutrino> let v = r.vectors[:, idx]; let s = v / sum(v)
+[0.7500; 0.2500]
 neutrino> P.' * s
-[-1.911e+15; 1.911e+15]
+[0.7500; 0.2500]
 ```
 
-**Discussion.** Normalized: 75% sunny, 25% rain — and Pᵀs = s confirms
-stationarity. Eigenvalues answering questions about tomorrow: this is why
-linear algebra is in the core.
+**Discussion.** `find` selects the column whose eigenvalue is 1 — never
+assume eigenvalue ordering, which is implementation- and platform-defined
+(this book's first printing did, normalized the wrong vector, and shipped
+±10¹⁵ garbage that a macOS build exposed). Properly selected and
+normalized: 75% sunny, 25% rain, and P′s = s confirms stationarity.
+Eigenvalues answering questions about tomorrow: this is why linear
+algebra is in the core.
 
 ---
 

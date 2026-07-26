@@ -1,5 +1,8 @@
 /* eval.c — Neutrino tree-walking evaluator. */
 #define _XOPEN_SOURCE 700         /* open_memstream + jn/yn Bessel (superset of POSIX.1-2008) */
+#define _DARWIN_C_SOURCE 1        /* macOS: _XOPEN_SOURCE alone HIDES extension fields like
+                                     rusage.ru_maxrss (Darwin clamps visibility to the requested
+                                     standard); this re-widens it. Inert on other platforms. */
 #include <errno.h>
 #include <float.h>
 #include <sys/resource.h>
