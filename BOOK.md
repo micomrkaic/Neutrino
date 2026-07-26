@@ -26,6 +26,9 @@ Neutrino itself. This book is about *using* the thing.
 7. Linear algebra
 8. Probability, statistics, and data
 9. Plotting
+10. Values and types
+11. Strings
+12. The Neutrino idiom — combinations of the unique syntax
 Appendix A. Finance (finance.nu)
 Appendix B. Astronomy (astro.nu)
 Appendix C. Physics (phys.nu)
@@ -690,6 +693,252 @@ the entire job of a scatter plot. `jitter(x, amount)` from the same
 package spreads overplotted values. Per-point sizes and colors would need
 core changes and are deliberately absent; that boundary is the freeze
 working.
+
+---
+
+## 10. Values and types
+
+Everything is a value: numbers, strings, arrays, records, functions —
+anything can sit in a variable, ride a pipe, or live in a record field.
+`who` is the type oracle: it shows every binding with its kind.
+
+**Problem 10.1 — The type zoo.** One of everything, then ask the workspace.
+
+```
+neutrino> let n = 42; let x = 2.5; let ok = true; let s = "helium";
+neutrino> let v = [1.5, 2.5]; let M = [1, 2; 3, 4]; let z = 3 + 4i;
+neutrino> let r = {name = "boron", Z = 5}; let f = fn t -> t ^ 2;
+neutrino> who
+  n            int        = 42
+  x            float      = 2.5
+  ok           bool       = true
+  s            string     (6 chars)
+  v            array      1x2 Float
+  M            array      2x2 Int
+  z            complex    = 3+4i
+  r            record     (2 fields)
+  f            function   (1 param)
+```
+
+**Discussion.** Nine kinds cover the language: `int`, `float`, `bool`,
+`string`, `complex`, arrays (with element type and shape shown), records,
+functions, and `null` (the silent value — suppressed statements and
+`print` return it). There is no separate matrix type: a matrix is an
+array with two dimensions in play.
+
+**Problem 10.2 — How numbers behave.**
+
+```
+neutrino> 7 / 2
+3.5
+neutrino> 2 ^ 10
+1024
+neutrino> 2 ^ 0.5
+1.41421
+neutrino> floor(7 / 2)
+3
+neutrino> [1, 5, 2, 8] > 3
+[false, true, false, true]
+neutrino> sum([1, 5, 2, 8] > 3)
+2
+neutrino> pick(true, 10, 20)
+10
+```
+
+**Discussion.** Division is true division (`7 / 2` is 3.5 — use `floor`
+for the integer part); integer powers of integers stay exact; a
+fractional power promotes to float. Comparisons yield booleans, and
+boolean *masks* count under reductions — `sum(x > 3)` is the idiom — but
+Bool refuses ordinary arithmetic (`1 + true` is a type error, on
+purpose); `pick(mask, a, b)` is the explicit bridge.
+
+**Problem 10.3 — Floating-point honesty.**
+
+```
+neutrino> 0.1 + 0.2 == 0.3
+false
+neutrino> abs(0.1 + 0.2 - 0.3) < eps * 4
+true
+neutrino> 1 / 0
+inf
+neutrino> -1 / 0
+-inf
+neutrino> 0 / 0
+nan
+neutrino> nan == nan
+false
+```
+
+**Discussion.** `0.1 + 0.2` is not `0.3` in any IEEE language; the honest
+comparison is against `eps`. Division by zero yields `inf`/`-inf`, `0/0`
+is `nan`, and `nan` equals nothing — not even itself. The constants are
+built in so these facts are one keystroke from checkable.
+
+---
+
+## 11. Strings
+
+A dozen builtins cover practical text: `upper lower trim`, the predicates
+`contains startswith endswith`, `strrep` for replacement, `strsplit` and
+`strjoin`, conversions `str` and `num`, and `fmt` for templates. `+`
+concatenates; `length` counts.
+
+**Problem 11.1 — Cleanup and assembly.**
+
+```
+neutrino> let name = "  Neutrino  ";
+neutrino> trim(name)
+"Neutrino"
+neutrino> upper(ans)
+"NEUTRINO"
+neutrino> length(trim(name))
+8
+neutrino> "version " + str(2.5) + ", " + str(153) + " builtins"
+"version 2.5, 153 builtins"
+```
+
+**Discussion.** `str` renders any value with the same text the REPL
+shows, so building messages is concatenation.
+
+**Problem 11.2 — Formatted reporting.** `fmt` uses `{}` placeholders,
+with `{:.2f}`-style precision control:
+
+```
+neutrino> fmt("pmt = {:.2f} at i = {:.4f}", -1984.153, 0.0575 / 12)
+"pmt = -1984.15 at i = 0.0048"
+neutrino> fmt("{} of {} lots pass", 18, 20)
+"18 of 20 lots pass"
+```
+
+**Discussion.** The template mini-language covers the report-writing
+cases; for full layout control, build pieces with `str` and concatenate.
+
+**Problem 11.3 — Parsing a data line.** Split a CSV record, take a field
+numeric, reassemble with a different separator.
+
+```
+neutrino> let csvline = "2026-07-25,close,187.44";
+neutrino> let parts = strsplit(csvline, ",")
+["2026-07-25", "close", "187.44"]
+neutrino> num(parts[3])
+187.44
+neutrino> strjoin(parts, " | ")
+"2026-07-25 | close | 187.44"
+neutrino> strrep(csvline, ",", ";")
+"2026-07-25;close;187.44"
+```
+
+**Discussion.** `strsplit` returns a string array (fields index from 1);
+`num` is the string-to-number bridge. For whole files, `readcsv` and
+`readtable` do this at scale — this is the hand tool.
+
+**Problem 11.4 — Predicates over listings.** Strings are values, so
+string functions ride the pipes like everything else:
+
+```
+neutrino> ls("packages")
+["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"]
+neutrino> ans ~> (fn f -> endswith(f, ".nu")) |> all
+true
+neutrino> ls("packages") ~> (fn f -> contains(f, "s")) |> sum
+4
+```
+
+**Discussion.** A directory listing maps under `~>` through `endswith`,
+and `all`/`sum` reduce the answers. Text processing and array processing
+are the same processing.
+
+---
+
+## 12. The Neutrino idiom
+
+The unique syntax — lambdas, `where`, index-bound reductions, and the
+pipe family — was designed to *combine*. This chapter is about the
+combinations: the sentences, not the words. It is the most important
+chapter in the book.
+
+**Problem 12.1 — Functions as ordinary values.** Pass them, return them,
+map them:
+
+```
+neutrino> let twice = fn f, x -> f(f(x))
+<fn/2>
+neutrino> twice(fn t -> t + 3, 10)
+16
+neutrino> let make_pow = fn p -> fn x -> x ^ p; let cube = make_pow(3); cube(4)
+64
+neutrino> [1, 2, 3] ~> make_pow(2)
+[1, 4, 9]
+```
+
+**Discussion.** `twice(f, x)` takes a function like any argument;
+`make_pow` *returns* one, closing over `p` — and the returned function
+rides `~>` immediately. No special syntax marks higher-order use, because
+functions were never special.
+
+**Problem 12.2 — `where`: the blackboard's word order.** State the
+formula first, the constants after — and let later bindings use earlier
+ones:
+
+```
+neutrino> sqrt(b ^ 2 - 4 * a * c) where a = 1, b = -3, c = 2
+1
+neutrino> (-b + [-d, d]) / (2 * a) where a = 1, b = -3, c = 2, d = sqrt(b ^ 2 - 4 * a * c)
+[1, 2]
+neutrino> 1:n ~> (@ ^ 2) |> sum where n = 5
+55
+```
+
+**Discussion.** The quadratic solved the way a textbook writes it: the
+discriminant `d` is defined *from* `a`, `b`, `c` in the same clause
+(bindings are sequential), and the array `[-d, d]` delivers both roots at
+once. The third line qualifies a whole pipeline at its end — `where`
+binds loosest of all, by design.
+
+**Problem 12.3 — Sigma notation, working.**
+
+```
+neutrino> (sum[k = 1:n] 1 / k ^ 2) where n = 100000
+1.64492
+neutrino> pi ^ 2 / 6
+1.64493
+neutrino> sum[i = 1:4] sum[j = 1:4] pick(i == j, i, 0)
+10
+neutrino> let dot_ = fn u, v -> sum[k = 1:length(u)] u[k] * v[k]; dot_([1, 2, 3], [4, 5, 6])
+32
+```
+
+**Discussion.** A hundred thousand terms of Basel; a double sum with
+`pick` selecting the diagonal (booleans don't multiply — the bridge is
+explicit); and a dot product *defined* in sigma notation — the definition
+reads as the mathematics because it is the mathematics.
+
+**Problem 12.4 — The grand combinations.** Everything at once:
+
+```
+neutrino> rng(1); A |> {a = det, b = inv} where A = eig(rand(2)).vectors
+{a = -0.998887, b = [-0.621925, 0.784499; 0.812955, 0.584237]}
+neutrino> ans.a * det(ans.b)
+1
+neutrino> rng(2); sum(-1.96 < z < 1.96) / n where n = 10000, z = randn(1, n)
+0.9484
+neutrino> 1:m ~> (fn k -> prod[j = 1:k] (1 - (j - 1) / 365)) |> (fn p -> find(p < 0.5)[1]) where m = 60
+23
+```
+
+**Discussion.** Line one is the thesis of the language in one statement:
+`rand(2)` makes a matrix, `eig(...).vectors` takes a field of its
+eigendecomposition, `where` names it `A`, and the fan-out applies `det`
+and `inv` to the same value — five features composing without a seam,
+and `det(A) * det(inv(A)) = 1` confirms the algebra on the next line.
+Line three is the statistician's one-liner: `n` and `z` bound in one
+`where` clause, the chain `-1.96 < z < 1.96` producing the mask,
+94.84% inside. And the last line is the **birthday problem** solved in a
+single pipeline — map each party size `k` to its all-distinct probability
+`prod[j = 1:k] (1 - (j - 1)/365)`, then find the first size where it
+drops below one half: **23**, the famous answer, computed in the notation
+you'd use to explain it. When the sentence structure of a language
+matches the thought structure of its user, this is what it looks like.
 
 ---
 

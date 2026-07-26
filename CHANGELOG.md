@@ -91,6 +91,19 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.6.0: the book's reference half — types, strings, and the idiom
+  chapter.** Three chapters join Neutrino by Example: 10 (Values and
+  types — the type zoo via who, numeric promotion, Bool's deliberate
+  refusal of arithmetic with pick as the bridge, floating-point honesty
+  with eps/inf/nan), 11 (Strings — the twelve string builtins worked:
+  cleanup, fmt reporting, CSV-line parsing with strsplit/num, predicates
+  riding the pipes over ls), and 12 (The Neutrino idiom — the important
+  one: lambdas as values, where as the blackboard's word order with the
+  quadratic solved textbook-style, sigma including a dot product defined
+  in notation, and the grand combinations: A |> {a = det, b = inv} where
+  A = eig(rand(2)).vectors with det(A)*det(inv(A)) = 1 confirmed, the
+  statistician's one-liner, and the birthday problem answered 23 in a
+  single pipeline). 213 verified transcripts; 52 worked problems total.
 - **v2.5.0: the book learns to draw, and the papers catch up.** Chapter 9
   (Plotting) joins Neutrino by Example with live figures: the transcript
   verifier now pins NEUTRINO_PLOT_TERM=ascii, and the ascii backend's
