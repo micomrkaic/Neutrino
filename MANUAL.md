@@ -713,7 +713,10 @@ the `style = "points"` path every backend honors.
 `plot(y)` plots a vector against its index; `plot(x, y)` plots pairs; if `y` is
 a **matrix**, each column is a separate series. An optional trailing argument is
 either a gnuplot style string (`"points"`, `"lines lw 2"`, `"impulses"`) or an
-options record:
+options record. The svg and ascii backends honor the marker family by
+substring — any style mentioning `point`, `circle`, or `dot` draws markers,
+everything else draws lines — so `"circle"` means the same thing on every
+backend:
 
 ```
 neutrino> let x = linspace(0, 10, 200)

@@ -5,6 +5,15 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.10.3: "circle" means circles everywhere.** plot(x, y,
+  {style = "circle"}) drew markers in the native REPL (gnuplot accepts its
+  whole marker family plus abbreviations) but a line in the browser: the
+  svg/ascii backends' point detection was an exact prefix match on
+  "points". The detection is now a substring match over the marker family
+  (point, circle, dot), verified across both backends and pinned by a new
+  svg regression; the manual documents the rule. Reported from the
+  author's Mac-vs-browser comparison — the two-frontend habit is itself a
+  test harness.
 - **v2.10.2: the Mac reads the book more strictly.** Four book transcripts
   failed on macOS, exposing two defects. (1) The fifth-roots-of-unity
   problem displayed the raw ~1e-16 residuals of mathematical zeros —
