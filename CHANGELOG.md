@@ -91,6 +91,18 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.9.0: the book gets its plates.** Ten hand-drawn vignettes in the
+  old-HP-handbook style, one heading each of chapters 1-10 (the dinner
+  bill, the type zoo, ribbon scissors, the Argand plane over an RLC
+  circuit, block matrices, punch cards, the f(x) machine, the pipe works,
+  the parts-bin card file, and tangent/area/root/deflection for calculus),
+  drawn by the author and installed at docs/vignettes/ (optimized to
+  ~2.8 MB total). The ASCII detector banner opens the book as its
+  frontispiece. The browser's markdown renderer learned image syntax, and
+  the Docs tab shows the plates CSS-inverted — white ink on the dark
+  workbench, chalkboard style — while the PDF keeps the originals via
+  pandoc's resource path. The verified transcripts are untouched: art and
+  proof, side by side.
 - **v2.8.0: calculus one-liners — the Fourier machine.** Three problems
   join the Calculus chapter: 10.5 defines Fourier coefficients for any
   function in two lines (the square wave's spectrum 4/pi(1, 0, 1/3, ...)

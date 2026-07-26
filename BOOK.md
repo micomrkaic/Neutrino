@@ -3,6 +3,16 @@
 *A book of worked problems — practical computing with a small array
 language.*
 
+```
+ ╭─╴   ╶─╮     _   _            _        _
+   ▪ ▪ ▪      | \ | | ___ _   _| |_ _ __(_)_ __   ___
+ · ▪ ◉ ▪ ·    |  \| |/ _ \ | | | __| '__| | '_ \ / _ \
+   ▪ ▪ ▪      | |\  |  __/ |_| | |_| |  | | | | | (_) |
+ ╰─╴   ╶─╯    |_| \_|\___|\__,_|\__|_|  |_|_| |_|\___/
+              a small functional array language
+```
+
+
 This book is written in the tradition of the calculator applications
 handbooks of the HP heyday: each section states a problem from ordinary
 technical life, solves it at the prompt, and discusses what happened. Every
@@ -40,6 +50,8 @@ Appendix E. Index of builtins
 ---
 
 ## 1. Basic calculations
+
+![](vignettes/vin1.png)
 
 The prompt is a calculator first. Three habits from the start: `ans` carries
 the last value you saw into the next expression; `format(n)` sets displayed
@@ -111,6 +123,8 @@ every element. Write the function once; the array case is free.
 ---
 
 ## 2. Values and types
+
+![](vignettes/vin2.png)
 
 Everything is a value: numbers, strings, arrays, records, functions —
 anything can sit in a variable, ride a pipe, or live in a record field.
@@ -192,6 +206,8 @@ built in so these facts are one keystroke from checkable.
 
 ## 3. Strings
 
+![](vignettes/vin3.png)
+
 A dozen builtins cover practical text: `upper lower trim`, the predicates
 `contains startswith endswith`, `strrep` for replacement, `strsplit` and
 `strjoin`, conversions `str` and `num`, and `fmt` for templates. `+`
@@ -266,6 +282,8 @@ are the same processing.
 
 ## 4. Complex numbers
 
+![](vignettes/vin4.png)
+
 Complex values are ordinary numbers here: `3 + 4i` is a literal, and
 `abs`, `angle`, `conj`, `real`, `imag` do what mathematics says.
 
@@ -339,6 +357,8 @@ as `abs` confirms.
 ---
 
 ## 5. Matrices
+
+![](vignettes/vin5.png)
 
 Arrays with two dimensions in play — the native material of the language.
 This chapter is the mechanics: building, indexing, computing, and
@@ -455,6 +475,8 @@ glance.
 
 ## 6. Reading and writing data
 
+![](vignettes/vin6.png)
+
 Numbers rarely start life at the prompt. `writecsv`/`readcsv` move plain
 numeric matrices; `readtable` reads a headered CSV into a record of named
 columns; `save`/`load` persist the workspace itself.
@@ -529,6 +551,8 @@ variables back. The standard library never travels; only your names do.
 
 ## 7. Writing your own functions
 
+![](vignettes/vin7.png)
+
 `fn` makes a function; `let` names it; recursion works; `body` shows the
 source of what you defined.
 
@@ -585,6 +609,8 @@ from now, you can ask your session what exactly this `bmi` computes.
 
 ## 8. Anonymous functions and pipes
 
+![](vignettes/vin8.png)
+
 The pipe family is the language's syntax for *thought order*: data first,
 then what happens to it. `|>` feeds a value to a function; `~>` maps over
 elements (`@` is the element); `|>>` is a tee that shows the value mid-flow;
@@ -629,6 +655,8 @@ per employee; `|> sum` closes the week: 4,592.75. One line per idea.
 
 ## 9. Records
 
+![](vignettes/vin9.png)
+
 Records collect named values: `{sku = "M8x40", price = 0.42}`. Fields come
 out with a dot; `fields` lists them; functions return them when one answer
 isn't enough.
@@ -670,6 +698,8 @@ the fan-out doesn't care who wrote its entries.
 ---
 
 ## 10. Calculus
+
+![](vignettes/vin10.png)
 
 `integral` (adaptive Simpson), `fzero` (Brent root-finding), `fminbnd`
 (bounded minimization), and poly.nu's exact polynomial calculus.
