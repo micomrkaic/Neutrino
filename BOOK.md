@@ -29,6 +29,7 @@ Appendix A. Finance (finance.nu)
 Appendix B. Astronomy (astro.nu)
 Appendix C. Physics (phys.nu)
 Appendix D. Random matrices (rmt.nu)
+Appendix E. Index of builtins
 
 ---
 
@@ -747,6 +748,174 @@ neutrino> sum(abs(lam) < 1) / 400
 them inside [−1, 1] — the semicircle law predicts 1/2 + sqrt(3)/(2π) +
 arcsin(1/2)/π ≈ 0.609 plus finite-size effects. Universality, on your own
 hardware.
+
+---
+
+## Appendix E. Index of builtins
+
+Every builtin and constant, alphabetically — machine-generated from the
+interpreter's own documentation table, so this index cannot drift from the
+language.
+
+<!-- INDEX:BEGIN -->
+| Name | Signature | Description | Area |
+|---|---|---|---|
+| `abs` | `abs(x)` | absolute value, or complex magnitude | math |
+| `acos` | `acos(x)` | arccosine (complex outside [-1, 1]) | trig |
+| `acosh` | `acosh(x)` | inverse hyperbolic cosine (complex below 1) | trig |
+| `all` | `all(mask) \| all(mask, dim)` | true if every element is nonzero/true (overall or along dim) | reductions |
+| `angle` | `angle(z)` | argument atan2(im, re) (elementwise) | complex |
+| `any` | `any(mask) \| any(mask, dim)` | true if any element is nonzero/true (overall or along dim) | reductions |
+| `arg` | `arg(z)` | argument atan2(im, re) (alias for angle) | complex |
+| `asin` | `asin(x)` | arcsine (complex outside [-1, 1]) | trig |
+| `asinh` | `asinh(x)` | inverse hyperbolic sine (complex-aware) | trig |
+| `assert` | `assert(cond) \| assert(cond, tmpl, ...)` | error unless cond is true | core |
+| `atan` | `atan(x)` | arctangent (complex-aware) | trig |
+| `atan2` | `atan2(y, x)` | two-argument arctangent (elementwise) | trig |
+| `atanh` | `atanh(x)` | inverse hyperbolic tangent (complex outside (-1, 1)) | trig |
+| `besselj` | `besselj(n, x)` | Bessel function of the first kind, integer order n | math |
+| `bessely` | `bessely(n, x)` | Bessel function of the second kind, integer order n (x > 0) | math |
+| `beta` | `beta(a, b)` | beta function (a, b > 0, elementwise) | math |
+| `betainc` | `betainc(x, a, b)` | regularized incomplete beta I_x(a, b) (Student-t / F CDFs) | math |
+| `body` | `body(f)` | print the source of a user-defined function | core |
+| `cbrt` | `cbrt(x)` | real cube root | math |
+| `cd` | `cd("dir") \| cd` | change the working directory (persists, unlike !cd); bare cd goes home | files |
+| `ceil` | `ceil(x)` | round toward +infinity (componentwise on complex) | math |
+| `chol` | `chol(A)` | Cholesky factor L (lower), L*L' = A (SPD / Hermitian PD) | linear algebra |
+| `clear` | `clear() \| clear("a", ...)` | remove all user variables, or the named ones; clearing a shadow restores the standard-library original | core |
+| `conj` | `conj(z)` | complex conjugate (elementwise) | complex |
+| `contains` | `contains(s, sub)` | true if sub occurs in s | strings |
+| `corr` | `corr(X) \| corr(x, y)` | Pearson correlation matrix of X's columns, or scalar correlation of two vectors | reductions |
+| `cos` | `cos(x)` | cosine (complex-aware, elementwise) | trig |
+| `cosh` | `cosh(x)` | hyperbolic cosine (complex-aware) | trig |
+| `cov` | `cov(X[, w]) \| cov(x, y[, w])` | covariance matrix of X's columns (rows = observations), or scalar cov of two vectors; w as in var | reductions |
+| `cumprod` | `cumprod(A)` | cumulative product along a vector, or down each column | arrays |
+| `cumsum` | `cumsum(A)` | cumulative sum along a vector, or down each column | arrays |
+| `det` | `det(A)` | determinant via LU | linear algebra |
+| `diag` | `diag(x)` | vector -> diagonal matrix; matrix -> its diagonal as a column | arrays |
+| `diff` | `diff(A)` | consecutive differences along a vector, or down each column | arrays |
+| `digamma` | `digamma(x)` | digamma psi(x) = d/dx log gamma(x) | math |
+| `dis` | `dis(f)` | disassemble a function's bytecode (compiler/VM introspection) | core |
+| `dot` | `dot(a, b)` | inner product of two vectors | linear algebra |
+| `e` | `e` | 2.71828..., Euler's number | constant |
+| `eig` | `eig(A)` | eigendecomposition -> {values, vectors}; Hermitian (ascending real) or general (complex) | linear algebra |
+| `endswith` | `endswith(s, p)` | true if s ends with p | strings |
+| `eps` | `eps` | machine epsilon for Float (2^-52) | constant |
+| `erf` | `erf(x)` | error function (real, elementwise) | math |
+| `erfc` | `erfc(x)` | complementary error function 1 - erf(x) | math |
+| `error` | `error(msg) \| error(tmpl, ...)` | raise a runtime error (fmt-style template) | core |
+| `eulergamma` | `eulergamma` | 0.57722..., the Euler-Mascheroni constant | constant |
+| `exit` | `exit \| exit(code)` | end the session (also: quit) | repl |
+| `exp` | `exp(x)` | e raised to the x (complex-aware) | math |
+| `eye` | `eye(n)` | n-by-n identity matrix | arrays |
+| `fields` | `fields(r)` | the record's field names, as a string column | core |
+| `find` | `find(mask)` | 1-based positions of nonzero/true elements (row-major) | arrays |
+| `fliplr` | `fliplr(A)` | reverse column order (flip left-right) | arrays |
+| `flipud` | `flipud(A)` | reverse row order (flip up-down) | arrays |
+| `floor` | `floor(x)` | round toward -infinity (componentwise on complex) | math |
+| `fminbnd` | `fminbnd(f, a, b)` | minimum of f on [a, b] (Brent) -> {x, fx} | solvers |
+| `fmt` | `fmt(tmpl, ...)` | print's template, returned as a string instead of printed | strings |
+| `format` | `format / format(m)` | show or set number display: "short", "long", "short e", or a digit count | core |
+| `fzero` | `fzero(f, a, b)` | root of f in [a, b] (Brent; f(a), f(b) must differ in sign) | solvers |
+| `gamma` | `gamma(x)` | gamma function (real, elementwise) | math |
+| `gammainc` | `gammainc(x, a)` | regularized lower incomplete gamma P(a, x) (the chi^2 CDF) | math |
+| `help` | `help / help(f)` | help lists every builtin; help(f) describes one | core |
+| `hist` | `hist(y[, nbins][, opts])` | histogram via gnuplot; opts as in plot (yrange to anchor the axis, label for the legend) | plot |
+| `hypot` | `hypot(a, b)` | sqrt(a^2 + b^2) without overflow (elementwise) | math |
+| `imag` | `imag(z)` | imaginary part (elementwise) | complex |
+| `inf` | `inf` | positive infinity (Float) | constant |
+| `integral` | `integral(f, a, b[, tol])` | definite integral (adaptive Simpson, finite limits; default tol 1e-10) | solvers |
+| `inv` | `inv(A)` | matrix inverse (solves A \\ I) | linear algebra |
+| `isfinite` | `isfinite(x)` | elementwise test for a finite value -> logical | test |
+| `isinf` | `isinf(x)` | elementwise test for +/-Inf -> logical | test |
+| `isnan` | `isnan(x)` | elementwise test for NaN -> logical | test |
+| `kron` | `kron(A, B)` | Kronecker product: (m x n) kron (p x q) -> (mp x nq) | linear algebra |
+| `lbeta` | `lbeta(a, b)` | log of the beta function | math |
+| `length` | `length(x)` | longest dimension of x (0 if empty) | core |
+| `lgamma` | `lgamma(x)` | log of \|gamma(x)\| (real, elementwise) | math |
+| `linspace` | `linspace(a, b, n)` | row of n points evenly spaced from a to b inclusive | arrays |
+| `ln` | `ln(x)` | natural logarithm (alias for log) | math |
+| `load` | `load("file.nu")` | run a file in the current session; its let-bindings persist (a record of closures makes a module) | core |
+| `log` | `log(x)` | natural logarithm (complex for negatives) | math |
+| `log10` | `log10(x)` | base-10 logarithm (complex for negatives) | math |
+| `log2` | `log2(x)` | base-2 logarithm (complex for negatives) | math |
+| `lower` | `lower(s)` | lowercase (ASCII bytes) | strings |
+| `ls` | `ls \| ls("dir") \| ls("*.nu")` | directory listing as a string array (globs supported) | files |
+| `lu` | `lu(A)` | LU with partial pivoting -> {L, U, p}, so P*A = L*U | linear algebra |
+| `manual` | `manual [doc]` | page rendered documentation: manual, manual packages\|changelog\|lessons\|design\|readme | repl |
+| `map` | `map(f, A)` | apply f to each element of A, returning an array of results | functional |
+| `max` | `max(A) \| max(a, b) \| max(A, [], dim)` | largest element; elementwise max; or max along dim | reductions |
+| `mean` | `mean(A) \| mean(A, dim)` | mean of all elements, or along dim | reductions |
+| `median` | `median(A) \| median(A, dim)` | median of all elements, or along dim | reductions |
+| `mem` | `mem` | print workspace size (variables) and peak process memory | core |
+| `min` | `min(A) \| min(a, b) \| min(A, [], dim)` | smallest element; elementwise min; or min along dim | reductions |
+| `mod` | `mod(a, b)` | modulo, result takes the sign of b (elementwise) | math |
+| `more` | `more on\|off` | page long output through $PAGER | repl |
+| `nan` | `nan` | not-a-number (Float); nan never equals anything, itself included | constant |
+| `norm` | `norm(x) \| norm(x, p)` | vector p-norm (p = 1 or 2, default 2); matrix Frobenius norm | linear algebra |
+| `norminv` | `norminv(p)` | standard normal quantile (inverse CDF) | math |
+| `now` | `now` | current local date and time: {y, m, d, h, mi, s} | core |
+| `num` | `num(s)` | parse a string as a number (Int if exact, else Float) | strings |
+| `numel` | `numel(x)` | number of elements (rows*cols) | core |
+| `ones` | `ones(r, c)` | r-by-c matrix of ones | arrays |
+| `phi` | `phi` | 1.61803..., the golden ratio | constant |
+| `pi` | `pi` | 3.14159..., the circle constant | constant |
+| `pick` | `pick(mask, a, b)` | elementwise select: a where the mask is true, else b | arrays |
+| `plot` | `plot(y) \| plot(x, y) \| plot(x, Y, opts)` | line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange, label, label1..labelN} | plot |
+| `pretty` | `pretty on\|off` | aligned multi-line matrix display (default on in the REPL) | repl |
+| `print` | `print(...) \| print(tmpl, ...)` | print values; template fills {} in order; {:[-][w][.p][f\|e\|g]} formats a hole ({{ }} literal) | core |
+| `prod` | `prod(A) \| prod(A, dim)` | product of all elements, or along dim | reductions |
+| `pwd` | `pwd` | the current working directory, as a string | files |
+| `qr` | `qr(A)` | Householder QR -> {Q, R} (real or complex) | linear algebra |
+| `quantile` | `quantile(x, p)` | quantile(s) of the data at probability p (scalar or vector); linear interpolation | reductions |
+| `rand` | `rand() \| rand(n) \| rand(r, c)` | uniform draws on [0, 1) | random |
+| `randi` | `randi(imax[, r, c]) \| randi([lo, hi], ...)` | uniform random integers | random |
+| `randn` | `randn() \| randn(n) \| randn(r, c)` | standard-normal draws | random |
+| `readcsv` | `readcsv(file[, opts])` | numeric CSV -> Float matrix; empty cells are nan; opts: {delim, skip} | files |
+| `readtable` | `readtable(file[, opts])` | CSV with a header -> record of column vectors named from the header | files |
+| `real` | `real(z)` | real part (elementwise) | complex |
+| `rem` | `rem(a, b)` | remainder, result takes the sign of a (elementwise) | math |
+| `repmat` | `repmat(A, m, n)` | tile A into an m-by-n grid of copies | arrays |
+| `reshape` | `reshape(A, r, c)` | reinterpret A's elements as r-by-c (row-major), element count must match | arrays |
+| `rng` | `rng(seed)` | reseed the generator (xoshiro256**); same seed, same stream | random |
+| `round` | `round(x)` | round to nearest (componentwise on complex) | math |
+| `save` | `save("file.nu")` | write all variables and functions as reloadable source (restore with load) | core |
+| `sign` | `sign(x)` | -1 / 0 / +1 by sign; z/\|z\| for complex | math |
+| `sin` | `sin(x)` | sine (complex-aware, elementwise) | trig |
+| `sinh` | `sinh(x)` | hyperbolic sine (complex-aware) | trig |
+| `size` | `size(x)` | [rows, cols] of x (a scalar is 1x1) | core |
+| `sort` | `sort(A)` | ascending sort: a vector as a whole, a matrix by column | arrays |
+| `sqrt` | `sqrt(x)` | square root (complex result for negative reals) | math |
+| `startswith` | `startswith(s, p)` | true if s begins with p | strings |
+| `std` | `std(A) \| std(A, w) \| std(A, w, dim)` | standard deviation (sqrt of var, same normalization) | reductions |
+| `str` | `str(x)` | the display text of any value, as a string | strings |
+| `strjoin` | `strjoin(a, sep)` | join a string array with a separator | strings |
+| `strrep` | `strrep(s, old, new)` | replace every occurrence of old with new | strings |
+| `strsplit` | `strsplit(s, sep)` | split a string on a separator, giving a string row vector | strings |
+| `sum` | `sum(A) \| sum(A, dim)` | sum of all elements, or along dim (1 = columns, 2 = rows) | reductions |
+| `svd` | `svd(A)` | thin SVD -> {U, S, V}, A = U*diag(S)*V' (S descending) | linear algebra |
+| `system` | `system(cmd)` | run a shell command string; return its exit status | core |
+| `tan` | `tan(x)` | tangent (complex-aware, elementwise) | trig |
+| `tanh` | `tanh(x)` | hyperbolic tangent (complex-aware) | trig |
+| `tic` | `tic` | start the wall-clock timer (monotonic) | core |
+| `toc` | `toc` | seconds elapsed since tic | core |
+| `trace` | `trace(A)` | sum of the diagonal | linear algebra |
+| `trim` | `trim(s)` | strip leading and trailing whitespace | strings |
+| `trunc` | `trunc(x)` | round toward zero | math |
+| `unique` | `unique(A)` | sorted distinct elements; vectors keep orientation, matrices flatten to a row | arrays |
+| `upper` | `upper(s)` | uppercase (ASCII bytes) | strings |
+| `var` | `var(A) \| var(A, w) \| var(A, w, dim)` | variance; w = 0 divides by N-1 (default), w = 1 by N | reductions |
+| `version` | `version` | the interpreter version, as a string | core |
+| `who` | `who \| who("functions", "sorted")` | list the workspace; filter by "records"/"functions"/"vars", add "sorted" for name order | core |
+| `whof` | `whof \| whof("sorted")` | your functions only (shorthand for who("functions")) | core |
+| `whor` | `whor \| whor("sorted")` | your records only (shorthand for who("records")) | core |
+| `whos` | `whos` | the whole workspace, sorted by name (who("sorted")) | core |
+| `whov` | `whov \| whov("sorted")` | your variables only (shorthand for who("vars")) | core |
+| `writecsv` | `writecsv(file, A[, opts])` | matrix -> CSV, full precision (round-trips); opts: {delim} | files |
+| `zeros` | `zeros(r, c)` | r-by-c matrix of zeros | arrays |
+
+*153 names; the same table drives `help`, tab completion, the reference, and the Emacs mode.*
+<!-- INDEX:END -->
 
 ---
 

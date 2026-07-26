@@ -84,6 +84,12 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.3.0: the book gains its function index.** Appendix E of Neutrino by
+  Example: every builtin and constant, alphabetical with signature,
+  description, and area — machine-generated from the interpreter's own
+  documentation table by tools/gen_book_index.py, whose --check runs in
+  make test, so the index cannot drift from the language. The HP handbooks
+  always ended with one; now so does ours.
 - **v2.2.0: Neutrino by Example, the full applications handbook.** The
   booklet grew into the book it was always meant to be, in the tradition of
   the HP calculator applications handbooks: 36 worked word problems across
