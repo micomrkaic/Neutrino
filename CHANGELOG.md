@@ -91,6 +91,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.4.0: scatter.nu — the first post-freeze package.** Scatter plots
+  without touching the core, proving the maintenance-mode contract: the
+  frozen plot() already honors style = "points" in every backend (SVG
+  circles in the browser, point markers in ascii and gnuplot), so
+  scatter(x, y), scatter_titled(x, y, t), and a jitter(x, amount) helper
+  are pure .nu. Per-point sizes and colors (bubble charts) would need
+  backend changes and are deliberately declined — the package header says
+  so. The SVG test suite asserts the circles and title; en route, the
+  ascii backend's comment was corrected again (a missing gnuplot is an
+  error, not a silent fallback — the code never promised what the comment
+  claimed).
 - **v2.3.0: the book gains its function index.** Appendix E of Neutrino by
   Example: every builtin and constant, alphabetical with signature,
   description, and area — machine-generated from the interpreter's own

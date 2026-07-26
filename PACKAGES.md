@@ -1,8 +1,8 @@
 # The Neutrino Packages
 
 *The standard packages that ship with Neutrino: probability distributions,
-polynomials, finance, a solar almanac, structured random matrices, and
-physical constants — all written in Neutrino itself.*
+polynomials, finance, a solar almanac, structured random matrices,
+physical constants, and scatter plots — all written in Neutrino itself.*
 
 A package is a file of `let` definitions; `load("packages/name.nu")` runs it
 in the current session and its bindings persist. Records of closures act as
@@ -363,6 +363,32 @@ neutrino> phys.k * 300 / phys.eV
 | `phys.alpha` | `1 / phys.alpha` | `137.036` |
 | `phys.sigma` | `phys.sigma` | `5.67037e-08` |
 | `phys.ly / phys.au` | `phys.ly / phys.au` | `63241.1` |
+
+## 7. scatter.nu — scatter plots without touching the core
+
+Proof that the frozen language plots more than it appears to: `plot()`'s
+`style = "points"` option is honored by every backend (SVG circles in the
+browser, point markers in ascii and gnuplot), so scatter plots are a pure
+package. `scatter(x, y)` and `scatter_titled(x, y, t)` wrap that fact;
+`jitter(x, amount)` spreads overplotted values for legibility. Per-point
+sizes and colors would need backend changes and are deliberately absent —
+the package's header says so. The transcript exercises the numeric helper;
+the SVG output itself is asserted by the plot test suite:
+
+```
+neutrino> load("packages/scatter.nu")
+neutrino> rng(1); let j = jitter(1:100, 0.1);
+neutrino> max(abs(j - (1:100))) <= 0.05
+true
+neutrino> size(jitter(rand(3, 4), 0.2))
+[3, 4]
+```
+
+| Function | Worked example | Result |
+|---|---|---|
+| `jitter(x, a) stays within a/2` | `max(abs(jitter(1:100, 0.1) - (1:100))) <= 0.05` | `true` |
+| `jitter preserves shape` | `size(jitter(rand(3, 4), 0.2)) == [3, 4]` | `[true, true]` |
+| `mean displacement is small` | `abs(mean(jitter(zeros(1, 2000), 0.2))) < 0.01` | `true` |
 
 ## Writing your own
 

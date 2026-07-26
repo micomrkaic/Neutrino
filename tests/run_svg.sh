@@ -14,4 +14,14 @@ d2 = xml.dom.minidom.parse('plot_2.svg')
 assert len(d2.getElementsByTagName('rect')) >= 11, "want histogram bars"
 print("svg: plot + hist backends well-formed, escaped, legended")
 PY
+# scatter.nu rides the frozen style=points path: circles + title, no C
+rm -f plot_*.svg
+printf 'load("packages/scatter.nu")\nrng(2); scatter_titled(rand(1, 25), rand(1, 25), "pkg scatter")\n' | NEUTRINO_PLOT_TERM=svg ./vmtest >/dev/null
+python3 - << 'PY'
+import xml.dom.minidom
+d = xml.dom.minidom.parse('plot_1.svg')
+assert len(d.getElementsByTagName('circle')) == 25, "want 25 scatter circles"
+assert 'pkg scatter' in open('plot_1.svg').read(), "want title"
+print("svg: scatter.nu renders circles via style=points")
+PY
 rm -f plot_*.svg

@@ -2319,11 +2319,11 @@ static void gp_qstr(FILE *g, const char *s, uint32_t len)
 }
 
 /* ------------------------------------------------------------------ */
-/* ASCII plotting: the terminal backend. Selected natively by           */
-/* NEUTRINO_PLOT_TERM=ascii or as a fallback when gnuplot cannot be     */
-/* started; in the browser it is reachable only if the page sets a      */
-/* non-svg NEUTRINO_PLOT_TERM (the browser DEFAULT is the SVG backend   */
-/* below — dispatch tries svg first). Renders into vout().              */
+/* ASCII plotting: the terminal backend, selected natively by           */
+/* NEUTRINO_PLOT_TERM=ascii (a missing gnuplot is an error, not a       */
+/* silent fallback); in the browser it is reachable only if the page    */
+/* sets a non-svg NEUTRINO_PLOT_TERM (the browser DEFAULT is the SVG    */
+/* backend below — dispatch tries svg first). Renders into vout().      */
 
 static Value gp_label(RecObj *o, uint32_t k);
 

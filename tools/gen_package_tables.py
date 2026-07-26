@@ -93,6 +93,11 @@ SPECS = {
     ("phys.sigma", "phys.sigma"),
     ("phys.ly / phys.au", "phys.ly / phys.au"),
   ]),
+  "scatter": ("load(\"packages/scatter.nu\"); rng(1)", [
+    ("jitter(x, a) stays within a/2", "max(abs(jitter(1:100, 0.1) - (1:100))) <= 0.05"),
+    ("jitter preserves shape", "size(jitter(rand(3, 4), 0.2)) == [3, 4]"),
+    ("mean displacement is small", "abs(mean(jitter(zeros(1, 2000), 0.2))) < 0.01"),
+  ]),
 }
 
 def esc(t): return t.replace("|", "\\|")
