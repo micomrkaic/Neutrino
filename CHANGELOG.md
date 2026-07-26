@@ -5,6 +5,13 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.3.1: a stale comment corrected.** The ASCII plot backend's header
+  claimed it runs "always in the browser" — true before the SVG backend
+  existed, false since: dispatch tries SVG first and the browser default
+  is SVG (verified against the bundle: plot() writes plot_1.svg, dark
+  palette, nothing in the terminal). ASCII remains the native
+  NEUTRINO_PLOT_TERM=ascii mode and the no-gnuplot fallback. No behavior
+  changed; comments are maintenance documentation and must not lie.
 - **v1.17.1: the standard library is not the workspace.** The new constants
   appeared in `who` as ordinary variables — and worse, `clear()` deleted
   them (and always had a latent sibling: clearing a shadowed builtin
