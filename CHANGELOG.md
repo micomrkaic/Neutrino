@@ -5,6 +5,16 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.9.1: the plates, printed right.** The vignette sources carry an
+  alpha channel with a soft halo; v2.9.0's grayscale conversion dropped
+  the alpha instead of compositing, shipping murky near-unreadable plates
+  in the PDF. Rebuilt from the originals: composited on white, then
+  re-inked as light line art on workbench navy (#0d1117) — the same
+  color as the new brand/banner.svg (the detector-and-wordmark banner,
+  now a proper vector asset in the repo). Plates placed 30% smaller in
+  the PDF (55% text width) and 62% in the browser, where the CSS
+  inversion is retired since the art is now dark-native. Art total
+  2.28 MB.
 - **v2.3.1: a stale comment corrected.** The ASCII plot backend's header
   claimed it runs "always in the browser" — true before the SVG backend
   existed, false since: dispatch tries SVG first and the browser default
