@@ -857,6 +857,8 @@ centuries of analysis.
 
 ## 11. Linear algebra
 
+![](vignettes/vin11.png)
+
 Matrices are the native tongue: `\` solves systems, `eig`, `lu`, `qr`,
 `svd`, `chol` decompose, and poly.nu's `polyfit` does least squares.
 
@@ -946,6 +948,8 @@ algebra is in the core.
 
 ## 12. Probability, statistics, and data
 
+![](vignettes/vin12.png)
+
 dist.nu supplies the distributions; `writecsv`/`readcsv` move data in and
 out; seeded `rng` makes every simulation a repeatable experiment.
 
@@ -1025,6 +1029,8 @@ live, on the poor man's Gaussian no less.
 ---
 
 ## 13. Plotting
+
+![](vignettes/vin13.png)
 
 Neutrino plots through three backends, chosen by environment: in the
 **browser** the default is SVG — dark-themed, rendered into the Plots pane
@@ -1131,6 +1137,8 @@ working.
 
 ## 14. The Neutrino idiom
 
+![](vignettes/vin14.png)
+
 The unique syntax — lambdas, `where`, index-bound reductions, and the
 pipe family — was designed to *combine*. This chapter is about the
 combinations: the sentences, not the words. It is the most important
@@ -1219,9 +1227,66 @@ drops below one half: **23**, the famous answer, computed in the notation
 you'd use to explain it. When the sentence structure of a language
 matches the thought structure of its user, this is what it looks like.
 
+**Problem 12.5 — Composing a function with itself.** An operator that
+returns f ∘ f — a function eating a function, producing their
+composition:
+
+```
+neutrino> format(4)
+neutrino> let selfcomp = fn f -> fn x -> f(f(x))
+<fn/1>
+neutrino> selfcomp(fn t -> t + 3)(10)
+16
+neutrino> selfcomp(sqrt)(16)
+2.000
+neutrino> [1, 2, 3] ~> selfcomp(fn t -> t * 10)
+[100, 200, 300]
+```
+
+**Discussion.** `selfcomp(f)` *is* a function: apply it, bind it, or send
+an array through it with `~>`. The n-fold generalization must use `if`
+rather than `pick` — `pick` is an ordinary function and evaluates *both*
+arms, which would recurse forever; `if` is the lazy form:
+
+```
+neutrino> format(4)
+neutrino> let iterate = fn f, n -> if n <= 0 then (fn x -> x) else (fn x -> f(iterate(f, n - 1)(x))) end
+<fn/2>
+neutrino> iterate(fn t -> t * 2, 10)(1)
+1024
+neutrino> iterate(fn t -> sqrt(1 + t), 40)(1)
+1.618
+neutrino> (1 + sqrt(5)) / 2
+1.618
+```
+
+**Discussion.** Ten doublings make 1024 — and the second line is a small
+wonder: forty-fold composition of √(1+t) converges to its fixed point,
+**the golden ratio**, because φ solves x = √(1+x). `selfcomp` is just
+`iterate(f, 2)`.
+
+```
+neutrino> format(4)
+neutrino> let d = fn f -> fn x -> (f(x + h) - f(x - h)) / (2 * h) where h = 1e-4
+<fn/1>
+neutrino> let selfcomp = fn f -> fn x -> f(f(x));
+neutrino> selfcomp(d)(sin)(pi / 3)
+-0.8660
+neutrino> -sin(pi / 3)
+-0.8660
+```
+
+**Discussion.** Composing the derivative operator of Problem 10.6 with
+itself yields the second derivative: −sin(π/3) on the nose. Note
+`h = 1e-4` rather than `1e-6` — nesting squares the step, and 10⁻¹²
+denominators drown in cancellation. Operators compose like functions
+because they *are* functions.
+
 ---
 
 ## Appendix A. Finance (finance.nu)
+
+![](vignettes/vinA.png)
 
 **Problem A.1 — The mortgage, end to end.** A 425,000 house, 20% down,
 30 years at 5.75% — payment, lifetime interest, and the effect of 300
@@ -1295,6 +1360,8 @@ begin to trust it on the contracts that have no formula.
 
 ## Appendix B. Astronomy (astro.nu)
 
+![](vignettes/vinB.png)
+
 **Problem B.1 — A July Saturday in Ljubljana.** Sunrise, sunset, and day
 length at 46.05°N, 14.51°E, UTC+2.
 
@@ -1329,6 +1396,8 @@ twenty days.
 ---
 
 ## Appendix C. Physics (phys.nu)
+
+![](vignettes/vinC.png)
 
 **Problem C.1 — Orbital and escape velocity.** Speed for a 400 km circular
 orbit; escape speed from the surface.
@@ -1365,6 +1434,8 @@ found by a microwave antenna.
 
 ## Appendix D. Random matrices (rmt.nu)
 
+![](vignettes/vinD.png)
+
 **Problem D.1 — Wigner's semicircle, witnessed.** The eigenvalues of a
 400 × 400 GOE matrix.
 
@@ -1386,6 +1457,8 @@ hardware.
 ---
 
 ## Appendix E. Index of builtins
+
+![](vignettes/vinE.png)
 
 Every builtin and constant, alphabetically — machine-generated from the
 interpreter's own documentation table, so this index cannot drift from the

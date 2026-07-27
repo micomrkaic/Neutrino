@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.11.1: the page break that printed itself.** v2.11.0's per-section
+  \newpage lost its backslash to shell quoting on the way into the
+  pandoc preprocessor, so the PDF rendered a literal 'ewpage' before
+  chapter 1 and broke no pages at all. The command is now assembled with
+  chr(92) — immune to every quoting layer — and the rebuilt PDF is
+  machine-checked two ways: zero stray 'ewpage' strings in its extracted
+  text, and a page count that jumped from 36 to the properly-broken
+  figure.
 - **v2.10.3: "circle" means circles everywhere.** plot(x, y,
   {style = "circle"}) drew markers in the native REPL (gnuplot accepts its
   whole marker family plus abbreviations) but a line in the browser: the
@@ -138,6 +146,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.11.0: the book fully illustrated, and self-composition joins the
+  idiom.** Problem 12.5 — selfcomp (fn f -> fn x -> f(f(x))) applied,
+  bound, and mapped; the n-fold iterate built with if (pick evaluates
+  both arms and would recurse forever); forty-fold composition of sqrt(1+t)
+  converging to the golden ratio; and selfcomp(d) delivering the second
+  derivative with the step-size caveat (nesting squares h). Nine new
+  author-drawn plates complete the art program: chapters 11-14 (linear
+  algebra, probability, plotting, the idiom) and appendices A-E (finance,
+  astronomy, physics, random matrices, the index), re-inked on HP-handbook
+  blue like the first ten. The PDF now starts every chapter and appendix
+  on a fresh page. 288 verified transcripts.
 - **v2.10.0: keep — the complement of clear, and the one sanctioned
   post-freeze builtin.** keep("a", "b") removes every user variable except
   the named ones. The pure-package route was probed first and is honestly
