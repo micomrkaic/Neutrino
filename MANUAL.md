@@ -126,7 +126,7 @@ shell escape: `!ls -la`.
 
 ```
 neutrino> ls("packages")
-["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"]
+["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"; "symb.nu"]
 neutrino> cd("packages");
 neutrino> load("dist.nu"); norm.cdf(0, 0, 1)
 0.5

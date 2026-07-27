@@ -146,6 +146,22 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.12.0: symb.nu — symbolic differentiation, pure showing off.** The
+  eighth package: expression trees as nested records, constructors instead
+  of a parser (the string builtins have no substring access — a recorded
+  limit, worked with rather than around), and ddx by structural recursion.
+  sub and divx desugar into add/mul/negative powers at construction, so
+  product, power, and chain rules alone carry the calculus — the quotient
+  rule falls out of d(b^-1) for free. simp folds constants and
+  reassociates them leftward (the third derivative of x^5 prints 60x^2);
+  subst composes; taylor extracts series by repeated ddx — sine's
+  0, 1, 0, -1/6, 0, 1/120 recovered from record recursion. PACKAGES §8 and
+  new book Appendix E cross-check the symbolic derivative against Chapter
+  10's numeric operator to 1e-8 in one verified session; the index of
+  builtins becomes Appendix F. Two spike lessons banked: the frozen
+  grammar has no elseif (nested if/end chains are the dispatch tax, a
+  motivated successor note), and & does not short-circuit (guards must
+  nest). 299 verified book transcripts; 92 in PACKAGES.
 - **v2.11.0: the book fully illustrated, and self-composition joins the
   idiom.** Problem 12.5 — selfcomp (fn f -> fn x -> f(f(x))) applied,
   bound, and mapped; the n-fold iterate built with if (pick evaluates

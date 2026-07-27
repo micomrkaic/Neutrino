@@ -38,7 +38,8 @@ Appendix A. Finance (finance.nu)
 Appendix B. Astronomy (astro.nu)
 Appendix C. Physics (phys.nu)
 Appendix D. Random matrices (rmt.nu)
-Appendix E. Index of builtins
+Appendix E. Symbolic differentiation (symb.nu)
+Appendix F. Index of builtins
 
 ---
 
@@ -260,11 +261,11 @@ string functions ride the pipes like everything else:
 
 ```
 neutrino> ls("packages")
-["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"]
+["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"; "symb.nu"]
 neutrino> ans ~> (fn f -> endswith(f, ".nu")) |> all
 true
 neutrino> ls("packages") ~> (fn f -> contains(f, "s")) |> sum
-4
+5
 ```
 
 **Discussion.** A directory listing maps under `~>` through `endswith`,
@@ -1456,7 +1457,49 @@ hardware.
 
 ---
 
-## Appendix E. Index of builtins
+## Appendix E. Symbolic differentiation (symb.nu)
+
+**Problem E.1 — The derivative, symbolically, checked numerically.**
+
+```
+neutrino> format(4)
+neutrino> load("packages/symb.nu")
+neutrino> let e = add(powc(X, 3), mul(C(5), sinx(X)));
+neutrino> show(simp(ddx(e)))
+"((3 * x^2) + (5 * cos(x)))"
+neutrino> let d = fn f -> fn x -> (f(x + h) - f(x - h)) / (2 * h) where h = 1e-6
+<fn/1>
+neutrino> abs(evalx(ddx(e), 2) - d(fn t -> t ^ 3 + 5 * sin(t))(2)) < 1e-8
+true
+```
+
+**Discussion.** Expressions are records; `ddx` is structural recursion;
+and the symbolic derivative agrees with Chapter 10's numeric operator to
+10⁻⁸ — two independent roads to the same slope, machine-verified in one
+session. The chapter-12 lesson at full power: data, functions, and
+operators are all just values.
+
+**Problem E.2 — Taylor series from structure.**
+
+```
+neutrino> format(4)
+neutrino> load("packages/symb.nu")
+neutrino> taylor(sinx(X), 7)
+[0.000, 1.000, -0.000, -0.1667, 0.000, 0.008333, -0.000, -0.0001984]
+neutrino> taylor(expx(X), 5)
+[1.000, 1.000, 0.5000, 0.1667, 0.04167, 0.008333]
+neutrino> show(dn(powc(X, 5), 3))
+"(60 * x^2)"
+```
+
+**Discussion.** Repeated `ddx`, evaluated at zero, divided by k!: the sine
+series 0, 1, 0, −1/6, 0, 1/120, ... and exp's 1/k! fall out of record
+recursion — no calculus tables consulted. The third derivative of x⁵
+folds to 60x² on its way through the simplifier.
+
+---
+
+## Appendix F. Index of builtins
 
 ![](vignettes/vinE.png)
 
