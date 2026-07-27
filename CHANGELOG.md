@@ -5,6 +5,13 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.12.1: substr stays out — on purpose, on record.** The string
+  family's missing extraction (no substr/strfind/char indexing) is now a
+  KNOWN_LIMITATIONS entry citing symb.nu's constructor API as its
+  friction transcript, together with the reasoning: unlike keep, which
+  merely complemented clear, extraction enables new program shapes
+  (parsers), and that is successor territory. The owner declined his own
+  sympathetic case; the freeze is the artifact.
 - **v2.11.1: the page break that printed itself.** v2.11.0's per-section
   \newpage lost its backslash to shell quoting on the way into the
   pandoc preprocessor, so the PDF rendered a literal 'ewpage' before

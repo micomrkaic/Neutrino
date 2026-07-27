@@ -103,3 +103,13 @@ compiled.
   series in one style; bubble charts and per-point color maps would need
   backend changes and are deferred to the successor language.
   `packages/scatter.nu` covers plain scatter via `style = "points"`.
+- **Strings: no extraction.** The string family covers transformation,
+  predicates, and assembly, but there is no substr, no strfind, and no
+  character indexing — length can measure a string that nothing can then
+  take a piece of. The friction transcript is symb.nu: it has a
+  constructor API instead of a parser because tokenizing is impossible.
+  Deliberately not fixed under the freeze (unlike keep, extraction
+  enables new program shapes, and "completes the family" is exactly the
+  reasoning that erodes freezes one sympathetic case at a time); the
+  successor opens extraction once, completely — substr, strfind, and
+  character indexing together.
