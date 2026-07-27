@@ -272,6 +272,31 @@ neutrino> ls("packages") ~> (fn f -> contains(f, "s")) |> sum
 and `all`/`sum` reduce the answers. Text processing and array processing
 are the same processing.
 
+**Problem 3.5 — Between text and values.** There is no
+string-to-array builtin because none is needed — conversion is a
+pipeline:
+
+```
+neutrino> strsplit("3.14, 2.71, 1.41", ",") ~> trim ~> num
+[3.14, 2.71, 1.41]
+neutrino> strsplit("10 20 30", " ") ~> num |> sum
+60
+neutrino> [1.5, 2.5, 3.5] ~> str |> (fn a -> strjoin(a, " | "))
+"1.5 | 2.5 | 3.5"
+neutrino> let r = {rate = 0.0575, n = 360}; str(r)
+"{rate = 0.0575, n = 360}"
+neutrino> fields(r)
+["rate"; "n"]
+```
+
+**Discussion.** `strsplit` cuts, `trim` cleans, `num` converts, and the
+reductions are waiting at the end of the pipe — text to numbers is three
+small tools composed, not one big one. The reverse trip maps `str` and
+joins. Records go *to* text (`str` gives the literal form, `fields` the
+names) but not back: building a record with runtime-determined field
+names is beyond the frozen language — a boundary worth knowing, recorded
+in KNOWN_LIMITATIONS for the successor.
+
 ---
 
 ## 4. Complex numbers

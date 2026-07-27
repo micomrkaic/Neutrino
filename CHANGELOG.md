@@ -153,6 +153,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.13.0: conversions mapped — one lesson each way.** Book Problem 3.5
+  shows string-to-array needs no builtin: strsplit ~> trim ~> num is the
+  idiom (and the reverse maps str through strjoin). The other direction is
+  a wall worth recording: fields(r) can see a record's names but nothing
+  can use a name dynamically, so generic k=v parsers, serializers, and
+  record utilities are impossible in userland — KNOWN_LIMITATIONS gains
+  the entry, and the Cozy seed gains design entry 5, the record
+  reflection trio (getfield/setfield/construction), same family as
+  ast(f). Milking maintenance for successor experience, per the owner's
+  standing order.
 - **v2.12.0: symb.nu — symbolic differentiation, pure showing off.** The
   eighth package: expression trees as nested records, constructors instead
   of a parser (the string builtins have no substring access — a recorded

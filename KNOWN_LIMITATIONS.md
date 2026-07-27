@@ -113,3 +113,13 @@ compiled.
   reasoning that erodes freezes one sympathetic case at a time); the
   successor opens extraction once, completely — substr, strfind, and
   character indexing together.
+- **Records: reflection sees, nothing touches.** fields(r) returns the
+  names, but there is no getfield/setfield/dynamic construction — field
+  access is spelled with literal names only. Consequence: no package can
+  write a generic key=value parser, serializer, record merge, or
+  field-mapped utility; string-to-record conversion is impossible in
+  userland (string-to-array, by contrast, is a strsplit ~> trim ~> num
+  pipeline and needs nothing). Successor design: the record reflection
+  trio — getfield(r, name), setfield(r, name, v) returning a new record,
+  and construction from parallel name/value arrays — the same reflection
+  family as ast(f).
