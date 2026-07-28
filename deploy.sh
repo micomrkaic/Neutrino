@@ -47,7 +47,19 @@ if git diff --cached --quiet; then
 else
     git commit -m "release $TAG"
 fi
-git push origin main
+# Two-workstation safety: releases are full snapshots, so if the remote is
+# ahead (a deploy from another machine), the correct resolution is a merge
+# with strategy "ours" — record the remote history, keep this tree byte-
+# for-byte (its content supersedes all earlier snapshots). Any work unique
+# to another machine that never entered a tarball would be discarded by
+# this; keep unique work out of the release repo.
+if ! git push origin main 2>/dev/null; then
+  echo "deploy: remote is ahead (another machine deployed); merging with -s ours"
+  git fetch origin
+  git log --oneline HEAD..origin/main | sed 's/^/deploy:   superseding /'
+  git merge -s ours origin/main -m "merge remote history (superseded by $VERSION snapshot)"
+  git push origin main
+fi
 git tag -a "$TAG" -m "Neutrino $VERSION"
 git push origin "$TAG"
 

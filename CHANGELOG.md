@@ -5,6 +5,15 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.16.2: deploy.sh survives two workstations.** Deploying from the
+  Mac and then the X1 produced a rejected non-fast-forward push — the
+  first real two-machine divergence. Since releases are full snapshots,
+  the principled resolution is git merge -s ours: record the remote
+  history, keep the local tree byte-for-byte (its content supersedes all
+  earlier snapshots). deploy.sh now does this automatically on push
+  failure, listing the superseded commits; the PLAYBOOK records the trap,
+  its resolution, and the rule it implies — nothing enters the release
+  repo except through a deploy.
 - **v2.16.1: the art catches up with the appendices.** Appendix E
   (Symbolic differentiation) receives its author-drawn plate — a notepad
   passing through d/dx to the answered whiteboard — and the index

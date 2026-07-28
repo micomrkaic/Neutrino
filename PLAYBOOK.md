@@ -221,3 +221,18 @@ Honest debts, so they're chosen consciously next time:
 
 *The methodology above is the actual product of the Neutrino project; the
 language is its first application. Build the heavy one on it.*
+
+### Trap: two-workstation deploys diverge
+
+Deploying from machine A then machine B leaves B's remote ahead of A;
+A's next push is rejected as a non-fast-forward. Because every release
+is a FULL SNAPSHOT (the tarball is the complete intended state), the
+correct resolution is never a content merge: `git merge -s ours
+origin/main` records the remote history while keeping the local tree
+byte-for-byte, then push. deploy.sh automates this on push failure,
+printing the superseded commits. The one hazard: work unique to another
+machine that never entered a tarball is discarded by `ours` — the rule
+is therefore that nothing lands in the release repo except through a
+deploy. Never resolve with `push --force`: it works, erases history, and
+teaches a bad reflex.
+
