@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.19.2: symb.nu enjoys the feature it motivated.** The package's
+  dispatchers — ddx, evalx, subst, simp, show, mkfun, the parser — are
+  rewritten with elseif: the stacked end-cascades — up to nine deep after
+  ddx and evalx — collapse to a single end per chain, and the ddx
+  dispatcher now reads like the table of derivative rules it is. Behavior is byte-identical: the full battery,
+  99 PACKAGES and 318 BOOK transcripts, and the suite all verify
+  unchanged. The header comment is also corrected — it still claimed
+  "there is no parser on purpose," which stopped being true in v2.14.0.
 - **v2.19.1: the index catches up, and a rite lesson is paid for.**
   v2.19.0's four new builtins left the book index stale — caught not
   here but by the owner's deploy, because the release-side suite run was
