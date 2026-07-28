@@ -5,6 +5,68 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.16.1: the art catches up with the appendices.** Appendix E
+  (Symbolic differentiation) receives its author-drawn plate — a notepad
+  passing through d/dx to the answered whiteboard — and the index
+  card-file, redrawn with its F shield, follows the index to Appendix F.
+  The book's title page is now the og-card (the navy social card with
+  the atom mark), also installed at docs/og-card.png with og:image meta
+  on the workbench page.
+- **v2.13.1: the limitation that wasn't.** Preparing the Cozy fork, the
+  conformance goldens impeached the v2.12.1 KNOWN_LIMITATIONS entry:
+  string extraction has existed all along as INDEXING — s[4], s[4:8],
+  s[end-3:end], fancy-index s[[3,2,1]], golden-tested since the strings
+  phase. The wrong entry came from grepping the builtin table for a
+  substr function while the grammar carried extraction as syntax; a
+  substr builtin would be redundant, which is why none exists. The entry
+  is rewritten: the genuine gap is only strfind (position of a pattern),
+  and symb.nu's parser was feasible under the freeze after all. The
+  goldens outrank the maintainer's memory — that is what they are for.
+- **v2.12.1: substr stays out — on purpose, on record.** The string
+  family's missing extraction (no substr/strfind/char indexing) is now a
+  KNOWN_LIMITATIONS entry citing symb.nu's constructor API as its
+  friction transcript, together with the reasoning: unlike keep, which
+  merely complemented clear, extraction enables new program shapes
+  (parsers), and that is successor territory. The owner declined his own
+  sympathetic case; the freeze is the artifact.
+- **v2.11.1: the page break that printed itself.** v2.11.0's per-section
+  \newpage lost its backslash to shell quoting on the way into the
+  pandoc preprocessor, so the PDF rendered a literal 'ewpage' before
+  chapter 1 and broke no pages at all. The command is now assembled with
+  chr(92) — immune to every quoting layer — and the rebuilt PDF is
+  machine-checked two ways: zero stray 'ewpage' strings in its extracted
+  text, and a page count that jumped from 36 to the properly-broken
+  figure.
+- **v2.10.3: "circle" means circles everywhere.** plot(x, y,
+  {style = "circle"}) drew markers in the native REPL (gnuplot accepts its
+  whole marker family plus abbreviations) but a line in the browser: the
+  svg/ascii backends' point detection was an exact prefix match on
+  "points". The detection is now a substring match over the marker family
+  (point, circle, dot), verified across both backends and pinned by a new
+  svg regression; the manual documents the rule. Reported from the
+  author's Mac-vs-browser comparison — the two-frontend habit is itself a
+  test harness.
+- **v2.10.2: the Mac reads the book more strictly.** Four book transcripts
+  failed on macOS, exposing two defects. (1) The fifth-roots-of-unity
+  problem displayed the raw ~1e-16 residuals of mathematical zeros —
+  asserting rounding noise, whose last digits differ between platforms'
+  complex math libraries; both identities are now asserted below tolerance
+  instead, and the discussion says why. (2) A genuine bug Linux's
+  determinism had certified: the Markov problem took eigenvector column 1
+  blindly — the 0.6 eigenvalue's vector, which sums to ~0 — so the
+  'stationary distribution' printed ±1e15 garbage while the prose claimed
+  75/25; deterministic garbage verifies, and only macOS's different
+  garbage broke the spell. The transcript now selects the eigenvalue-1
+  column with find (never assume eigenvalue ordering), prints [0.75; 0.25],
+  and the discussion records the lesson with the first printing named.
+- **v2.10.1: macOS build fix (first report from a real clone).** eval.c
+  failed on Apple Clang: 'no member named ru_maxrss in struct rusage'.
+  Cause: Darwin clamps header visibility to the requested standard, so our
+  _XOPEN_SOURCE 700 *hid* the BSD extension fields of struct rusage that
+  the mem builtin reads — glibc doesn't guard struct members, which is why
+  Linux never noticed. Fix: define _DARWIN_C_SOURCE alongside, restoring
+  full visibility on macOS and inert elsewhere. Reported by the author
+  from his own Mac — the maintenance contract operating as designed.
 - **v2.9.2: HP-handbook blue.** The plates' near-black background read as
   severity on paper; re-inked on deep navy blue (#1a3a6a) — the classic HP
   applications-handbook cover color, which is also now the background of
@@ -108,6 +170,76 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.16.0: symbols become functions again.** symb.nu gains the lift
+  back to function-space: tofun(e) closes an expression tree into an
+  ordinary fn x, with string conveniences ffun(src) and dfun(src) —
+  dfun("sin(x)/x") is a callable derivative. The payoff is
+  reunification, and book Problem E.4 stages it twice over: fzero on the
+  symbolic derivative and fminbnd on the original function agree on
+  4.49341 (the tan(x) = x critical point of sin(x)/x), and the
+  Fundamental Theorem of Calculus verifies numerically —
+  integral(dfun("x^3"), 1, 2) = 7 = the function's change. Two new table
+  specs. 316 verified book transcripts; 98 in PACKAGES.
+- **v2.15.0: the derivative reads like the textbook.** symb.nu's printer
+  learns division and subtraction — mul(u, powc(v, -n)) prints u / v^n on
+  either side, add(a, mul(-1, b)) prints a - b, and simp hoists buried
+  negative constants so the patterns form — with the payoff
+  deriv("sin(x)/x") = "((cos(x) / x) - (sin(x) / x^2))", the quotient
+  rule as the blackboard writes it. En route the battery caught a real
+  parser bug: unary minus bound tighter than ^, making -x^2 parse as
+  (-x)^2; fixed to mathematical convention (minus parses a power), with
+  evalx(parse("-x^2"), 3) = -9 and exp(-x^2) differentiating to
+  -2x exp(-x^2), numerically cross-checked. 311 verified book
+  transcripts; 98 in PACKAGES.
+- **v2.14.0: the parser that was possible all along.** symb.nu completes
+  its circle: a recursive-descent parser in pure Neutrino — legal all
+  along, as v2.13.1's correction established — so the differentiator
+  takes mathematics as typed: deriv("x^3 + 5*sin(x)") returns
+  "((3 * x^2) + (5 * cos(x)))". Character classes are chained string
+  comparisons ("0" <= c <= "9"), the grammar threads position through
+  records, errors surface with positions via a num()-based fail, and
+  general powers desugar as f^g = exp(g log f) — so x^x differentiates
+  to x^x(ln x + 1) with no special case. Constructors remain (additive
+  change); PACKAGES §8 extended, book Problem E.3 tells the story with
+  the lesson attached, two new table specs. 309 verified book
+  transcripts; 97 in PACKAGES.
+- **v2.13.0: conversions mapped — one lesson each way.** Book Problem 3.5
+  shows string-to-array needs no builtin: strsplit ~> trim ~> num is the
+  idiom (and the reverse maps str through strjoin). The other direction is
+  a wall worth recording: fields(r) can see a record's names but nothing
+  can use a name dynamically, so generic k=v parsers, serializers, and
+  record utilities are impossible in userland — KNOWN_LIMITATIONS gains
+  the entry, and the Cozy seed gains design entry 5, the record
+  reflection trio (getfield/setfield/construction), same family as
+  ast(f). Milking maintenance for successor experience, per the owner's
+  standing order.
+- **v2.12.0: symb.nu — symbolic differentiation, pure showing off.** The
+  eighth package: expression trees as nested records, constructors instead
+  of a parser (the string builtins have no substring access — a recorded
+  limit, worked with rather than around), and ddx by structural recursion.
+  sub and divx desugar into add/mul/negative powers at construction, so
+  product, power, and chain rules alone carry the calculus — the quotient
+  rule falls out of d(b^-1) for free. simp folds constants and
+  reassociates them leftward (the third derivative of x^5 prints 60x^2);
+  subst composes; taylor extracts series by repeated ddx — sine's
+  0, 1, 0, -1/6, 0, 1/120 recovered from record recursion. PACKAGES §8 and
+  new book Appendix E cross-check the symbolic derivative against Chapter
+  10's numeric operator to 1e-8 in one verified session; the index of
+  builtins becomes Appendix F. Two spike lessons banked: the frozen
+  grammar has no elseif (nested if/end chains are the dispatch tax, a
+  motivated successor note), and & does not short-circuit (guards must
+  nest). 299 verified book transcripts; 92 in PACKAGES.
+- **v2.11.0: the book fully illustrated, and self-composition joins the
+  idiom.** Problem 12.5 — selfcomp (fn f -> fn x -> f(f(x))) applied,
+  bound, and mapped; the n-fold iterate built with if (pick evaluates
+  both arms and would recurse forever); forty-fold composition of sqrt(1+t)
+  converging to the golden ratio; and selfcomp(d) delivering the second
+  derivative with the step-size caveat (nesting squares h). Nine new
+  author-drawn plates complete the art program: chapters 11-14 (linear
+  algebra, probability, plotting, the idiom) and appendices A-E (finance,
+  astronomy, physics, random matrices, the index), re-inked on HP-handbook
+  blue like the first ten. The PDF now starts every chapter and appendix
+  on a fresh page. 288 verified transcripts.
 - **v2.10.0: keep — the complement of clear, and the one sanctioned
   post-freeze builtin.** keep("a", "b") removes every user variable except
   the named ones. The pure-package route was probed first and is honestly

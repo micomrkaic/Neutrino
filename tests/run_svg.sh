@@ -24,4 +24,13 @@ assert len(d.getElementsByTagName('circle')) == 25, "want 25 scatter circles"
 assert 'pkg scatter' in open('plot_1.svg').read(), "want title"
 print("svg: scatter.nu renders circles via style=points")
 PY
+# marker-family unification: "circle" means circles on every backend
+rm -f plot_*.svg
+printf 'plot(1:6, (1:6) .^ 2, {style = "circle"})\n' | NEUTRINO_PLOT_TERM=svg ./vmtest >/dev/null
+python3 - << 'PY'
+import xml.dom.minidom
+d = xml.dom.minidom.parse('plot_1.svg')
+assert len(d.getElementsByTagName('circle')) == 6, "want circle-style markers"
+print("svg: marker family (circle/points/dots) unified")
+PY
 rm -f plot_*.svg

@@ -3,7 +3,7 @@
 *A book of worked problems — practical computing with a small array
 language.*
 
-![](logo.png)
+![](og-card.png)
 
 
 This book is written in the tradition of the calculator applications
@@ -38,7 +38,8 @@ Appendix A. Finance (finance.nu)
 Appendix B. Astronomy (astro.nu)
 Appendix C. Physics (phys.nu)
 Appendix D. Random matrices (rmt.nu)
-Appendix E. Index of builtins
+Appendix E. Symbolic differentiation (symb.nu)
+Appendix F. Index of builtins
 
 ---
 
@@ -260,16 +261,41 @@ string functions ride the pipes like everything else:
 
 ```
 neutrino> ls("packages")
-["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"]
+["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"; "symb.nu"]
 neutrino> ans ~> (fn f -> endswith(f, ".nu")) |> all
 true
 neutrino> ls("packages") ~> (fn f -> contains(f, "s")) |> sum
-4
+5
 ```
 
 **Discussion.** A directory listing maps under `~>` through `endswith`,
 and `all`/`sum` reduce the answers. Text processing and array processing
 are the same processing.
+
+**Problem 3.5 — Between text and values.** There is no
+string-to-array builtin because none is needed — conversion is a
+pipeline:
+
+```
+neutrino> strsplit("3.14, 2.71, 1.41", ",") ~> trim ~> num
+[3.14, 2.71, 1.41]
+neutrino> strsplit("10 20 30", " ") ~> num |> sum
+60
+neutrino> [1.5, 2.5, 3.5] ~> str |> (fn a -> strjoin(a, " | "))
+"1.5 | 2.5 | 3.5"
+neutrino> let r = {rate = 0.0575, n = 360}; str(r)
+"{rate = 0.0575, n = 360}"
+neutrino> fields(r)
+["rate"; "n"]
+```
+
+**Discussion.** `strsplit` cuts, `trim` cleans, `num` converts, and the
+reductions are waiting at the end of the pipe — text to numbers is three
+small tools composed, not one big one. The reverse trip maps `str` and
+joins. Records go *to* text (`str` gives the literal form, `fields` the
+names) but not back: building a record with runtime-determined field
+names is beyond the frozen language — a boundary worth knowing, recorded
+in KNOWN_LIMITATIONS for the successor.
 
 ---
 
@@ -318,18 +344,20 @@ neutrino> let z = exp(2i * pi / 5)
 0.3090+0.9511i
 neutrino> let zpow = fn n -> prod[k = 1:n] z
 <fn/1>
-neutrino> zpow(5)
-1.000-2.220e-16i
-neutrino> sum[k = 0:4] zpow(k)
--5.551e-17-1.110e-16i
+neutrino> abs(zpow(5) - 1) < 1e-12
+true
+neutrino> abs(sum[k = 0:4] zpow(k)) < 1e-12
+true
 neutrino> abs(z - 1)
 1.176
 ```
 
 **Discussion.** Complex `^` is deliberately absent from the core, and the
 index-bound reduction supplies it with a certain wit: `prod[k = 1:n] z`
-*is* zⁿ. The geometric sum vanishes to rounding, and |z − 1| ≈ 1.176 is
-the unit pentagon's side.
+*is* zⁿ. Both classical identities — z⁵ = 1 and the vanishing sum of the
+five roots — are asserted below tolerance rather than displayed, because
+their residuals are pure rounding noise whose last digits differ between
+platforms' math libraries; |z − 1| ≈ 1.176 is the unit pentagon's side.
 
 **Problem 4.3 — Rotation as multiplication.** Rotate the point (3, 2) by
 60° about the origin.
@@ -855,6 +883,8 @@ centuries of analysis.
 
 ## 11. Linear algebra
 
+![](vignettes/vin11.png)
+
 Matrices are the native tongue: `\` solves systems, `eig`, `lu`, `qr`,
 `svd`, `chol` decompose, and poly.nu's `polyfit` does least squares.
 
@@ -924,19 +954,27 @@ neutrino> format(4)
 neutrino> let P = [0.9, 0.1; 0.3, 0.7];
 neutrino> let r = eig(P.')
 {values = [0.6000; 1.000], vectors = [-0.7071, 0.9487; 0.7071, 0.3162]}
-neutrino> let v = r.vectors[:, 1]; let s = v / sum(v)
-[-3.185e+15; 3.185e+15]
+neutrino> let idx = find(abs(r.values - 1) < 1e-9)[1]
+2
+neutrino> let v = r.vectors[:, idx]; let s = v / sum(v)
+[0.7500; 0.2500]
 neutrino> P.' * s
-[-1.911e+15; 1.911e+15]
+[0.7500; 0.2500]
 ```
 
-**Discussion.** Normalized: 75% sunny, 25% rain — and Pᵀs = s confirms
-stationarity. Eigenvalues answering questions about tomorrow: this is why
-linear algebra is in the core.
+**Discussion.** `find` selects the column whose eigenvalue is 1 — never
+assume eigenvalue ordering, which is implementation- and platform-defined
+(this book's first printing did, normalized the wrong vector, and shipped
+±10¹⁵ garbage that a macOS build exposed). Properly selected and
+normalized: 75% sunny, 25% rain, and P′s = s confirms stationarity.
+Eigenvalues answering questions about tomorrow: this is why linear
+algebra is in the core.
 
 ---
 
 ## 12. Probability, statistics, and data
+
+![](vignettes/vin12.png)
 
 dist.nu supplies the distributions; `writecsv`/`readcsv` move data in and
 out; seeded `rng` makes every simulation a repeatable experiment.
@@ -1017,6 +1055,8 @@ live, on the poor man's Gaussian no less.
 ---
 
 ## 13. Plotting
+
+![](vignettes/vin13.png)
 
 Neutrino plots through three backends, chosen by environment: in the
 **browser** the default is SVG — dark-themed, rendered into the Plots pane
@@ -1123,6 +1163,8 @@ working.
 
 ## 14. The Neutrino idiom
 
+![](vignettes/vin14.png)
+
 The unique syntax — lambdas, `where`, index-bound reductions, and the
 pipe family — was designed to *combine*. This chapter is about the
 combinations: the sentences, not the words. It is the most important
@@ -1211,9 +1253,66 @@ drops below one half: **23**, the famous answer, computed in the notation
 you'd use to explain it. When the sentence structure of a language
 matches the thought structure of its user, this is what it looks like.
 
+**Problem 12.5 — Composing a function with itself.** An operator that
+returns f ∘ f — a function eating a function, producing their
+composition:
+
+```
+neutrino> format(4)
+neutrino> let selfcomp = fn f -> fn x -> f(f(x))
+<fn/1>
+neutrino> selfcomp(fn t -> t + 3)(10)
+16
+neutrino> selfcomp(sqrt)(16)
+2.000
+neutrino> [1, 2, 3] ~> selfcomp(fn t -> t * 10)
+[100, 200, 300]
+```
+
+**Discussion.** `selfcomp(f)` *is* a function: apply it, bind it, or send
+an array through it with `~>`. The n-fold generalization must use `if`
+rather than `pick` — `pick` is an ordinary function and evaluates *both*
+arms, which would recurse forever; `if` is the lazy form:
+
+```
+neutrino> format(4)
+neutrino> let iterate = fn f, n -> if n <= 0 then (fn x -> x) else (fn x -> f(iterate(f, n - 1)(x))) end
+<fn/2>
+neutrino> iterate(fn t -> t * 2, 10)(1)
+1024
+neutrino> iterate(fn t -> sqrt(1 + t), 40)(1)
+1.618
+neutrino> (1 + sqrt(5)) / 2
+1.618
+```
+
+**Discussion.** Ten doublings make 1024 — and the second line is a small
+wonder: forty-fold composition of √(1+t) converges to its fixed point,
+**the golden ratio**, because φ solves x = √(1+x). `selfcomp` is just
+`iterate(f, 2)`.
+
+```
+neutrino> format(4)
+neutrino> let d = fn f -> fn x -> (f(x + h) - f(x - h)) / (2 * h) where h = 1e-4
+<fn/1>
+neutrino> let selfcomp = fn f -> fn x -> f(f(x));
+neutrino> selfcomp(d)(sin)(pi / 3)
+-0.8660
+neutrino> -sin(pi / 3)
+-0.8660
+```
+
+**Discussion.** Composing the derivative operator of Problem 10.6 with
+itself yields the second derivative: −sin(π/3) on the nose. Note
+`h = 1e-4` rather than `1e-6` — nesting squares the step, and 10⁻¹²
+denominators drown in cancellation. Operators compose like functions
+because they *are* functions.
+
 ---
 
 ## Appendix A. Finance (finance.nu)
+
+![](vignettes/vinA.png)
 
 **Problem A.1 — The mortgage, end to end.** A 425,000 house, 20% down,
 30 years at 5.75% — payment, lifetime interest, and the effect of 300
@@ -1287,6 +1386,8 @@ begin to trust it on the contracts that have no formula.
 
 ## Appendix B. Astronomy (astro.nu)
 
+![](vignettes/vinB.png)
+
 **Problem B.1 — A July Saturday in Ljubljana.** Sunrise, sunset, and day
 length at 46.05°N, 14.51°E, UTC+2.
 
@@ -1321,6 +1422,8 @@ twenty days.
 ---
 
 ## Appendix C. Physics (phys.nu)
+
+![](vignettes/vinC.png)
 
 **Problem C.1 — Orbital and escape velocity.** Speed for a 400 km circular
 orbit; escape speed from the surface.
@@ -1357,6 +1460,8 @@ found by a microwave antenna.
 
 ## Appendix D. Random matrices (rmt.nu)
 
+![](vignettes/vinD.png)
+
 **Problem D.1 — Wigner's semicircle, witnessed.** The eigenvalues of a
 400 × 400 GOE matrix.
 
@@ -1377,7 +1482,116 @@ hardware.
 
 ---
 
-## Appendix E. Index of builtins
+## Appendix E. Symbolic differentiation (symb.nu)
+
+![](vignettes/vinE.png)
+
+**Problem E.1 — The derivative, symbolically, checked numerically.**
+
+```
+neutrino> format(4)
+neutrino> load("packages/symb.nu")
+neutrino> let e = add(powc(X, 3), mul(C(5), sinx(X)));
+neutrino> show(simp(ddx(e)))
+"((3 * x^2) + (5 * cos(x)))"
+neutrino> let d = fn f -> fn x -> (f(x + h) - f(x - h)) / (2 * h) where h = 1e-6
+<fn/1>
+neutrino> abs(evalx(ddx(e), 2) - d(fn t -> t ^ 3 + 5 * sin(t))(2)) < 1e-8
+true
+```
+
+**Discussion.** Expressions are records; `ddx` is structural recursion;
+and the symbolic derivative agrees with Chapter 10's numeric operator to
+10⁻⁸ — two independent roads to the same slope, machine-verified in one
+session. The chapter-12 lesson at full power: data, functions, and
+operators are all just values.
+
+**Problem E.2 — Taylor series from structure.**
+
+```
+neutrino> format(4)
+neutrino> load("packages/symb.nu")
+neutrino> taylor(sinx(X), 7)
+[0.000, 1.000, -0.000, -0.1667, 0.000, 0.008333, -0.000, -0.0001984]
+neutrino> taylor(expx(X), 5)
+[1.000, 1.000, 0.5000, 0.1667, 0.04167, 0.008333]
+neutrino> show(dn(powc(X, 5), 3))
+"(60 * x^2)"
+```
+
+**Discussion.** Repeated `ddx`, evaluated at zero, divided by k!: the sine
+series 0, 1, 0, −1/6, 0, 1/120, ... and exp's 1/k! fall out of record
+recursion — no calculus tables consulted. The third derivative of x⁵
+folds to 60x² on its way through the simplifier.
+
+**Problem E.3 — The parser that was possible all along.** Release
+v2.12.1 recorded string extraction as impossible; v2.13.1 discovered the
+goldens said otherwise — strings index like arrays, always did. This
+problem is the correction made executable: a recursive-descent parser in
+pure Neutrino, so the differentiator takes mathematics as you would type
+it:
+
+```
+neutrino> format(4)
+neutrino> load("packages/symb.nu")
+neutrino> deriv("sin(x)/x")
+"((cos(x) / x) - (sin(x) / x^2))"
+neutrino> deriv("x^3 + 5*sin(x)")
+"((3 * x^2) + (5 * cos(x)))"
+neutrino> deriv("exp(-x^2)")
+"(-2 * (exp((-x^2)) * x))"
+neutrino> let d = fn f -> fn x -> (f(x + h) - f(x - h)) / (2 * h) where h = 1e-6
+<fn/1>
+neutrino> abs(evalx(ddx(parse("sin(x)/x")), 1.5) - d(fn t -> sin(t) / t)(1.5)) < 1e-8
+true
+```
+
+**Discussion.** Character classes are chained comparisons
+(`"0" <= c <= "9"`); the grammar threads its position through records
+(with unary minus binding looser than `^`, so `-x^2` means −(x²) as
+mathematics demands); and the printer recognizes division and
+subtraction, so the quotient rule for sin(x)/x prints as the textbook
+writes it. General powers desugar as f^g = exp(g·log f). The numeric
+cross-check closes the loop: parsed, symbolically differentiated, and
+agreeing with the finite difference to 10⁻⁸. The lesson rides with the
+code: the limitation was in the maintainer's memory, not the language —
+and the goldens outranked the memory, which is what they are for.
+
+**Problem E.4 — From symbols back to functions.** `tofun` lifts an
+expression tree into an ordinary function (`fn x -> evalx(e, x)`);
+`dfun(src)` goes from string to derivative-as-function in one step. The
+payoff is reunification — symbolic results re-enter the numeric
+ecosystem:
+
+```
+neutrino> format(6)
+neutrino> load("packages/symb.nu")
+neutrino> let f = dfun("sin(x)/x");
+neutrino> fzero(f, 4, 5)
+4.49341
+neutrino> fminbnd(ffun("sin(x)/x"), 4, 5)
+{x = 4.49341, fx = -0.217234}
+neutrino> integral(dfun("x^3"), 1, 2)
+7.00000
+neutrino> ffun("x^3")(2) - ffun("x^3")(1)
+7
+```
+
+**Discussion.** The first pair is the showpiece: `fzero` hunting the root
+of the *symbolic* derivative and `fminbnd` minimizing the *original*
+function land on the same 4.49341 — the famous critical point of
+sin(x)/x, where tan(x) = x — two independent routes to one extremum,
+agreeing to six digits inside one verified session. The second pair is
+the Fundamental Theorem of Calculus, checked numerically: the integral
+of the symbolic derivative equals the function's change, 7 exactly.
+Strings become trees, trees become functions, functions meet the
+integrator — the package and the core, one calculus.
+
+---
+
+## Appendix F. Index of builtins
+
+![](vignettes/vinF.png)
 
 Every builtin and constant, alphabetically — machine-generated from the
 interpreter's own documentation table, so this index cannot drift from the

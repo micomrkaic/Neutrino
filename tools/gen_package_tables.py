@@ -98,6 +98,15 @@ SPECS = {
     ("jitter preserves shape", "size(jitter(rand(3, 4), 0.2)) == [3, 4]"),
     ("mean displacement is small", "abs(mean(jitter(zeros(1, 2000), 0.2))) < 0.01"),
   ]),
+  "symb": ("load(\"packages/symb.nu\")", [
+    ("d/dx of x^3 at 2 is 12", "evalx(ddx(powc(X, 3)), 2) == 12"),
+    ("chain rule through exp(2x)", "abs(evalx(ddx(subst(expx(X), mul(C(2), X))), 0) - 2) < 1e-12"),
+    ("taylor of exp begins 1, 1, 1/2", "max(abs(taylor(expx(X), 2) - [1, 1, 0.5])) < 1e-9"),
+    ("parse then evaluate", "abs(evalx(parse(\"2*pi\"), 0) - 2 * pi) < 1e-12"),
+    ("deriv: string in, string out", "deriv(\"x^2\") == \"(2 * x)\""),
+    ("dfun: derivative as a function", "abs(dfun(\"x^3\")(2) - 12) < 1e-12"),
+    ("FTC: integral of dfun is the change", "abs(integral(dfun(\"x^3\"), 1, 2) - 7) < 1e-6"),
+  ]),
 }
 
 def esc(t): return t.replace("|", "\\|")

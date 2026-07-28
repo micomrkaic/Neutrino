@@ -2,7 +2,8 @@
 
 *The standard packages that ship with Neutrino: probability distributions,
 polynomials, finance, a solar almanac, structured random matrices,
-physical constants, and scatter plots — all written in Neutrino itself.*
+physical constants, scatter plots,
+and symbolic differentiation — all written in Neutrino itself.*
 
 A package is a file of `let` definitions; `load("packages/name.nu")` runs it
 in the current session and its bindings persist. Records of closures act as
@@ -389,6 +390,77 @@ neutrino> size(jitter(rand(3, 4), 0.2))
 | `jitter(x, a) stays within a/2` | `max(abs(jitter(1:100, 0.1) - (1:100))) <= 0.05` | `true` |
 | `jitter preserves shape` | `size(jitter(rand(3, 4), 0.2)) == [3, 4]` | `[true, true]` |
 | `mean displacement is small` | `abs(mean(jitter(zeros(1, 2000), 0.2))) < 0.01` | `true` |
+
+## 8. symb.nu — symbolic differentiation
+
+Pure showing off: a symbolic differentiator in pure Neutrino. Expressions
+are nested records built by constructors (`C(5)`, `X`, `add`, `mul`,
+`powc`, `sinx`, ...; there is deliberately no string parser — the string
+builtins have no substring access, so entry is constructor-style, in the
+spirit of RPN). `ddx` differentiates by structural recursion; `sub` and
+`divx` desugar into add/mul/negative powers at construction, so product,
+power, and chain rules alone carry the whole calculus — the quotient rule
+falls out of d(b⁻¹) for free. `simp` folds constants, `show` prints,
+`evalx` evaluates, `subst` composes, and `taylor` extracts series
+coefficients by repeated differentiation. The transcript cross-checks the
+symbolic answer against numeric differentiation — two independent
+derivatives agreeing inside one verified session:
+
+```
+neutrino> format(4)
+neutrino> load("packages/symb.nu")
+neutrino> let e = add(powc(X, 3), mul(C(5), sinx(X)));
+neutrino> show(simp(ddx(e)))
+"((3 * x^2) + (5 * cos(x)))"
+neutrino> let d = fn f -> fn x -> (f(x + h) - f(x - h)) / (2 * h) where h = 1e-6
+<fn/1>
+neutrino> abs(evalx(ddx(e), 2) - d(fn t -> t ^ 3 + 5 * sin(t))(2)) < 1e-8
+true
+neutrino> show(dn(powc(X, 5), 3))
+"(60 * x^2)"
+neutrino> taylor(sinx(X), 7)
+[0.000, 1.000, -0.000, -0.1667, 0.000, 0.008333, -0.000, -0.0001984]
+neutrino> show(simp(ddx(subst(expx(X), mul(C(2), X)))))
+"(2 * exp((2 * x)))"
+```
+
+That last-but-one line is the sine series — 0, 1, 0, −1/6, 0, 1/120, ... —
+recovered from pure record recursion.
+
+And since v2.13.1 established that strings index like arrays (and always
+did), the package now carries **the parser that was possible all along**:
+recursive descent over `s[i]`, character classes as chained comparisons
+(`"0" <= c <= "9"`), general powers desugared as f^g = exp(g·log f) so
+even x^x differentiates. The printer knows division and subtraction, so
+the quotient rule reads as the textbook writes it. And `tofun`/`ffun`/`dfun` lift results back into
+function-space — `dfun("sin(x)/x")` is an ordinary function, ready for
+`fzero`, `integral`, and the pipes. String in, string out:
+
+```
+neutrino> load("packages/symb.nu")
+neutrino> deriv("sin(x)/x")
+"((cos(x) / x) - (sin(x) / x^2))"
+neutrino> deriv("x^3 + 5*sin(x)")
+"((3 * x^2) + (5 * cos(x)))"
+neutrino> deriv("x^x")
+"(exp((x * log(x))) * (log(x) + (x / x)))"
+neutrino> deriv("log(x^2 + 1)")
+"(2 * (x / (x^2 + 1)))"
+neutrino> taylor(parse("exp(x)"), 4)
+[1, 1, 0.5, 0.166667, 0.0416667]
+```
+
+
+
+| Function | Worked example | Result |
+|---|---|---|
+| `d/dx of x^3 at 2 is 12` | `evalx(ddx(powc(X, 3)), 2) == 12` | `true` |
+| `chain rule through exp(2x)` | `abs(evalx(ddx(subst(expx(X), mul(C(2), X))), 0) - 2) < 1e-12` | `true` |
+| `taylor of exp begins 1, 1, 1/2` | `max(abs(taylor(expx(X), 2) - [1, 1, 0.5])) < 1e-9` | `true` |
+| `parse then evaluate` | `abs(evalx(parse("2*pi"), 0) - 2 * pi) < 1e-12` | `true` |
+| `deriv: string in, string out` | `deriv("x^2") == "(2 * x)"` | `true` |
+| `dfun: derivative as a function` | `abs(dfun("x^3")(2) - 12) < 1e-12` | `true` |
+| `FTC: integral of dfun is the change` | `abs(integral(dfun("x^3"), 1, 2) - 7) < 1e-6` | `true` |
 
 ## Writing your own
 

@@ -1,5 +1,8 @@
 /* eval.c — Neutrino tree-walking evaluator. */
 #define _XOPEN_SOURCE 700         /* open_memstream + jn/yn Bessel (superset of POSIX.1-2008) */
+#define _DARWIN_C_SOURCE 1        /* macOS: _XOPEN_SOURCE alone HIDES extension fields like
+                                     rusage.ru_maxrss (Darwin clamps visibility to the requested
+                                     standard); this re-widens it. Inert on other platforms. */
 #include <errno.h>
 #include <float.h>
 #include <sys/resource.h>
@@ -2492,7 +2495,16 @@ static void svg_plot_render(Interp *I, ArrObj *X, ArrObj *Y, bool yvec,
     const char *xl = ascii_optstr(opts, "xlabel", &xllen);
     const char *yl = ascii_optstr(opts, "ylabel", &yllen);
     const char *style = ascii_optstr(opts, "style", &stlen);
-    bool points_only = style && stlen >= 6 && memcmp(style, "points", 6) == 0;
+    /* Marker-family styles render as points in the svg/ascii backends.
+     * gnuplot accepts a whole family (points, circles, dots) plus
+     * abbreviations; match by substring so "circle" means the same thing
+     * on every backend instead of silently becoming a line. */
+    bool points_only = false;
+    if (style)
+        for (uint32_t si = 0; si + 2 < stlen && !points_only; si++)
+            points_only = (stlen - si >= 5 && memcmp(style + si, "point", 5) == 0)
+                       || (stlen - si >= 6 && memcmp(style + si, "circle", 6) == 0)
+                       || (stlen - si >= 3 && memcmp(style + si, "dot", 3) == 0);
 
     svg_frame(o, xmin, xmax, ymin, ymax, title, tlen, xl, xllen, yl, yllen);
     const int PW = SVG_W - SVG_ML - SVG_MR, PH = SVG_H - SVG_MT - SVG_MB;

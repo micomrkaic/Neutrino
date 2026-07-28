@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Appendix E of BOOK.md: an alphabetical index of every builtin
+"""Generate Appendix F of BOOK.md: an alphabetical index of every builtin
 and constant, extracted from eval.c's documentation table (the single
 source of truth). --check verifies the book is current without writing."""
 import re, sys, os

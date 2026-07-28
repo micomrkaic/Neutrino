@@ -103,3 +103,27 @@ compiled.
   series in one style; bubble charts and per-point color maps would need
   backend changes and are deferred to the successor language.
   `packages/scatter.nu` covers plain scatter via `style = "points"`.
+- **Strings: extraction exists (correction of the v2.12.1 entry); only
+  strfind is missing.** The v2.12.1 printing of this entry claimed no
+  substr and no character indexing — wrong, and the error is a lesson:
+  the assessment grepped the builtin table for an extraction *function*
+  while the *grammar* had extraction as indexing all along. Strings
+  index like arrays — s[4], s[4:8], s[end-3:end], even s[[3,2,1]] — all
+  golden-tested since the strings phase; a substr builtin would be
+  redundant, which is why it does not exist. The genuine gap is
+  narrower: no strfind (contains says whether a pattern occurs, nothing
+  reports where), so pattern-directed slicing needs a char-by-char scan.
+  Tokenizers are therefore writable, just laborious — symb.nu's
+  constructor API was a choice made on a false premise, and a parser
+  remains possible under the freeze. Successor: add strfind; character
+  indexing needs nothing.
+- **Records: reflection sees, nothing touches.** fields(r) returns the
+  names, but there is no getfield/setfield/dynamic construction — field
+  access is spelled with literal names only. Consequence: no package can
+  write a generic key=value parser, serializer, record merge, or
+  field-mapped utility; string-to-record conversion is impossible in
+  userland (string-to-array, by contrast, is a strsplit ~> trim ~> num
+  pipeline and needs nothing). Successor design: the record reflection
+  trio — getfield(r, name), setfield(r, name, v) returning a new record,
+  and construction from parallel name/value arrays — the same reflection
+  family as ast(f).
