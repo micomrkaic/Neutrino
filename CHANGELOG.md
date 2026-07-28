@@ -179,6 +179,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.18.0: the tour gains its crown jewels.** A new act, Functions as
+  values — anonymous application, Euclid's algorithm as bare recursion
+  (gcd_(1071, 462) = 21), and iterate composing any function with itself
+  n times, with forty-fold sqrt(1+t) converging on the golden ratio —
+  and the pipelines act now opens with both jewels: the oscillation pipe
+  (1:12 ~> (@ ^ 2) |> (fn v -> v[v > 50]) ~> sqrt |> mean, landing on
+  exactly 10 as values flavor-change between element-wise and whole-value
+  flow) and the fan-out dashboard (a seeded rand(1, 500) piped into
+  {mu, sd, hi, lo} in one line). Six acts; run_demo.sh asserts the
+  golden ratio and Euclid alongside the birthday.
 - **v2.17.0: the tour, and a lit legend.** packages/demo.nu is the ninth
   package and the first performance: five acts of greatest hits — Basel
   in Euler's notation, the Gaussian integral's pi, the quadratic in

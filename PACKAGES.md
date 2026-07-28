@@ -465,10 +465,12 @@ neutrino> taylor(parse("exp(x)"), 4)
 ## 9. demo.nu — the tour
 
 Not a library: a performance. `load("packages/demo.nu")` plays a guided
-tour in five acts — executable mathematics (Basel, the Gaussian
+tour in six acts — executable mathematics (Basel, the Gaussian
 integral), the blackboard's word order (`where`, chained masks),
-pipelines (the birthday problem in one sentence, the fan-out thesis
-line), the calculus (symb.nu's `deriv` and a symbolic derivative fed to
+functions as values (anonymous application, Euclid's recursion, n-fold
+self-composition converging on the golden ratio), the pipelines act with
+both crown jewels (the oscillation pipe — values flavor-changing between
+~> and |> down one chain — and the fan-out dashboard), the calculus (symb.nu's `deriv` and a symbolic derivative fed to
 `fzero`), money (the HP-12C mortgage), and a plotted finale. Every
 number is computed live in the session, seeded where random,
 deterministic throughout; `make test` asserts the tour plays clean end
