@@ -179,6 +179,19 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.17.0: the tour, and a lit legend.** packages/demo.nu is the ninth
+  package and the first performance: five acts of greatest hits — Basel
+  in Euler's notation, the Gaussian integral's pi, the quadratic in
+  blackboard word order, the seeded CLT mask, the birthday problem in one
+  sentence, the fan-out thesis line, symb.nu's deriv("sin(x)/x") with
+  fzero finding the tan x = x critical point, the HP-12C mortgage, and a
+  plotted finale — every number computed live, deterministic, with make
+  test asserting the tour plays clean (tests/run_demo.sh). Along the way
+  print's template semantics met record braces (praw doubles them). And
+  the browser's plot legend is finally readable: the svg legend text
+  carried no fill attribute, defaulting to black on the dark theme —
+  fixed to the axis color, with the svg suite now asserting every legend
+  text carries a fill.
 - **v2.16.0: symbols become functions again.** symb.nu gains the lift
   back to function-space: tofun(e) closes an expression tree into an
   ordinary fn x, with string conveniences ffun(src) and dfun(src) —

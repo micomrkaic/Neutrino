@@ -261,7 +261,7 @@ string functions ride the pipes like everything else:
 
 ```
 neutrino> ls("packages")
-["astro.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"; "symb.nu"]
+["astro.nu"; "demo.nu"; "dist.nu"; "finance.nu"; "phys.nu"; "poly.nu"; "rmt.nu"; "scatter.nu"; "symb.nu"]
 neutrino> ans ~> (fn f -> endswith(f, ".nu")) |> all
 true
 neutrino> ls("packages") ~> (fn f -> contains(f, "s")) |> sum

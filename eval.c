@@ -2538,7 +2538,7 @@ static void svg_plot_render(Interp *I, ArrObj *X, ArrObj *Y, bool yvec,
         double lx = SVG_ML + PW - 132, ly = SVG_MT + 16 + 18 * s;
         fprintf(o, "<line x1=\"%.1f\" y1=\"%.1f\" x2=\"%.1f\" y2=\"%.1f\" stroke=\"%s\" stroke-width=\"2\"/>\n",
                 lx, ly - 4, lx + 22, ly - 4, col);
-        fprintf(o, "<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\">", lx + 28, ly);
+        fprintf(o, "<text x=\"%.1f\" y=\"%.1f\" font-size=\"12\" fill=\"#c6cdd8\">", lx + 28, ly);
         if (lv.kind == VAL_STRING) svg_esc(o, as_str(lv)->data, as_str(lv)->len);
         else fprintf(o, "series %u", s + 1);
         fputs("</text>\n", o);

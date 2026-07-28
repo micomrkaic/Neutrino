@@ -102,6 +102,7 @@ test: vmtest $(BIN)
 	@bash tests/run_longline.sh
 	@timeout 30 python3 tests/run_completion.py || true
 	@bash tests/run_svg.sh
+	@bash tests/run_demo.sh
 	@python3 tests/run_doclint.py
 	@bash tests/run_emacs.sh
 

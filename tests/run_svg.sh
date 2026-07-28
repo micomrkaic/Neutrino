@@ -10,6 +10,9 @@ d1 = xml.dom.minidom.parse('plot_1.svg')
 assert len(d1.getElementsByTagName('polyline')) == 2, "want 2 series polylines"
 s = open('plot_1.svg').read()
 assert 't &amp; &lt;q&gt;' in s and '>a<' in s and '>b<' in s, "escape/legend"
+import re
+for m in re.finditer(r'<text[^>]*>(?:a|b)</text>', s):
+    assert 'fill=' in m.group(0), "legend text must carry a fill (dark theme)"
 d2 = xml.dom.minidom.parse('plot_2.svg')
 assert len(d2.getElementsByTagName('rect')) >= 11, "want histogram bars"
 print("svg: plot + hist backends well-formed, escaped, legended")

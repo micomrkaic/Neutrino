@@ -3,7 +3,7 @@
 *The standard packages that ship with Neutrino: probability distributions,
 polynomials, finance, a solar almanac, structured random matrices,
 physical constants, scatter plots,
-and symbolic differentiation — all written in Neutrino itself.*
+symbolic differentiation, and a guided tour — all written in Neutrino itself.*
 
 A package is a file of `let` definitions; `load("packages/name.nu")` runs it
 in the current session and its bindings persist. Records of closures act as
@@ -461,6 +461,22 @@ neutrino> taylor(parse("exp(x)"), 4)
 | `deriv: string in, string out` | `deriv("x^2") == "(2 * x)"` | `true` |
 | `dfun: derivative as a function` | `abs(dfun("x^3")(2) - 12) < 1e-12` | `true` |
 | `FTC: integral of dfun is the change` | `abs(integral(dfun("x^3"), 1, 2) - 7) < 1e-6` | `true` |
+
+## 9. demo.nu — the tour
+
+Not a library: a performance. `load("packages/demo.nu")` plays a guided
+tour in five acts — executable mathematics (Basel, the Gaussian
+integral), the blackboard's word order (`where`, chained masks),
+pipelines (the birthday problem in one sentence, the fan-out thesis
+line), the calculus (symb.nu's `deriv` and a symbolic derivative fed to
+`fzero`), money (the HP-12C mortgage), and a plotted finale. Every
+number is computed live in the session, seeded where random,
+deterministic throughout; `make test` asserts the tour plays clean end
+to end. Point a newcomer at this file first.
+
+```
+neutrino> load("packages/demo.nu")
+```
 
 ## Writing your own
 

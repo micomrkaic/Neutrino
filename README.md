@@ -56,7 +56,7 @@ territory: they are written in Neutrino and add no weight to the core.
 
 ## Packages
 
-Eight standard packages, all written in Neutrino itself (see PACKAGES.md;
+Nine standard packages, all written in Neutrino itself (see PACKAGES.md;
 worked problems in BOOK.md): **dist** (probability distributions), **poly**
 (polynomials, fitting, exact calculus), **finance** (TVM, bonds, cash
 flows, dates), **astro** (sun, moon, and places), **rmt** (structured
@@ -64,7 +64,8 @@ random matrices), **phys** (CODATA constants), and **scatter** (scatter
 plots over the frozen style = "points" path — the first post-freeze
 package, core untouched), and **symb**
 (symbolic differentiation — expression trees as records, the chain rule by
-structural recursion, Taylor series by repeated ddx).
+structural recursion, Taylor series by repeated ddx), and **demo** — the
+guided tour: load it and watch the greatest hits compute live.
 
 ## Build
 
