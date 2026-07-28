@@ -236,3 +236,14 @@ is therefore that nothing lands in the release repo except through a
 deploy. Never resolve with `push --force`: it works, erases history, and
 teaches a bad reflex.
 
+### Trap: the grep that hid the verdict
+
+v2.19.0 shipped with a red lattice line — "book index: STALE" — because
+the release rite's suite step piped make test through a grep for
+expected-looking lines and read the survivors as green. The failure
+matched no pattern; the pipe swallowed the exit code; the owner's deploy
+found it in one honest run. The law: THE SUITE'S VERDICT IS ITS EXIT
+CODE. Filters may decorate a green run; they must never stand between a
+red one and the eyes. Run make test to a log, test $?, and only then
+summarize.
+

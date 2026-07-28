@@ -1645,6 +1645,7 @@ language.
 | `erfc` | `erfc(x)` | complementary error function 1 - erf(x) | math |
 | `error` | `error(msg) \| error(tmpl, ...)` | raise a runtime error (fmt-style template) | core |
 | `eulergamma` | `eulergamma` | 0.57722..., the Euler-Mascheroni constant | constant |
+| `eval` | `eval("code")` | run a string as Neutrino code in this session; returns the last value | core |
 | `exit` | `exit \| exit(code)` | end the session (also: quit) | repl |
 | `exp` | `exp(x)` | e raised to the x (complex-aware) | math |
 | `eye` | `eye(n)` | n-by-n identity matrix | arrays |
@@ -1664,6 +1665,7 @@ language.
 | `hypot` | `hypot(a, b)` | sqrt(a^2 + b^2) without overflow (elementwise) | math |
 | `imag` | `imag(z)` | imaginary part (elementwise) | complex |
 | `inf` | `inf` | positive infinity (Float) | constant |
+| `input` | `input("prompt")` | read one line from the keyboard as a string (window.prompt in the browser) | files |
 | `integral` | `integral(f, a, b[, tol])` | definite integral (adaptive Simpson, finite limits; default tol 1e-10) | solvers |
 | `inv` | `inv(A)` | matrix inverse (solves A \\ I) | linear algebra |
 | `isfinite` | `isfinite(x)` | elementwise test for a finite value -> logical | test |
@@ -1692,6 +1694,7 @@ language.
 | `min` | `min(A) \| min(a, b) \| min(A, [], dim)` | smallest element; elementwise min; or min along dim | reductions |
 | `mod` | `mod(a, b)` | modulo, result takes the sign of b (elementwise) | math |
 | `more` | `more on\|off` | page long output through $PAGER | repl |
+| `names` | `names() \| names("vars"\|"funcs")` | your workspace names as a sorted string column (the programmatic who) | core |
 | `nan` | `nan` | not-a-number (Float); nan never equals anything, itself included | constant |
 | `norm` | `norm(x) \| norm(x, p)` | vector p-norm (p = 1 or 2, default 2); matrix Frobenius norm | linear algebra |
 | `norminv` | `norminv(p)` | standard normal quantile (inverse CDF) | math |
@@ -1699,6 +1702,7 @@ language.
 | `num` | `num(s)` | parse a string as a number (Int if exact, else Float) | strings |
 | `numel` | `numel(x)` | number of elements (rows*cols) | core |
 | `ones` | `ones(r, c)` | r-by-c matrix of ones | arrays |
+| `pause` | `pause() \| pause("msg")` | wait for the user before continuing (alert in the browser) | files |
 | `phi` | `phi` | 1.61803..., the golden ratio | constant |
 | `pi` | `pi` | 3.14159..., the circle constant | constant |
 | `pick` | `pick(mask, a, b)` | elementwise select: a where the mask is true, else b | arrays |
@@ -1755,7 +1759,7 @@ language.
 | `writecsv` | `writecsv(file, A[, opts])` | matrix -> CSV, full precision (round-trips); opts: {delim} | files |
 | `zeros` | `zeros(r, c)` | r-by-c matrix of zeros | arrays |
 
-*154 names; the same table drives `help`, tab completion, the reference, and the Emacs mode.*
+*158 names; the same table drives `help`, tab completion, the reference, and the Emacs mode.*
 <!-- INDEX:END -->
 
 ---

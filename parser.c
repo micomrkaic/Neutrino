@@ -207,19 +207,32 @@ static AstNode *parse_if(Parser *p)
     Token kw = p->cur;
     expect(p, TOK_KW_IF, "'if'");
     AstNode *n = node(p, AST_IF, kw);
-    n->as.iff.cond = parse_expr(p, 0);
-    skip_newlines(p);
-    expect(p, TOK_KW_THEN, "'then'");
-    skip_newlines(p);
-    n->as.iff.then_e = parse_expr(p, 0);
-    skip_newlines(p);
-    if (accept(p, TOK_KW_ELSE)) {
+    AstNode *ret = n;
+    /* if c then a [elseif c2 then b]... [else z] end — the elseif chain
+     * desugars into nested ifs sharing the single closing 'end'. */
+    for (;;) {
+        n->as.iff.cond = parse_expr(p, 0);
         skip_newlines(p);
-        n->as.iff.else_e = parse_expr(p, 0);
+        expect(p, TOK_KW_THEN, "'then'");
         skip_newlines(p);
+        n->as.iff.then_e = parse_expr(p, 0);
+        skip_newlines(p);
+        if (accept(p, TOK_KW_ELSEIF)) {
+            skip_newlines(p);
+            AstNode *m = node(p, AST_IF, p->cur);
+            n->as.iff.else_e = m;
+            n = m;
+            continue;
+        }
+        if (accept(p, TOK_KW_ELSE)) {
+            skip_newlines(p);
+            n->as.iff.else_e = parse_expr(p, 0);
+            skip_newlines(p);
+        }
+        break;
     }
     expect(p, TOK_KW_END, "'end' to close if");
-    return n;
+    return ret;
 }
 
 static AstNode *parse_record(Parser *p)

@@ -53,7 +53,7 @@
   "Syntax table for `neutrino-mode'.")
 
 (defconst neutrino--keywords
-  '("let" "fn" "if" "then" "else" "end" "for" "while" "where" "do" "in"
+  '("let" "fn" "if" "then" "else" "elseif" "end" "for" "while" "where" "do" "in"
     "return" "break" "continue")
   "Neutrino reserved words.")
 
@@ -107,6 +107,7 @@
     "erfc"
     "error"
     "eulergamma"
+    "eval"
     "exit"
     "exp"
     "eye"
@@ -126,6 +127,7 @@
     "hypot"
     "imag"
     "inf"
+    "input"
     "integral"
     "inv"
     "isfinite"
@@ -154,6 +156,7 @@
     "min"
     "mod"
     "more"
+    "names"
     "nan"
     "norm"
     "norminv"
@@ -161,6 +164,7 @@
     "num"
     "numel"
     "ones"
+    "pause"
     "phi"
     "pi"
     "pick"

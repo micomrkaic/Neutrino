@@ -1456,6 +1456,10 @@ static const BuiltinDoc builtin_docs[] = {
     { "cd",    "cd(\"dir\") | cd",     "change the working directory (persists, unlike !cd); bare cd goes home", "io" , "cd(\"packages\")                    % ...then load(\"dist.nu\") works\ncd(\"..\")                          % back up" },
     { "ls",    "ls | ls(\"dir\") | ls(\"*.nu\")", "directory listing as a string array (globs supported)", "io" , "numel(ls(\"packages\")) >= 5        %= true" },
     { "load",  "load(\"file.nu\")",  "run a file in the current session; its let-bindings persist (a record of closures makes a module)", "core" , "load(\"tests/data/mathlib.nu\"); cube(3)   %= 27\nload(\"mylib.nu\"); mylib.f(2)     % record-of-closures as a namespace" },
+    { "eval",  "eval(\"code\")", "run a string as Neutrino code in this session; returns the last value", "core" , "eval(\"2 + 2\")                      % 4" },
+    { "names", "names() | names(\"vars\"|\"funcs\")", "your workspace names as a sorted string column (the programmatic who)", "core" , "let a = 1; names(\"vars\")           % [\"a\"]" },
+    { "input", "input(\"prompt\")", "read one line from the keyboard as a string (window.prompt in the browser)", "io" , "let name = input(\"who? \")          % interactive" },
+    { "pause", "pause() | pause(\"msg\")", "wait for the user before continuing (alert in the browser)", "io" , "pause()                            % interactive" },
     { "clear", "clear() | clear(\"a\", ...)", "remove all user variables, or the named ones; clearing a shadow restores the standard-library original", "core" , "let junk = 42; clear(\"junk\")   % junk is gone\nclear                             % bare: everything user-defined" },
     { "keep",  "keep(\"a\", \"b\", ...)", "remove all user variables except the named ones (the complement of clear)", "core" , "let a = 1; let b = 2; keep(\"a\")     % b is gone, a survives" },
     { "mem",   "mem",               "print workspace size (variables) and peak process memory", "core" , "mem                               % e.g.  workspace: 3 variables, 2.1 MB" },
@@ -1768,6 +1772,143 @@ static Value bi_save(Interp *I, Value *args, uint32_t n)
     fwrite(buf, 1, buflen, out);
     fclose(out); free(buf);
     (void)saved;                                   /* silent on success, like clear */
+    return val_null();
+}
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+/* eval("code"): parse and run a string in the current session; the value
+ * of the last statement is returned. The parsed program's arena and
+ * source are retained for the session (function values may reference
+ * them), exactly as load does. */
+static Value bi_eval_str(Interp *I, Value *args, uint32_t n)
+{
+    (void)n;
+    if (args[0].kind != VAL_STRING)
+        runtime_error(I, "eval: expected a code string");
+    StrObj *ps = as_str(args[0]);
+    char *src = malloc((size_t)ps->len + 1);
+    if (!src) runtime_error(I, "eval: out of memory");
+    memcpy(src, ps->data, ps->len); src[ps->len] = '\0';
+
+    Arena *a = arena_new();
+    Parser p;
+    parser_init(&p, src, a);
+    AstNode *prog = parser_parse(&p);
+    if (p.had_error) {
+        char msg[256];
+        snprintf(msg, sizeof msg, "%s", p.err_msg);
+        uint32_t el = p.err_tok.line, ec = p.err_tok.col;
+        arena_free(a); free(src);
+        runtime_error(I, "eval: parse error at %u:%u: %s", el, ec, msg);
+    }
+    load_keep_push(a, src);
+    Value r = vm_eval_program(I, prog, I->globals, /*echo=*/false);
+    if (I->had_error) {
+        char saved[256];
+        snprintf(saved, sizeof saved, "%s", I->err);
+        value_release(r);
+        runtime_error(I, "eval: %s", saved);
+    }
+    return r;
+}
+
+/* names() / names("vars") / names("funcs"): the user region's names as a
+ * sorted string column — the programmatic sibling of the who family,
+ * whose printed tables stay exactly as they are. */
+static int names_cmp(const void *pa, const void *pb)
+{
+    const char *const *x = pa; const char *const *y = pb;
+    return strcmp(*x, *y);
+}
+static Value bi_names(Interp *I, Value *args, uint32_t n)
+{
+    int want = 0;                                  /* 0 all, 1 vars, 2 funcs */
+    if (n == 1) {
+        if (args[0].kind != VAL_STRING)
+            runtime_error(I, "names: expected \"vars\", \"funcs\", or no argument");
+        StrObj *s0 = as_str(args[0]);
+        if (s0->len == 4 && memcmp(s0->data, "vars", 4) == 0) want = 1;
+        else if (s0->len == 5 && memcmp(s0->data, "funcs", 5) == 0) want = 2;
+        else if (s0->len == 3 && memcmp(s0->data, "all", 3) == 0) want = 0;
+        else runtime_error(I, "names: unknown selector (use \"vars\", \"funcs\", or \"all\")");
+    }
+    EnvObj *g = I->globals;
+    uint32_t cnt = 0;
+    char *tmp[4096];
+    for (uint32_t i = g->n_protected; i < g->count && cnt < 4096; i++) {
+        bool is_fn = (g->vals[i].kind == VAL_CLOSURE || g->vals[i].kind == VAL_BUILTIN);
+        if ((want == 1 && is_fn) || (want == 2 && !is_fn)) continue;
+        char *nm = malloc(g->namelens[i] + 1);
+        memcpy(nm, g->names[i], g->namelens[i]); nm[g->namelens[i]] = '\0';
+        tmp[cnt++] = nm;
+    }
+    qsort(tmp, cnt, sizeof tmp[0], names_cmp);
+    Value out = val_array(ELT_STRING, cnt, cnt ? 1 : 0);
+    for (uint32_t i = 0; i < cnt; i++) {
+        Value sv = val_string(tmp[i], (uint32_t)strlen(tmp[i]));
+        arr_set(as_arr(out), i, sv);
+        value_release(sv);
+        free(tmp[i]);
+    }
+    return out;
+}
+
+/* input("prompt"): print the prompt, read one line from the keyboard,
+ * return it as a string (newline stripped). In the browser this is
+ * window.prompt. */
+static Value bi_input(Interp *I, Value *args, uint32_t n)
+{
+    const char *prompt = ""; uint32_t plen = 0;
+    if (n == 1) {
+        if (args[0].kind != VAL_STRING) runtime_error(I, "input: expected a prompt string");
+        StrObj *s0 = as_str(args[0]); prompt = s0->data; plen = s0->len;
+    }
+#ifdef __EMSCRIPTEN__
+    char cp[256];
+    snprintf(cp, sizeof cp, "%.*s", (int)plen, prompt);
+    char *ans = (char *)(intptr_t)EM_ASM_INT({
+        var r = window.prompt(UTF8ToString($0));
+        if (r === null) r = "";
+        var len = lengthBytesUTF8(r) + 1;
+        var b = _malloc(len);
+        stringToUTF8(r, b, len);
+        return b;
+    }, cp);
+    Value v = val_string(ans, (uint32_t)strlen(ans));
+    free(ans);
+    return v;
+#else
+    if (plen) { fwrite(prompt, 1, plen, stdout); fflush(stdout); }
+    char *line = NULL; size_t cap = 0;
+    ssize_t got = getline(&line, &cap, stdin);
+    if (got < 0) { free(line); return val_string("", 0); }
+    while (got > 0 && (line[got - 1] == '\n' || line[got - 1] == '\r')) got--;
+    Value v = val_string(line, (uint32_t)got);
+    free(line);
+    return v;
+#endif
+}
+
+/* pause() / pause("message"): wait for the user before continuing. */
+static Value bi_pause(Interp *I, Value *args, uint32_t n)
+{
+    (void)I;
+    const char *msg = "pause: press Enter to continue..."; uint32_t mlen = (uint32_t)strlen(msg);
+    if (n == 1 && args[0].kind == VAL_STRING) {
+        StrObj *s0 = as_str(args[0]); msg = s0->data; mlen = s0->len;
+    }
+#ifdef __EMSCRIPTEN__
+    char cm[256];
+    snprintf(cm, sizeof cm, "%.*s", (int)mlen, msg);
+    EM_ASM({ window.alert(UTF8ToString($0)); }, cm);
+#else
+    fwrite(msg, 1, mlen, stdout); fflush(stdout);
+    int c;
+    while ((c = getchar()) != EOF && c != '\n') { }
+#endif
     return val_null();
 }
 
@@ -5634,6 +5775,10 @@ EnvObj *globals_new(void)
     def_builtin(e, "cd",    bi_cd,    0, 1);
     def_builtin(e, "ls",    bi_ls,    0, 1);
     def_builtin(e, "load",    bi_load,    1, 1);
+    def_builtin(e, "eval",    bi_eval_str, 1, 1);
+    def_builtin(e, "names",   bi_names,   0, 1);
+    def_builtin(e, "input",   bi_input,   0, 1);
+    def_builtin(e, "pause",   bi_pause,   0, 1);
     def_builtin(e, "save",    bi_save,    1, 1);
     def_builtin(e, "body",    bi_body,    1, 1);
     def_builtin(e, "clear",   bi_clear,   0, UINT32_MAX);

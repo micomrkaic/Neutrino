@@ -1,0 +1,23 @@
+# elseif: chains share one end; behavior identical to nested ifs
+if 1 > 2 then "a" elseif 2 > 3 then "b" elseif 3 > 2 then "c" else "d" end
+=> "c"
+if 1 > 2 then "a" elseif 2 > 1 then "b" end
+=> "b"
+let f = fn x -> if x < 0 then "neg" elseif x == 0 then "zero" else "pos" end; f(-3) + f(0) + f(7)
+=> "negzeropos"
+if true then 1 else 2 end
+=> 1
+# eval: strings become code in this session; last value returned
+eval("2 + 2")
+=> 4
+eval("let zz9 = 7;"); zz9 * 3
+=> 21
+let w9 = {temp = [21.5; 19.8], rain = [0; 4.2]}; let c9 = "temp"; eval("w9." + c9)
+=> [21.5; 19.8]
+eval("(sum[k = 1:10] k)")
+=> 55
+# names: the programmatic who — sorted string column, selectors
+clear(); let a9 = 1; let f9 = fn x -> x; names("funcs")
+=> ["f9"]
+clear(); let a9 = 1; let b9 = 2; names("vars")
+=> ["a9"; "b9"]

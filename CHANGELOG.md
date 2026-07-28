@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.19.1: the index catches up, and a rite lesson is paid for.**
+  v2.19.0's four new builtins left the book index stale — caught not
+  here but by the owner's deploy, because the release-side suite run was
+  piped through a grep for expected lines and the STALE verdict matched
+  no pattern while the pipe swallowed the exit code. Index regenerated;
+  the PLAYBOOK gains the law: the suite's verdict is its exit code, and
+  filters may decorate a green run but never stand between a red one and
+  the eyes.
 - **v2.16.2: deploy.sh survives two workstations.** Deploying from the
   Mac and then the X1 produced a rejected non-fast-forward push — the
   first real two-machine divergence. Since releases are full snapshots,
@@ -179,6 +187,23 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.19.0: the owner gives in — five sanctioned conveniences, all
+  additive, destined for Cozy.** (1) elseif: chains share one end,
+  desugaring in the parser to nested ifs; no legal program changes.
+  (2) eval("code"): a string runs in the current session and returns its
+  last value — delivering, as a corollary, dynamic record access
+  (eval("w." + col)), the v2.13.0 reflection wall's first door.
+  (3) names()/names("vars")/names("funcs"): the programmatic who — a
+  sorted string column — while the who family's printed tables stay
+  exactly as they were (the owner asked whether who should return names;
+  the answer shipped is no: display commands stay commands, reflection
+  gets its own function). (4) input("prompt") reads the keyboard
+  (window.prompt in the browser); (5) pause() waits for Enter (alert in
+  the browser); both consume the next stdin line under a pipe, which
+  tests/run_io.sh checks exactly. README's Status now states the honest
+  contract: the 2.x surface is append-only — owner-sanctioned, strictly
+  additive, individually listed. 905 goldens; 159 builtins; manual
+  sections for all five.
 - **v2.18.0: the tour gains its crown jewels.** A new act, Functions as
   values — anonymous application, Euclid's algorithm as bare recursion
   (gcd_(1071, 462) = 21), and iterate composing any function with itself

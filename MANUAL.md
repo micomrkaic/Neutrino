@@ -317,6 +317,19 @@ error: undefined name 'q'          # block locals do not leak
 
 This is the natural shape for a multi-step function body.
 
+### `elseif` (since 2.19)
+
+Chains share a single closing `end`; each condition is tried in order:
+
+```
+neutrino> if 1 > 2 then "a" elseif 3 > 2 then "c" else "d" end
+"c"
+neutrino> let sign_ = fn x -> if x < 0 then -1 elseif x == 0 then 0 else 1 end
+<fn/1>
+neutrino> [sign_(-7), sign_(0), sign_(4)]
+[-1, 0, 1]
+```
+
 ## 7. Functions
 
 `fn params -> expr` is a lambda; its body is one expression (use a block
@@ -826,6 +839,38 @@ Strings print without quotes in `print`; the REPL echo shows them quoted (the
 echo is a representation, `print` is output). `pretty on|off` toggles the
 aligned matrix display; `more on` pages long output.
 
+## 15b. Strings as code, and the keyboard (since 2.19)
+
+`eval` runs a string as Neutrino code in the current session and returns
+its last value — which, among other things, gives dynamic record access:
+`eval("w." + col)`. `names` is the programmatic sibling of the `who`
+family (whose printed tables are unchanged): your workspace names as a
+sorted string column, with `"vars"`/`"funcs"` selectors.
+
+```
+neutrino> eval("2 + 2")
+4
+neutrino> let w = {temp = [21.5; 19.8], rain = [0; 4.2]};
+neutrino> let col = "temp"; eval("w." + col)
+[21.5; 19.8]
+neutrino> let a = 1; let f = fn x -> x; names("vars")
+["a"; "ans"; "col"; "w"]
+neutrino> names("funcs")
+["f"]
+```
+
+`input("prompt")` reads one line from the keyboard as a string, and
+`pause()` waits for Enter — `window.prompt` and an alert in the browser.
+Interactive by nature, so shown here rather than machine-replayed (under
+a pipe they consume the next stdin line; `tests/run_io.sh` checks exactly
+that):
+
+```
+let name = input("who are you? ");
+print("hello, " + name)
+pause("press Enter for the plot...")
+```
+
 ## 16. Scripts and tools
 
 `neutrino file.nu` runs a script (top level is a statement sequence; `#`/`%`
@@ -899,6 +944,8 @@ linguist learns Neutrino.
 | `save("file.nu")` | write all variables and functions as reloadable source (restore with load) |
 | `body(f)` | print the source of a user-defined function |
 | `load("file.nu")` | run a file in the current session; its let-bindings persist (a record of closures makes a module) |
+| `eval("code")` | run a string as Neutrino code in this session; returns the last value |
+| `names() \| names("vars"\|"funcs")` | your workspace names as a sorted string column (the programmatic who) |
 | `clear() \| clear("a", ...)` | remove all user variables, or the named ones; clearing a shadow restores the standard-library original |
 | `keep("a", "b", ...)` | remove all user variables except the named ones (the complement of clear) |
 | `mem` | print workspace size (variables) and peak process memory |
@@ -949,6 +996,8 @@ linguist learns Neutrino.
 | `pwd` | the current working directory, as a string |
 | `cd("dir") \| cd` | change the working directory (persists, unlike !cd); bare cd goes home |
 | `ls \| ls("dir") \| ls("*.nu")` | directory listing as a string array (globs supported) |
+| `input("prompt")` | read one line from the keyboard as a string (window.prompt in the browser) |
+| `pause() \| pause("msg")` | wait for the user before continuing (alert in the browser) |
 
 ### Plotting
 
