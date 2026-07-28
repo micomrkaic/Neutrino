@@ -95,8 +95,11 @@ let simp = fn e -> (
     else if b.op == "const" then (
       if b.v == 0 then C(0) else if b.v == 1 then a else mul(b, a) end end
     )
+    else if b.op == "mul" then (
+      if b.l.op == "const" then mul(b.l, mul(a, b.r)) else mul(a, b) end
+    )
     else mul(a, b)
-    end end
+    end end end
   )
   else if e.op == "pow" then (
     let a = simp(e.l);
@@ -112,13 +115,35 @@ let simp = fn e -> (
   end end end end end
 )
 
-% ---- pretty printer ----
+% ---- pretty printer (division- and subtraction-aware) ----
+let is_neg1 = fn e -> if e.op == "const" then e.v == -1 else false end
+let showdenom = fn b, m -> if m == 1 then show(b) else show(b) + "^" + str(m) end
 let show = fn e -> (
   if e.op == "const" then str(e.v)
   else if e.op == "var" then "x"
-  else if e.op == "add" then "(" + show(e.l) + " + " + show(e.r) + ")"
-  else if e.op == "mul" then "(" + show(e.l) + " * " + show(e.r) + ")"
-  else if e.op == "pow" then show(e.l) + "^" + str(e.n)
+  else if e.op == "add" then (
+    if e.r.op == "mul" then (
+      if is_neg1(e.r.l) then "(" + show(e.l) + " - " + show(e.r.r) + ")"
+      else "(" + show(e.l) + " + " + show(e.r) + ")" end
+    )
+    else "(" + show(e.l) + " + " + show(e.r) + ")" end
+  )
+  else if e.op == "mul" then (
+    if is_neg1(e.l) then "(-" + show(e.r) + ")"
+    else if e.r.op == "pow" then (
+      if e.r.n < 0 then "(" + show(e.l) + " / " + showdenom(e.r.l, -e.r.n) + ")"
+      else "(" + show(e.l) + " * " + show(e.r) + ")" end
+    )
+    else if e.l.op == "pow" then (
+      if e.l.n < 0 then "(" + show(e.r) + " / " + showdenom(e.l.l, -e.l.n) + ")"
+      else "(" + show(e.l) + " * " + show(e.r) + ")" end
+    )
+    else "(" + show(e.l) + " * " + show(e.r) + ")" end end end
+  )
+  else if e.op == "pow" then (
+    if e.n < 0 then "(1 / " + showdenom(e.l, -e.n) + ")"
+    else show(e.l) + "^" + str(e.n) end
+  )
   else e.op + "(" + show(e.l) + ")"
   end end end end end
 )
@@ -174,7 +199,7 @@ let parse_atom = fn s, i0 -> (
     if peek(s, j) == ")" then {i = j + 1, e = r.e} else fail("expected )") end
   )
   else if c == "-" then (
-    let r = parse_atom(s, i + 1);
+    let r = parse_pow(s, i + 1);       % minus binds looser than ^: -x^2 is -(x^2)
     {i = r.i, e = mul(C(-1), r.e)}
   )
   else if isalp(c) then (

@@ -1532,10 +1532,12 @@ it:
 ```
 neutrino> format(4)
 neutrino> load("packages/symb.nu")
+neutrino> deriv("sin(x)/x")
+"((cos(x) / x) - (sin(x) / x^2))"
 neutrino> deriv("x^3 + 5*sin(x)")
 "((3 * x^2) + (5 * cos(x)))"
-neutrino> deriv("x^x")
-"(exp((x * log(x))) * (log(x) + (x * x^-1)))"
+neutrino> deriv("exp(-x^2)")
+"(-2 * (exp((-x^2)) * x))"
 neutrino> let d = fn f -> fn x -> (f(x + h) - f(x - h)) / (2 * h) where h = 1e-6
 <fn/1>
 neutrino> abs(evalx(ddx(parse("sin(x)/x")), 1.5) - d(fn t -> sin(t) / t)(1.5)) < 1e-8
@@ -1543,9 +1545,11 @@ true
 ```
 
 **Discussion.** Character classes are chained comparisons
-(`"0" <= c <= "9"`); the grammar threads its position through records;
-and general powers desugar as f^g = exp(g·log f), which is why x^x
-differentiates to x^x(ln x + 1) with no special case. The numeric
+(`"0" <= c <= "9"`); the grammar threads its position through records
+(with unary minus binding looser than `^`, so `-x^2` means −(x²) as
+mathematics demands); and the printer recognizes division and
+subtraction, so the quotient rule for sin(x)/x prints as the textbook
+writes it. General powers desugar as f^g = exp(g·log f). The numeric
 cross-check closes the loop: parsed, symbolically differentiated, and
 agreeing with the finite difference to 10⁻⁸. The lesson rides with the
 code: the limitation was in the maintainer's memory, not the language —

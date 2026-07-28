@@ -431,16 +431,19 @@ And since v2.13.1 established that strings index like arrays (and always
 did), the package now carries **the parser that was possible all along**:
 recursive descent over `s[i]`, character classes as chained comparisons
 (`"0" <= c <= "9"`), general powers desugared as f^g = exp(g·log f) so
-even x^x differentiates. String in, string out:
+even x^x differentiates. The printer knows division and subtraction, so
+the quotient rule reads as the textbook writes it. String in, string out:
 
 ```
 neutrino> load("packages/symb.nu")
+neutrino> deriv("sin(x)/x")
+"((cos(x) / x) - (sin(x) / x^2))"
 neutrino> deriv("x^3 + 5*sin(x)")
 "((3 * x^2) + (5 * cos(x)))"
 neutrino> deriv("x^x")
-"(exp((x * log(x))) * (log(x) + (x * x^-1)))"
+"(exp((x * log(x))) * (log(x) + (x / x)))"
 neutrino> deriv("log(x^2 + 1)")
-"((x^2 + 1)^-1 * (2 * x))"
+"(2 * (x / (x^2 + 1)))"
 neutrino> taylor(parse("exp(x)"), 4)
 [1, 1, 0.5, 0.166667, 0.0416667]
 ```

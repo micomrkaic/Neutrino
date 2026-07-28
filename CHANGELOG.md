@@ -163,6 +163,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.15.0: the derivative reads like the textbook.** symb.nu's printer
+  learns division and subtraction — mul(u, powc(v, -n)) prints u / v^n on
+  either side, add(a, mul(-1, b)) prints a - b, and simp hoists buried
+  negative constants so the patterns form — with the payoff
+  deriv("sin(x)/x") = "((cos(x) / x) - (sin(x) / x^2))", the quotient
+  rule as the blackboard writes it. En route the battery caught a real
+  parser bug: unary minus bound tighter than ^, making -x^2 parse as
+  (-x)^2; fixed to mathematical convention (minus parses a power), with
+  evalx(parse("-x^2"), 3) = -9 and exp(-x^2) differentiating to
+  -2x exp(-x^2), numerically cross-checked. 311 verified book
+  transcripts; 98 in PACKAGES.
 - **v2.14.0: the parser that was possible all along.** symb.nu completes
   its circle: a recursive-descent parser in pure Neutrino — legal all
   along, as v2.13.1's correction established — so the differentiator
