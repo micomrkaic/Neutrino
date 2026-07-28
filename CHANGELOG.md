@@ -163,6 +163,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.16.0: symbols become functions again.** symb.nu gains the lift
+  back to function-space: tofun(e) closes an expression tree into an
+  ordinary fn x, with string conveniences ffun(src) and dfun(src) —
+  dfun("sin(x)/x") is a callable derivative. The payoff is
+  reunification, and book Problem E.4 stages it twice over: fzero on the
+  symbolic derivative and fminbnd on the original function agree on
+  4.49341 (the tan(x) = x critical point of sin(x)/x), and the
+  Fundamental Theorem of Calculus verifies numerically —
+  integral(dfun("x^3"), 1, 2) = 7 = the function's change. Two new table
+  specs. 316 verified book transcripts; 98 in PACKAGES.
 - **v2.15.0: the derivative reads like the textbook.** symb.nu's printer
   learns division and subtraction — mul(u, powc(v, -n)) prints u / v^n on
   either side, add(a, mul(-1, b)) prints a - b, and simp hoists buried

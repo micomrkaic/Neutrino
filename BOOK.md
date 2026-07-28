@@ -1555,6 +1555,36 @@ agreeing with the finite difference to 10⁻⁸. The lesson rides with the
 code: the limitation was in the maintainer's memory, not the language —
 and the goldens outranked the memory, which is what they are for.
 
+**Problem E.4 — From symbols back to functions.** `tofun` lifts an
+expression tree into an ordinary function (`fn x -> evalx(e, x)`);
+`dfun(src)` goes from string to derivative-as-function in one step. The
+payoff is reunification — symbolic results re-enter the numeric
+ecosystem:
+
+```
+neutrino> format(6)
+neutrino> load("packages/symb.nu")
+neutrino> let f = dfun("sin(x)/x");
+neutrino> fzero(f, 4, 5)
+4.49341
+neutrino> fminbnd(ffun("sin(x)/x"), 4, 5)
+{x = 4.49341, fx = -0.217234}
+neutrino> integral(dfun("x^3"), 1, 2)
+7.00000
+neutrino> ffun("x^3")(2) - ffun("x^3")(1)
+7
+```
+
+**Discussion.** The first pair is the showpiece: `fzero` hunting the root
+of the *symbolic* derivative and `fminbnd` minimizing the *original*
+function land on the same 4.49341 — the famous critical point of
+sin(x)/x, where tan(x) = x — two independent routes to one extremum,
+agreeing to six digits inside one verified session. The second pair is
+the Fundamental Theorem of Calculus, checked numerically: the integral
+of the symbolic derivative equals the function's change, 7 exactly.
+Strings become trees, trees become functions, functions meet the
+integrator — the package and the core, one calculus.
+
 ---
 
 ## Appendix F. Index of builtins

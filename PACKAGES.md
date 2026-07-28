@@ -432,7 +432,9 @@ did), the package now carries **the parser that was possible all along**:
 recursive descent over `s[i]`, character classes as chained comparisons
 (`"0" <= c <= "9"`), general powers desugared as f^g = exp(g·log f) so
 even x^x differentiates. The printer knows division and subtraction, so
-the quotient rule reads as the textbook writes it. String in, string out:
+the quotient rule reads as the textbook writes it. And `tofun`/`ffun`/`dfun` lift results back into
+function-space — `dfun("sin(x)/x")` is an ordinary function, ready for
+`fzero`, `integral`, and the pipes. String in, string out:
 
 ```
 neutrino> load("packages/symb.nu")
@@ -457,6 +459,8 @@ neutrino> taylor(parse("exp(x)"), 4)
 | `taylor of exp begins 1, 1, 1/2` | `max(abs(taylor(expx(X), 2) - [1, 1, 0.5])) < 1e-9` | `true` |
 | `parse then evaluate` | `abs(evalx(parse("2*pi"), 0) - 2 * pi) < 1e-12` | `true` |
 | `deriv: string in, string out` | `deriv("x^2") == "(2 * x)"` | `true` |
+| `dfun: derivative as a function` | `abs(dfun("x^3")(2) - 12) < 1e-12` | `true` |
+| `FTC: integral of dfun is the change` | `abs(integral(dfun("x^3"), 1, 2) - 7) < 1e-6` | `true` |
 
 ## Writing your own
 

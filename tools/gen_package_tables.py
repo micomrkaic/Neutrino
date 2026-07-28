@@ -104,6 +104,8 @@ SPECS = {
     ("taylor of exp begins 1, 1, 1/2", "max(abs(taylor(expx(X), 2) - [1, 1, 0.5])) < 1e-9"),
     ("parse then evaluate", "abs(evalx(parse(\"2*pi\"), 0) - 2 * pi) < 1e-12"),
     ("deriv: string in, string out", "deriv(\"x^2\") == \"(2 * x)\""),
+    ("dfun: derivative as a function", "abs(dfun(\"x^3\")(2) - 12) < 1e-12"),
+    ("FTC: integral of dfun is the change", "abs(integral(dfun(\"x^3\"), 1, 2) - 7) < 1e-6"),
   ]),
 }
 

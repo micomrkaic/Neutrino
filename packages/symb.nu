@@ -267,3 +267,11 @@ let parse = fn src -> (
 )
 
 let deriv = fn src -> show(simp(ddx(parse(src))))
+
+% ---- back to function-space: symbolic results as callable functions ----
+% tofun lifts an expression tree into an ordinary function of x, so
+% symbolic results re-enter the whole numeric ecosystem: integral, fzero,
+% fminbnd, pipes, plots. ffun and dfun are the string conveniences.
+let tofun = fn e -> fn x -> evalx(e, x)
+let ffun = fn src -> tofun(parse(src))
+let dfun = fn src -> tofun(simp(ddx(parse(src))))
