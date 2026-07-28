@@ -3,7 +3,7 @@
 *A book of worked problems — practical computing with a small array
 language.*
 
-![](logo.png)
+![](og-card.png)
 
 
 This book is written in the tradition of the calculator applications
@@ -1484,6 +1484,8 @@ hardware.
 
 ## Appendix E. Symbolic differentiation (symb.nu)
 
+![](vignettes/vinE.png)
+
 **Problem E.1 — The derivative, symbolically, checked numerically.**
 
 ```
@@ -1589,7 +1591,7 @@ integrator — the package and the core, one calculus.
 
 ## Appendix F. Index of builtins
 
-![](vignettes/vinE.png)
+![](vignettes/vinF.png)
 
 Every builtin and constant, alphabetically — machine-generated from the
 interpreter's own documentation table, so this index cannot drift from the

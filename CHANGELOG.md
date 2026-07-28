@@ -5,6 +5,13 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.16.1: the art catches up with the appendices.** Appendix E
+  (Symbolic differentiation) receives its author-drawn plate — a notepad
+  passing through d/dx to the answered whiteboard — and the index
+  card-file, redrawn with its F shield, follows the index to Appendix F.
+  The book's title page is now the og-card (the navy social card with
+  the atom mark), also installed at docs/og-card.png with og:image meta
+  on the workbench page.
 - **v2.13.1: the limitation that wasn't.** Preparing the Cozy fork, the
   conformance goldens impeached the v2.12.1 KNOWN_LIMITATIONS entry:
   string extraction has existed all along as INDEXING — s[4], s[4:8],
