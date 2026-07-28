@@ -3495,11 +3495,13 @@ static Value who_impl(Interp *I, enum WhoKind kind, bool sorted)
         for (uint32_t i = 0; i < g->count; i++) {
         if (i < g->n_protected) continue;   /* standard library: not workspace */
             ValueKind k = g->vals[i].kind;
-            if (k == VAL_BUILTIN) continue;                      /* user bindings only */
+            /* a VAL_BUILTIN here is a user alias (let v = version): the
+             * protected region is already skipped, so list it — under
+             * functions, where it belongs (the invisible-alias bug). */
             bool take = kind == W_ALL
                      || (kind == W_REC && k == VAL_RECORD)
-                     || (kind == W_FN  && k == VAL_CLOSURE)
-                     || (kind == W_VAR && k != VAL_RECORD && k != VAL_CLOSURE);
+                     || (kind == W_FN  && (k == VAL_CLOSURE || k == VAL_BUILTIN))
+                     || (kind == W_VAR && k != VAL_RECORD && k != VAL_CLOSURE && k != VAL_BUILTIN);
             if (take) sel[nsel++] = i;
         }
         if (sorted && nsel > 1) { g_who_env = g; qsort(sel, nsel, sizeof *sel, who_name_cmp); }

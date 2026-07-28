@@ -871,6 +871,30 @@ print("hello, " + name)
 pause("press Enter for the plot...")
 ```
 
+### Binding builtins: functions are values, commands autocall
+
+`version` is a function; `let v = version` stores *the function* (like
+`let s = sin`), which `whof` lists. A bare zero-argument builtin —
+including through an alias — autocalls at the top level and prints its
+result; in argument position it does not, so `length(v)` measures the
+function value (1). To store the *result*, call it: `let w = version()`
+— then `w` is an ordinary string variable. (The version string itself is
+suppressed below with `;` so this page never goes stale.)
+
+```
+neutrino> let v = version
+<builtin version>
+neutrino> whof
+  v            builtin
+neutrino> length(v)
+1
+neutrino> let w = version();
+neutrino> w == version()
+true
+neutrino> names("vars")
+["ans"; "w"]
+```
+
 ## 16. Scripts and tools
 
 `neutrino file.nu` runs a script (top level is a statement sequence; `#`/`%`

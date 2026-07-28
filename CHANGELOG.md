@@ -5,6 +5,16 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.19.3: the invisible alias.** let v = version bound the builtin as
+  a first-class value — and then v appeared in no census: who correctly
+  skipped it (not a variable) but whof skipped it too, via a blanket
+  VAL_BUILTIN filter whose job was already done by the protected-region
+  skip above it. User builtin aliases are now listed by whof (and whos/
+  who) as builtin; who("vars") keeps excluding them; names("funcs") had
+  it right all along. The manual gains the explainer the owner's session
+  deserved: binding a builtin stores the function; bare zero-arg
+  builtins autocall at top level but not in argument position; call with
+  () to store the result. Two goldens pin the census.
 - **v2.19.2: symb.nu enjoys the feature it motivated.** The package's
   dispatchers — ddx, evalx, subst, simp, show, mkfun, the parser — are
   rewritten with elseif: the stacked end-cascades — up to nine deep after

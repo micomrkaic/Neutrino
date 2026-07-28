@@ -21,3 +21,8 @@ clear(); let a9 = 1; let f9 = fn x -> x; names("funcs")
 => ["f9"]
 clear(); let a9 = 1; let b9 = 2; names("vars")
 => ["a9"; "b9"]
+# who family: user-bound builtin aliases are functions, and visible
+clear(); let v9 = version; whof
+=>   v9           builtin
+clear(); let v9 = version; let a9 = 1; who("vars")
+=>   a9           int        = 1
