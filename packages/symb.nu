@@ -130,3 +130,115 @@ let dn = fn e, k -> if k <= 0 then simp(e) else dn(simp(ddx(e)), k - 1) end
 let taylor = fn e, n -> (
   0:n ~> (fn k -> evalx(dn(e, k), 0) / (if k == 0 then 1 else prod[j = 1:k] j end))
 )
+
+% ---- the parser that was possible all along ----
+% (v2.12.1 recorded string extraction as impossible; v2.13.1 corrected the
+% record: strings index like arrays, and always did. This parser is the
+% correction made executable: recursive descent over s[i], character
+% classes as chained comparisons, expression grammar with ^ right-assoc.
+% General powers desugar as f^g = exp(g*log(f)) — fully differentiable.
+% Grammar: numbers, x, pi, + - * / ^ ( ), sin cos tan exp log sqrt.)
+let fail = fn msg -> num("symb parse error: " + msg)
+let peek = fn s, i -> if i > length(s) then "" else s[i] end
+let skipws = fn s, i -> if peek(s, i) == " " then skipws(s, i + 1) else i end
+let isdig = fn c -> if c == "" then false else "0" <= c <= "9" end
+let isalp = fn c -> if c == "" then false else "a" <= c <= "z" end
+let scannum = fn s, i -> (
+  if isdig(peek(s, i)) then scannum(s, i + 1)
+  else if peek(s, i) == "." then scannum(s, i + 1)
+  else i end end
+)
+let scanid = fn s, i -> if isalp(peek(s, i)) then scanid(s, i + 1) else i end
+let mkfun = fn name, a -> (
+  if name == "sin" then sinx(a)
+  else if name == "cos" then cosx(a)
+  else if name == "tan" then tanx(a)
+  else if name == "exp" then expx(a)
+  else if name == "log" then logx(a)
+  else if name == "sqrt" then sqrtx(a)
+  else fail("unknown function " + name)
+  end end end end end end
+)
+let mkpow = fn a, b -> if b.op == "const" then powc(a, b.v) else expx(mul(b, logx(a))) end
+
+let parse_atom = fn s, i0 -> (
+  let i = skipws(s, i0);
+  let c = peek(s, i);
+  if isdig(c) then (
+    let j = scannum(s, i);
+    {i = j, e = C(num(s[i : j - 1]))}
+  )
+  else if c == "(" then (
+    let r = parse_expr(s, i + 1);
+    let j = skipws(s, r.i);
+    if peek(s, j) == ")" then {i = j + 1, e = r.e} else fail("expected )") end
+  )
+  else if c == "-" then (
+    let r = parse_atom(s, i + 1);
+    {i = r.i, e = mul(C(-1), r.e)}
+  )
+  else if isalp(c) then (
+    let j = scanid(s, i);
+    let name = s[i : j - 1];
+    if name == "x" then {i = j, e = X}
+    else if name == "pi" then {i = j, e = C(pi)}
+    else (
+      let k = skipws(s, j);
+      if peek(s, k) == "(" then (
+        let r = parse_expr(s, k + 1);
+        let m = skipws(s, r.i);
+        if peek(s, m) == ")" then {i = m + 1, e = mkfun(name, r.e)}
+        else fail("expected ) after " + name) end
+      ) else fail("expected ( after " + name) end
+    ) end end
+  )
+  else fail("unexpected input at position " + str(i))
+  end end end end
+)
+
+let parse_pow = fn s, i -> (
+  let a = parse_atom(s, i);
+  let j = skipws(s, a.i);
+  if peek(s, j) == "^" then (
+    let b = parse_pow(s, j + 1);
+    {i = b.i, e = mkpow(a.e, b.e)}
+  ) else a end
+)
+
+let term_loop = fn s, st -> (
+  let j = skipws(s, st.i);
+  let c = peek(s, j);
+  if c == "*" then (
+    let b = parse_pow(s, j + 1);
+    term_loop(s, {i = b.i, e = mul(st.e, b.e)})
+  )
+  else if c == "/" then (
+    let b = parse_pow(s, j + 1);
+    term_loop(s, {i = b.i, e = divx(st.e, b.e)})
+  )
+  else st end end
+)
+let parse_term = fn s, i -> term_loop(s, parse_pow(s, i))
+
+let expr_loop = fn s, st -> (
+  let j = skipws(s, st.i);
+  let c = peek(s, j);
+  if c == "+" then (
+    let b = parse_term(s, j + 1);
+    expr_loop(s, {i = b.i, e = add(st.e, b.e)})
+  )
+  else if c == "-" then (
+    let b = parse_term(s, j + 1);
+    expr_loop(s, {i = b.i, e = sub(st.e, b.e)})
+  )
+  else st end end
+)
+let parse_expr = fn s, i -> expr_loop(s, parse_term(s, i))
+
+let parse = fn src -> (
+  let r = parse_expr(src, 1);
+  let j = skipws(src, r.i);
+  if j > length(src) then r.e else fail("trailing input at position " + str(j)) end
+)
+
+let deriv = fn src -> show(simp(ddx(parse(src))))

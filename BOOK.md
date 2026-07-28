@@ -1522,6 +1522,35 @@ series 0, 1, 0, −1/6, 0, 1/120, ... and exp's 1/k! fall out of record
 recursion — no calculus tables consulted. The third derivative of x⁵
 folds to 60x² on its way through the simplifier.
 
+**Problem E.3 — The parser that was possible all along.** Release
+v2.12.1 recorded string extraction as impossible; v2.13.1 discovered the
+goldens said otherwise — strings index like arrays, always did. This
+problem is the correction made executable: a recursive-descent parser in
+pure Neutrino, so the differentiator takes mathematics as you would type
+it:
+
+```
+neutrino> format(4)
+neutrino> load("packages/symb.nu")
+neutrino> deriv("x^3 + 5*sin(x)")
+"((3 * x^2) + (5 * cos(x)))"
+neutrino> deriv("x^x")
+"(exp((x * log(x))) * (log(x) + (x * x^-1)))"
+neutrino> let d = fn f -> fn x -> (f(x + h) - f(x - h)) / (2 * h) where h = 1e-6
+<fn/1>
+neutrino> abs(evalx(ddx(parse("sin(x)/x")), 1.5) - d(fn t -> sin(t) / t)(1.5)) < 1e-8
+true
+```
+
+**Discussion.** Character classes are chained comparisons
+(`"0" <= c <= "9"`); the grammar threads its position through records;
+and general powers desugar as f^g = exp(g·log f), which is why x^x
+differentiates to x^x(ln x + 1) with no special case. The numeric
+cross-check closes the loop: parsed, symbolically differentiated, and
+agreeing with the finite difference to 10⁻⁸. The lesson rides with the
+code: the limitation was in the maintainer's memory, not the language —
+and the goldens outranked the memory, which is what they are for.
+
 ---
 
 ## Appendix F. Index of builtins

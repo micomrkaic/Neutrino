@@ -103,16 +103,20 @@ compiled.
   series in one style; bubble charts and per-point color maps would need
   backend changes and are deferred to the successor language.
   `packages/scatter.nu` covers plain scatter via `style = "points"`.
-- **Strings: no extraction.** The string family covers transformation,
-  predicates, and assembly, but there is no substr, no strfind, and no
-  character indexing — length can measure a string that nothing can then
-  take a piece of. The friction transcript is symb.nu: it has a
-  constructor API instead of a parser because tokenizing is impossible.
-  Deliberately not fixed under the freeze (unlike keep, extraction
-  enables new program shapes, and "completes the family" is exactly the
-  reasoning that erodes freezes one sympathetic case at a time); the
-  successor opens extraction once, completely — substr, strfind, and
-  character indexing together.
+- **Strings: extraction exists (correction of the v2.12.1 entry); only
+  strfind is missing.** The v2.12.1 printing of this entry claimed no
+  substr and no character indexing — wrong, and the error is a lesson:
+  the assessment grepped the builtin table for an extraction *function*
+  while the *grammar* had extraction as indexing all along. Strings
+  index like arrays — s[4], s[4:8], s[end-3:end], even s[[3,2,1]] — all
+  golden-tested since the strings phase; a substr builtin would be
+  redundant, which is why it does not exist. The genuine gap is
+  narrower: no strfind (contains says whether a pattern occurs, nothing
+  reports where), so pattern-directed slicing needs a char-by-char scan.
+  Tokenizers are therefore writable, just laborious — symb.nu's
+  constructor API was a choice made on a false premise, and a parser
+  remains possible under the freeze. Successor: add strfind; character
+  indexing needs nothing.
 - **Records: reflection sees, nothing touches.** fields(r) returns the
   names, but there is no getfield/setfield/dynamic construction — field
   access is spelled with literal names only. Consequence: no package can

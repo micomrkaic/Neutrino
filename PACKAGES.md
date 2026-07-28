@@ -427,11 +427,33 @@ neutrino> show(simp(ddx(subst(expx(X), mul(C(2), X)))))
 That last-but-one line is the sine series — 0, 1, 0, −1/6, 0, 1/120, ... —
 recovered from pure record recursion.
 
+And since v2.13.1 established that strings index like arrays (and always
+did), the package now carries **the parser that was possible all along**:
+recursive descent over `s[i]`, character classes as chained comparisons
+(`"0" <= c <= "9"`), general powers desugared as f^g = exp(g·log f) so
+even x^x differentiates. String in, string out:
+
+```
+neutrino> load("packages/symb.nu")
+neutrino> deriv("x^3 + 5*sin(x)")
+"((3 * x^2) + (5 * cos(x)))"
+neutrino> deriv("x^x")
+"(exp((x * log(x))) * (log(x) + (x * x^-1)))"
+neutrino> deriv("log(x^2 + 1)")
+"((x^2 + 1)^-1 * (2 * x))"
+neutrino> taylor(parse("exp(x)"), 4)
+[1, 1, 0.5, 0.166667, 0.0416667]
+```
+
+
+
 | Function | Worked example | Result |
 |---|---|---|
 | `d/dx of x^3 at 2 is 12` | `evalx(ddx(powc(X, 3)), 2) == 12` | `true` |
 | `chain rule through exp(2x)` | `abs(evalx(ddx(subst(expx(X), mul(C(2), X))), 0) - 2) < 1e-12` | `true` |
 | `taylor of exp begins 1, 1, 1/2` | `max(abs(taylor(expx(X), 2) - [1, 1, 0.5])) < 1e-9` | `true` |
+| `parse then evaluate` | `abs(evalx(parse("2*pi"), 0) - 2 * pi) < 1e-12` | `true` |
+| `deriv: string in, string out` | `deriv("x^2") == "(2 * x)"` | `true` |
 
 ## Writing your own
 

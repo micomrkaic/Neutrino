@@ -5,6 +5,16 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.13.1: the limitation that wasn't.** Preparing the Cozy fork, the
+  conformance goldens impeached the v2.12.1 KNOWN_LIMITATIONS entry:
+  string extraction has existed all along as INDEXING — s[4], s[4:8],
+  s[end-3:end], fancy-index s[[3,2,1]], golden-tested since the strings
+  phase. The wrong entry came from grepping the builtin table for a
+  substr function while the grammar carried extraction as syntax; a
+  substr builtin would be redundant, which is why none exists. The entry
+  is rewritten: the genuine gap is only strfind (position of a pattern),
+  and symb.nu's parser was feasible under the freeze after all. The
+  goldens outrank the maintainer's memory — that is what they are for.
 - **v2.12.1: substr stays out — on purpose, on record.** The string
   family's missing extraction (no substr/strfind/char indexing) is now a
   KNOWN_LIMITATIONS entry citing symb.nu's constructor API as its
@@ -153,6 +163,18 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.14.0: the parser that was possible all along.** symb.nu completes
+  its circle: a recursive-descent parser in pure Neutrino — legal all
+  along, as v2.13.1's correction established — so the differentiator
+  takes mathematics as typed: deriv("x^3 + 5*sin(x)") returns
+  "((3 * x^2) + (5 * cos(x)))". Character classes are chained string
+  comparisons ("0" <= c <= "9"), the grammar threads position through
+  records, errors surface with positions via a num()-based fail, and
+  general powers desugar as f^g = exp(g log f) — so x^x differentiates
+  to x^x(ln x + 1) with no special case. Constructors remain (additive
+  change); PACKAGES §8 extended, book Problem E.3 tells the story with
+  the lesson attached, two new table specs. 309 verified book
+  transcripts; 97 in PACKAGES.
 - **v2.13.0: conversions mapped — one lesson each way.** Book Problem 3.5
   shows string-to-array needs no builtin: strsplit ~> trim ~> num is the
   idiom (and the reverse maps str through strjoin). The other direction is
