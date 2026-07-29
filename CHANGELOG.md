@@ -5,6 +5,16 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.19.4: the symb chapter catches up with the package.** PACKAGES §8
+  still opened with the v2.12 claim that no string parser was possible —
+  the exact assertion v2.13.1 disproved — followed by strata of bolted-on
+  addenda. Rewritten as one current narrative: the string front door
+  first (deriv, the tan x = x double confirmation, the FTC check), then
+  the machinery (desugaring, precedence, the printer's manners, the
+  elseif dispatchers), then the constructor layer as the representation
+  it always was, with the historical wrong turn kept honest in a closing
+  note. All transcripts freshly captured; the worked-example table
+  unchanged.
 - **v2.19.3: the invisible alias.** let v = version bound the builtin as
   a first-class value — and then v appeared in no census: who correctly
   skipped it (not a variable) but whof skipped it too, via a blanket

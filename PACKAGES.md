@@ -393,18 +393,57 @@ neutrino> size(jitter(rand(3, 4), 0.2))
 
 ## 8. symb.nu — symbolic differentiation
 
-Pure showing off: a symbolic differentiator in pure Neutrino. Expressions
-are nested records built by constructors (`C(5)`, `X`, `add`, `mul`,
-`powc`, `sinx`, ...; there is deliberately no string parser — the string
-builtins have no substring access, so entry is constructor-style, in the
-spirit of RPN). `ddx` differentiates by structural recursion; `sub` and
-`divx` desugar into add/mul/negative powers at construction, so product,
-power, and chain rules alone carry the whole calculus — the quotient rule
-falls out of d(b⁻¹) for free. `simp` folds constants, `show` prints,
-`evalx` evaluates, `subst` composes, and `taylor` extracts series
-coefficients by repeated differentiation. The transcript cross-checks the
-symbolic answer against numeric differentiation — two independent
-derivatives agreeing inside one verified session:
+A symbolic differentiator in pure Neutrino, addressed in mathematics and
+answering in it. The front door is a string:
+
+```
+neutrino> format(6)
+neutrino> load("packages/symb.nu")
+neutrino> deriv("sin(x)/x")
+"((cos(x) / x) - (sin(x) / x^2))"
+neutrino> deriv("x^x")
+"(exp((x * log(x))) * (log(x) + (x / x)))"
+neutrino> deriv("exp(-x^2)")
+"(-2 * (exp((-x^2)) * x))"
+neutrino> let f = dfun("sin(x)/x");
+neutrino> fzero(f, 4, 5)
+4.49341
+neutrino> fminbnd(ffun("sin(x)/x"), 4, 5)
+{x = 4.49341, fx = -0.217234}
+neutrino> integral(dfun("x^3"), 1, 2)
+7.00000
+```
+
+`deriv` parses, differentiates, simplifies, and prints; `ffun` and
+`dfun` lift a string to an ordinary function (of the original, or of its
+derivative), which then rides the whole numeric ecosystem — the
+transcript above finds the tan x = x critical point of sin(x)/x twice
+over (fzero on the symbolic derivative, fminbnd on the original,
+agreeing at 4.49341) and checks the Fundamental Theorem of Calculus
+(the integral of dfun("x^3") over [1, 2] is 7, the function's change).
+
+**How it works.** Expressions are nested records; `ddx` differentiates
+by structural recursion. `sub` and `divx` desugar into add/mul/negative
+powers at construction, so the product, power, and chain rules alone
+carry the whole calculus — the quotient rule falls out of d(b⁻¹) for
+free, which is why deriv("sin(x)/x") above prints the textbook form.
+The parser is recursive descent over `s[i]` (character classes are
+chained comparisons: `"0" <= c <= "9"`), unary minus binds looser than
+`^` so -x^2 means −(x²), and general powers desugar as
+f^g = exp(g·log f) — which is how x^x differentiates with no special
+case. The printer recognizes division and subtraction; `simp` folds and
+hoists constants. Since v2.19.2 the dispatchers are written with
+`elseif` — the package whose nine-deep end-cascades helped motivate the
+feature was first to enjoy it.
+
+**The constructor layer** remains public — it *is* the representation,
+and remains the door for programmatic tree-building: `C(5)`, `X`, `add`,
+`mul`, `powc`, `sinx`, ... plus `evalx` (evaluate at a point), `subst`
+(compose), `dn` (n-th derivative), and `taylor` (series coefficients by
+repeated ddx). The transcript cross-checks the symbolic answer against
+numeric differencing — two independent derivatives agreeing inside one
+verified session — and recovers the sine series (0, 1, 0, −1/6, ...)
+from pure record recursion:
 
 ```
 neutrino> format(4)
@@ -420,37 +459,15 @@ neutrino> show(dn(powc(X, 5), 3))
 "(60 * x^2)"
 neutrino> taylor(sinx(X), 7)
 [0.000, 1.000, -0.000, -0.1667, 0.000, 0.008333, -0.000, -0.0001984]
-neutrino> show(simp(ddx(subst(expx(X), mul(C(2), X)))))
-"(2 * exp((2 * x)))"
 ```
 
-That last-but-one line is the sine series — 0, 1, 0, −1/6, 0, 1/120, ... —
-recovered from pure record recursion.
-
-And since v2.13.1 established that strings index like arrays (and always
-did), the package now carries **the parser that was possible all along**:
-recursive descent over `s[i]`, character classes as chained comparisons
-(`"0" <= c <= "9"`), general powers desugared as f^g = exp(g·log f) so
-even x^x differentiates. The printer knows division and subtraction, so
-the quotient rule reads as the textbook writes it. And `tofun`/`ffun`/`dfun` lift results back into
-function-space — `dfun("sin(x)/x")` is an ordinary function, ready for
-`fzero`, `integral`, and the pipes. String in, string out:
-
-```
-neutrino> load("packages/symb.nu")
-neutrino> deriv("sin(x)/x")
-"((cos(x) / x) - (sin(x) / x^2))"
-neutrino> deriv("x^3 + 5*sin(x)")
-"((3 * x^2) + (5 * cos(x)))"
-neutrino> deriv("x^x")
-"(exp((x * log(x))) * (log(x) + (x / x)))"
-neutrino> deriv("log(x^2 + 1)")
-"(2 * (x / (x^2 + 1)))"
-neutrino> taylor(parse("exp(x)"), 4)
-[1, 1, 0.5, 0.166667, 0.0416667]
-```
-
-
+*(History, kept honest: v2.12.0 shipped constructor-only under a
+recorded limitation — "no substring access" — that v2.13.1 discovered
+was false all along: strings index like arrays, golden-tested since the
+strings phase. v2.14.0 built the parser that was always possible;
+v2.15.0 taught the printer textbook manners; v2.16.0 added the
+function-space lifts. The wrong entry and its correction are both in
+KNOWN_LIMITATIONS — the goldens outrank the maintainer's memory.)*
 
 | Function | Worked example | Result |
 |---|---|---|
