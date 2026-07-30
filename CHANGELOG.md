@@ -5,6 +5,17 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.20.1: the money problems get their decimals.** An owner audit
+  found five book problems — the bill (1.1), the currency helper (1.4),
+  the progressive tax (7.1), weekly payroll (8.2), the parts bin (9.1) —
+  displaying prices in two SIGNIFICANT digits: 1.0e+02 dinners,
+  [18., 42., 1.2e+02] price lists, 4.5e+03 payrolls, verified-correct
+  and unreadable since chapter 1. All five recaptured under
+  format("fixed", 2): 100.51, [18.40, 41.88, 118.73], 950.00 / 3380.00 /
+  8507.50, wages summing 4526.50, a 106.00 parts order. The chapter-1
+  habits paragraph now teaches both modes in one breath, 7.1's tax
+  bracket is written with elseif, and the manual's REPL table advertises
+  the fixed form.
 - **v2.19.4: the symb chapter catches up with the package.** PACKAGES §8
   still opened with the v2.12 claim that no string parser was possible —
   the exact assertion v2.13.1 disproved — followed by strata of bolted-on

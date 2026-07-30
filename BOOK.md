@@ -49,18 +49,19 @@ Appendix F. Index of builtins
 
 The prompt is a calculator first. Three habits from the start: `ans` carries
 the last value you saw into the next expression; `format(n)` sets displayed
-significant digits without touching the numbers underneath; and a trailing
+significant digits — and `format("fixed", 2)` sets *decimals*, the right
+mode for money — without touching the numbers underneath; and a trailing
 `;` silences an echo you don't need.
 
 **Problem 1.1 — Splitting the bill.** Dinner came to 87.40; you tip 15% and
 split four ways.
 
 ```
-neutrino> format(2)
+neutrino> format("fixed", 2)
 neutrino> let bill = 87.40; bill * 1.15
-1.0e+02
+100.51
 neutrino> ans / 4
-25.
+25.13
 ```
 
 **Discussion.** `ans` is the running total exactly as on a desk calculator —
@@ -103,12 +104,12 @@ predicts 72/4.9 ≈ 14.7 — the exact formula, one `fn` long, is now on file.
 price — then a whole price list, with the same function.
 
 ```
-neutrino> format(2)
+neutrino> format("fixed", 2)
 neutrino> let eur = fn usd -> usd / 1.0865;
 neutrino> eur(1500)
-1.4e+03
+1380.58
 neutrino> [19.99, 45.50, 129] ~> eur
-[18., 42., 1.2e+02]
+[18.40, 41.88, 118.73]
 ```
 
 **Discussion.** The elementwise pipe `~>` applies your scalar helper to
@@ -581,18 +582,18 @@ source of what you defined.
 above. Compute the tax at three incomes.
 
 ```
-neutrino> format(2)
-neutrino> let tax = fn inc -> if inc <= 11000 then inc * 0.10 else if inc <= 44725 then 1100 + (inc - 11000) * 0.12 else 5147 + (inc - 44725) * 0.22 end end
+neutrino> format("fixed", 2)
+neutrino> let tax = fn inc -> if inc <= 11000 then inc * 0.10 elseif inc <= 44725 then 1100 + (inc - 11000) * 0.12 else 5147 + (inc - 44725) * 0.22 end
 <fn/1>
 neutrino> tax(9500)
-9.5e+02
+950.00
 neutrino> tax(30000)
-3.4e+03
+3380.00
 neutrino> tax(60000)
-8.5e+03
+8507.50
 ```
 
-**Discussion.** The bracket structure is one `if/else if/else` expression —
+**Discussion.** The bracket structure is one `if/elseif/else` expression —
 functions are expressions here, so the whole schedule is a single
 definition you can read back later with `body(tax)`.
 
@@ -661,12 +662,12 @@ anonymous — can ride in the fan-out.
 and a half beyond. Five employees' hours; total the week's wages.
 
 ```
-neutrino> format(2)
+neutrino> format("fixed", 2)
 neutrino> let hours = [38, 42.5, 40, 45, 36.5];
 neutrino> hours ~> (fn h -> if h <= 40 then h * 22 else 880 + (h - 40) * 33 end)
-[8.4e+02, 9.6e+02, 8.8e+02, 1.0e+03, 8.0e+02]
+[836.00, 962.50, 880.00, 1045.00, 803.00]
 neutrino> ans |> sum
-4.5e+03
+4526.50
 ```
 
 **Discussion.** The anonymous function holds the pay rule; `~>` applies it
@@ -685,11 +686,11 @@ isn't enough.
 **Problem 9.1 — A parts bin.**
 
 ```
-neutrino> format(2)
+neutrino> format("fixed", 2)
 neutrino> let bolt = {sku = "M8x40", price = 0.42, stock = 1180};
 neutrino> let nut = {sku = "M8n", price = 0.11, stock = 2600};
 neutrino> bolt.price * 200 + nut.price * 200
-1.1e+02
+106.00
 neutrino> fields(bolt)
 ["sku"; "price"; "stock"]
 neutrino> let bolt = {sku = bolt.sku, price = bolt.price * 1.06, stock = bolt.stock}; bolt.price
