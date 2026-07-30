@@ -1722,7 +1722,7 @@ language.
 | `lower` | `lower(s)` | lowercase (ASCII bytes) | strings |
 | `ls` | `ls \| ls("dir") \| ls("*.nu")` | directory listing as a string array (globs supported) | files |
 | `lu` | `lu(A)` | LU with partial pivoting -> {L, U, p}, so P*A = L*U | linear algebra |
-| `manual` | `manual [doc]` | page rendered documentation: manual, manual packages\|changelog\|lessons\|design\|readme | repl |
+| `manual` | `manual [doc]` | page rendered documentation: manual, manual book\|packages\|changelog\|lessons\|design\|readme | repl |
 | `map` | `map(f, A)` | apply f to each element of A, returning an array of results | functional |
 | `max` | `max(A) \| max(a, b) \| max(A, [], dim)` | largest element; elementwise max; or max along dim | reductions |
 | `mean` | `mean(A) \| mean(A, dim)` | mean of all elements, or along dim | reductions |

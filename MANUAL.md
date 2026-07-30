@@ -1011,7 +1011,7 @@ linguist learns Neutrino.
 | Signature | Description |
 |---|---|
 | `exit \| exit(code)` | end the session (also: quit) |
-| `manual [doc]` | page rendered documentation: manual, manual packages\|changelog\|lessons\|design\|readme |
+| `manual [doc]` | page rendered documentation: manual, manual book\|packages\|changelog\|lessons\|design\|readme |
 | `pretty on\|off` | aligned multi-line matrix display (default on in the REPL) |
 | `more on\|off` | page long output through $PAGER |
 

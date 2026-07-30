@@ -441,6 +441,7 @@ int repl_run(void)
                  * NEUTRINO_MANUAL to override the main manual's path. */
                 static const struct { const char *name, *file; } docs[] = {
                     { "",          "MANUAL.md" },     { "packages", "PACKAGES.md" },
+                    { "book",      "BOOK.md" },
                     { "changelog", "CHANGELOG.md" },  { "lessons",  "LESSONS.md" },
                     { "design",    "DESIGN_NOTES.md" },{ "readme",   "README.md" },
                 };
@@ -449,7 +450,7 @@ int repl_run(void)
                 for (size_t di = 0; di < sizeof docs / sizeof *docs; di++)
                     if (strcmp(arg, docs[di].name) == 0) { file = docs[di].file; break; }
                 if (!file) {
-                    fputs("manual: unknown document; try one of: manual, manual packages, "
+                    fputs("manual: unknown document; try one of: manual, manual book, manual packages, "
                           "manual changelog, manual lessons, manual design, manual readme\n", stderr);
                     goto manual_done;
                 }

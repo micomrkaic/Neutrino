@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.21.1: the book reaches the terminal, and the docs pane lights up.**
+  Two owner catches from the workbench screenshot: the Docs tab rendered
+  transcripts in #1b2733 — near-black on the dark theme, a light-theme
+  fossil — now #c9d4e0; and the native manual command's routing table
+  simply never had a book row, so the flagship document was reachable
+  everywhere except the terminal: manual book now pages BOOK.md, with
+  the unknown-document hint, the builtin reference row, and the
+  workbench hint line all updated.
 - **v2.20.1: the money problems get their decimals.** An owner audit
   found five book problems — the bill (1.1), the currency helper (1.4),
   the progressive tax (7.1), weekly payroll (8.2), the parts bin (9.1) —

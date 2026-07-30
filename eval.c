@@ -1413,7 +1413,7 @@ static const BuiltinDoc builtin_docs[] = {
     { "whor",  "whor | whor(\"sorted\")", "your records only (shorthand for who(\"records\"))", "core" , "whor                              % records, insertion order" },
     { "whos",  "whos",            "the whole workspace, sorted by name (who(\"sorted\"))", "core" , "whos                              % everything, alphabetical" },
     { "exit",  "exit | exit(code)", "end the session (also: quit)", "repl" , "exit                              % goodbye" },
-    { "manual", "manual [doc]",  "page rendered documentation: manual, manual packages|changelog|lessons|design|readme", "repl" , "manual packages                  % the packages guide, formatted and paged" },
+    { "manual", "manual [doc]",  "page rendered documentation: manual, manual book|packages|changelog|lessons|design|readme", "repl" , "manual packages                  % the packages guide, formatted and paged" },
     { "pretty", "pretty on|off", "aligned multi-line matrix display (default on in the REPL)", "repl" , "pretty off                        % single-line matrices" },
     { "more",   "more on|off",   "page long output through $PAGER", "repl" , "more on                           % long results go through less" },
     { "who",   "who | who(\"functions\", \"sorted\")", "list the workspace; filter by \"records\"/\"functions\"/\"vars\", add \"sorted\" for name order", "core" , "who(\"functions\")                  % only your fn bindings\nwho(\"sorted\")                     % everything, alphabetical" },
