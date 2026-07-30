@@ -1428,7 +1428,7 @@ static const BuiltinDoc builtin_docs[] = {
     { "readtable","readtable(file[, opts])", "CSV with a header -> record of column vectors named from the header", "io" , "let d = readtable(\"macro.csv\")    % record of columns: d.year, d.cpi, ..." },
     { "plot",  "plot(y) | plot(x, y) | plot(x, Y, opts)", "line plot via gnuplot; Y columns are series; opts: style string or {title, xlabel, ylabel, style, logx, logy, grid, xrange, yrange, label, label1..labelN}", "plot" , "plot(x, map(sin, x), {title = \"sin\", grid = true})\nplot(x, Y, {label1 = \"GDP\", label2 = \"CPI\"})   % matrix columns as series" },
     { "hist",  "hist(y[, nbins][, opts])", "histogram via gnuplot; opts as in plot (yrange to anchor the axis, label for the legend)", "plot" , "hist(randn(1, 10000), 30)\nhist(u, 20, {yrange = [0, 6000]})   % anchor the axis" },
-    { "format","format / format(m)", "show or set number display: \"short\", \"long\", \"short e\", or a digit count", "core" , "format(3); sqrt(2)                %= 1.41\nformat(\"default\")                 % back to the terse startup style" },
+        { "format","format / format(n) / format(mode, digits)", "number display: format(n) sets SIGNIFICANT digits; format(\"fixed\", d) / format(\"sci\", d) / format(\"auto\", d) set the mode and digits explicitly; format() shows the current setting", "core" , "format(\"fixed\", 2); 87.40 * 1.15    %= 100.51\nformat(\"default\")                 % back to the terse startup style" },
     { "size",  "size(x)",           "[rows, cols] of x (a scalar is 1x1)", "core" , "size([1, 2, 3; 4, 5, 6])          %= [2, 3]" },
     { "length","length(x)",         "longest dimension of x (0 if empty)", "core" , "length([4, 5, 6])                 %= 3" },
     { "numel", "numel(x)",          "number of elements (rows*cols)", "core" , "numel([1, 2; 3, 4])               %= 4" },
@@ -1575,9 +1575,27 @@ static Value bi_format(Interp *I, Value *args, uint32_t n)
     if (a.kind == VAL_STRING) {
         StrObj *s = as_str(a);
         char name[32];
-        if (s->len >= sizeof name || !value_format_by_name((memcpy(name, s->data, s->len), name[s->len] = '\0', name)))
-            runtime_error(I, "format: unknown mode (try short, long, short e, long e, default)");
+        if (s->len >= sizeof name)
+            runtime_error(I, "format: unknown mode");
+        memcpy(name, s->data, s->len); name[s->len] = '\0';
+        if (n == 2) {
+            /* format("fixed"|"sci"|"auto", digits): the systematic form */
+            if (args[1].kind != VAL_INT)
+                runtime_error(I, "format: digits must be an integer");
+            int64_t d = args[1].as.i;
+            if (d < 0 || d > 17) runtime_error(I, "format: digits must be 0..17");
+            NumFmtStyle st;
+            if      (strcmp(name, "fixed") == 0) st = NFMT_F;
+            else if (strcmp(name, "sci") == 0 || strcmp(name, "scientific") == 0) st = NFMT_E;
+            else if (strcmp(name, "auto") == 0 || strcmp(name, "sig") == 0) st = NFMT_G;
+            else runtime_error(I, "format: two-argument form takes \"fixed\", \"sci\", or \"auto\"");
+            value_format_set(st, (int)d);
+            return val_null();
+        }
+        if (!value_format_by_name(name))
+            runtime_error(I, "format: unknown mode (try fixed/sci/auto with digits; or short, long, short f, long f, short e, long e, default)");
     } else if (a.kind == VAL_INT) {
+        if (n == 2) runtime_error(I, "format: mode comes first — format(\"fixed\", 2)");
         if (a.as.i < 1 || a.as.i > 17) runtime_error(I, "format: digit count must be 1..17");
         value_format_set(NFMT_G, (int)a.as.i);
     } else {
@@ -5853,7 +5871,7 @@ EnvObj *globals_new(void)
     def_builtin(e, "readtable",bi_readtable,1, 2);
     def_builtin(e, "plot",  bi_plot,  1, 3);
     def_builtin(e, "hist",  bi_hist,  1, 3);
-    def_builtin(e, "format",bi_format,0, 1);
+    def_builtin(e, "format",bi_format,0, 2);
     e->n_protected = e->count;   /* everything above is the standard library */
     return e;
 }

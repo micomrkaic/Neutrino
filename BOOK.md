@@ -1656,7 +1656,7 @@ language.
 | `floor` | `floor(x)` | round toward -infinity (componentwise on complex) | math |
 | `fminbnd` | `fminbnd(f, a, b)` | minimum of f on [a, b] (Brent) -> {x, fx} | solvers |
 | `fmt` | `fmt(tmpl, ...)` | print's template, returned as a string instead of printed | strings |
-| `format` | `format / format(m)` | show or set number display: "short", "long", "short e", or a digit count | core |
+| `format` | `format / format(n) / format(mode, digits)` | number display: format(n) sets SIGNIFICANT digits; format("fixed", d) / format("sci", d) / format("auto", d) set the mode and digits explicitly; format() shows the current setting | core |
 | `fzero` | `fzero(f, a, b)` | root of f in [a, b] (Brent; f(a), f(b) must differ in sign) | solvers |
 | `gamma` | `gamma(x)` | gamma function (real, elementwise) | math |
 | `gammainc` | `gammainc(x, a)` | regularized lower incomplete gamma P(a, x) (the chi^2 CDF) | math |

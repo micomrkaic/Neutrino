@@ -1,0 +1,15 @@
+# format: the systematic modes (fixed/sci/auto + digits); format(n) = significant
+format("fixed", 2); 87.40 * 1.15
+=> 100.51
+format("fixed", 2); 25.1275
+=> 25.13
+format("sci", 3); 25.1275
+=> 2.513e+01
+format("auto", 6); 25.1275
+=> 25.1275
+format(2); 100.51
+=> 1.0e+02
+format("fixed", 0); 2.7
+=> 3
+format("default"); 1 / 3
+=> 0.333333

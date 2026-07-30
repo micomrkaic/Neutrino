@@ -215,6 +215,16 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.20.0: format becomes systematic.** The owner's bill printed as
+  1.0e+02 under format(2) — correct, since format(n) has always meant
+  SIGNIFICANT digits, and two of them cannot spell 100.51 — but nothing
+  offered decimals at all (the presets stopped at "short f" = 4). The
+  two-argument form closes it: format("fixed", d), format("sci", d),
+  format("auto", d) — additive, with format(n) keeping its documented
+  meaning, bare format reporting the current setting, and the Octave
+  presets intact. Manual §15 rewritten around the one rule worth
+  internalizing plus a verified bill-to-sci transcript; the error
+  message now lists every mode; seven goldens pin the semantics.
 - **v2.19.0: the owner gives in — five sanctioned conveniences, all
   additive, destined for Cozy.** (1) elseif: chains share one end,
   desugaring in the parser to nested ifs; no legal program changes.

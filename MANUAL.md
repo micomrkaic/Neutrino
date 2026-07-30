@@ -815,29 +815,42 @@ first-class strings, which the language does not yet have.
 
 ## 15. Output and formatting
 
-`format` controls how numbers print. Explicitly chosen formats keep trailing
-zeros for consistent width; the startup default is terse:
+Number display has one rule worth internalizing: **`format(n)` sets
+significant digits** (printf `%g`), which is why `format(2)` shows
+100.51 as `1.0e+02` — two significant digits genuinely cannot spell
+100.51. When you want *decimals* — bills, prices, fixed-width tables —
+say so explicitly with the systematic two-argument form:
+
+- `format("fixed", d)` — d digits after the point (`%f`): the bill mode.
+- `format("sci", d)` — scientific with d decimals (`%e`).
+- `format("auto", d)` — d significant digits (`%g`); `format(d)` is its
+  shorthand.
+- `format` with no arguments reports the current setting;
+  `format("default")` restores the terse startup style. The Octave-style
+  names (`"short"`, `"long"`, `"short f"`, `"long f"`, `"short e"`,
+  `"long e"`) remain as presets.
 
 ```
-neutrino> format(4)
-neutrino> for i = 1:3 do print(sqrt(i)) end
-1.000
-1.414
-1.732
+neutrino> let bill = 87.40; bill * 1.15
+100.51
+neutrino> format(2)
+neutrino> bill * 1.15
+1.0e+02
+neutrino> format("fixed", 2)
+neutrino> bill * 1.15
+100.51
+neutrino> ans / 4
+25.13
+neutrino> format("sci", 3)
+neutrino> ans
+2.513e+01
+neutrino> format
+format: scientific, 3 decimals
+neutrino> format("default")
 ```
 
-`print` takes either plain values (space-separated) or a template whose `{}`
-holes are filled in order; a hole can carry its own spec
-`{:[-][width][.prec][f|e|g]}` for per-hole width, precision, and conversion:
-
-```
-neutrino> print("sqrt({}) = {:8.4f}", 2, sqrt(2))
-sqrt(2) =   1.4142
-```
-
-Strings print without quotes in `print`; the REPL echo shows them quoted (the
-echo is a representation, `print` is output). `pretty on|off` toggles the
-aligned matrix display; `more on` pages long output.
+Strings interpolate with `fmt`, and `print` shares its template
+semantics (`{}` placeholders; double the braces for literals).
 
 ## 15b. Strings as code, and the keyboard (since 2.19)
 
@@ -961,7 +974,7 @@ linguist learns Neutrino.
 | `help / help(f)` | help lists every builtin; help(f) describes one |
 | `system(cmd)` | run a shell command string; return its exit status |
 | `dis(f)` | disassemble a function's bytecode (compiler/VM introspection) |
-| `format / format(m)` | show or set number display: "short", "long", "short e", or a digit count |
+| `format / format(n) / format(mode, digits)` | number display: format(n) sets SIGNIFICANT digits; format("fixed", d) / format("sci", d) / format("auto", d) set the mode and digits explicitly; format() shows the current setting |
 | `size(x)` | [rows, cols] of x (a scalar is 1x1) |
 | `length(x)` | longest dimension of x (0 if empty) |
 | `numel(x)` | number of elements (rows*cols) |
