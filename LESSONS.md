@@ -235,3 +235,19 @@ inert sentinel (`print(...)` outputs without echoing) — and the lasting
 rule: when capture and check must share a harness, the harness belongs on
 the trap list, and any new observable state (like `ans`) demands an audit
 of every instrument that touches a session.
+
+### The symmetric-zero quadrature trap
+
+integral(fn x -> x * sin(2 * x), -pi, pi) returned 3e-17 — for an
+integral whose true value is -pi — because adaptive Simpson launched
+from the midpoint probes a, m, b and the quarter points, and x sin 2x
+vanishes at every one of them on [-pi, pi]: the estimate and its
+refinement agreed at zero, so the routine declared convergence on
+garbage. Found not by a test but by a USER IDEA (the Fourier fan-out,
+Problem 10.6) whose b2 coefficient came back wrong. Fix: launch from a
+golden-section split (c = a + (b-a)/phi) — no simple symmetry survives
+an irrational fraction — at three extra evaluations per call; all 914
+existing goldens passed unchanged. The class: any fixed initial
+partition can be aligned with by some integrand; commensurate nodes are
+the enemy, and pretty intervals like [-pi, pi] are where they ambush.
+

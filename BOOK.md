@@ -812,11 +812,11 @@ neutrino> let fb = fn f, k -> integral(fn x -> f(x) * sin(k * x), -pi, pi) / pi
 <fn/2>
 neutrino> let sq = fn x -> pick(x > 0, 1, -1);
 neutrino> 1:5 ~> (fn k -> fb(sq, k))
-[1.273, 9.797e-17, 0.4244, -5.007e-16, 0.2546]
+[1.273, 1.060e-16, 0.4244, -3.534e-17, 0.2546]
 neutrino> 4 / pi * [1, 0, 1/3, 0, 1/5]
 [1.273, 0.000, 0.4244, 0.000, 0.2546]
 neutrino> (sum[k = 1:n] fb(sq, k) * sin(k * x)) where n = 40, x = 1
-1.012
+1.023
 ```
 
 **Discussion.** `fb(f, k)` is the textbook formula verbatim:
@@ -827,6 +827,42 @@ can say it. The last line *resynthesizes* the wave from forty terms of
 its own spectrum via a sigma, landing near 1 at x = 1 (the wiggle is
 Gibbs' phenomenon, honestly reported). Analysis and synthesis, three
 lines total, any integrable `f` you can write.
+
+**Problem 10.6 — The spectrum analyzer, one pipe wide.** The owner's
+observation: a *function* is a value, so it can ride the fan-out pipe —
+and a record whose fields each map over k turns one pipe into a whole
+Fourier table.
+
+```
+neutrino> format(4)
+neutrino> let fa = fn f, k -> integral(fn x -> f(x) * cos(k * x), -pi, pi) / pi
+<fn/2>
+neutrino> let fb = fn f, k -> integral(fn x -> f(x) * sin(k * x), -pi, pi) / pi
+<fn/2>
+neutrino> let spectrum = fn n -> {a = fn f -> 0:n ~> (fn k -> fa(f, k)), b = fn f -> 1:n ~> (fn k -> fb(f, k))}
+<fn/1>
+neutrino> let s = spectrum(4);
+neutrino> (fn x -> x) |> {a = s.a, b = s.b}
+{a = [0.000, 2.827e-16, 1.325e-16, 1.767e-17, 1.414e-16], b = [2.000, -1.000, 0.6667, -0.5000]}
+neutrino> (fn x -> x ^ 2) |> {a = s.a, b = s.b}
+{a = [6.580, -4.000, 1.000, -0.4444, 0.2500], b = [5.654e-16, 0.000, 0.000, 2.827e-16]}
+```
+
+**Discussion.** The sawtooth's sines read 2, −1, 2/3, −1/2 — the
+textbook 2(−1)ᵏ⁺¹/k — and the parabola's cosines read 2π²/3 then
+4(−1)ᵏ/k², with the opposite table flat at zero in each case: odd
+functions are pure sine, even are pure cosine, and the fan-out shows
+both ledgers side by side. Two idioms carry the construction: fan-out
+fields are *unary*, so `spectrum(n)` bakes k-ranges into closures; and
+fan-out is *syntax on record literals*, so a record-valued expression
+pipes through the one-line literal `{a = s.a, b = s.b}`. One caution
+with a story: the analyzer's first run returned b₂ ≈ 0 for the sawtooth
+— not a Fourier error but a quadrature trap, since x·sin 2x vanishes at
+every node of a midpoint-launched Simpson rule on [−π, π]. The
+integrator now launches from a golden-section split, which no simple
+symmetry survives.
+
+---
 
 **Problem 10.6 — The derivative as an operator.** `d` takes a function
 and returns its derivative — a function eating a function, producing a

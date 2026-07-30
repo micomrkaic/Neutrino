@@ -2130,9 +2130,18 @@ static Value bi_integral(Interp *I, Value *args, uint32_t n)
     double sgn = 1.0;
     if (a > b) { double t = a; a = b; b = t; sgn = -1.0; }
     double fa2 = call_f1(I, f, a, "integral"), fb2 = call_f1(I, f, b, "integral");
-    double m = 0.5 * (a + b), fm = call_f1(I, f, m, "integral");
-    double whole = (b - a) / 6.0 * (fa2 + 4.0 * fm + fb2);
-    return val_float(sgn * simpson_rec(I, f, a, fa2, m, fm, b, fb2, whole, tol, 0));
+    /* Launch from a golden-section split, not the midpoint: a symmetric
+     * integrand whose zeros sit at a, m, b and the quarter points (e.g.
+     * x sin 2x on [-pi, pi]) makes the classic midpoint launch see 0 = 0
+     * and converge on garbage. No simple symmetry survives 1/phi. */
+    double c  = a + (b - a) * 0.6180339887498949;
+    double fc = call_f1(I, f, c, "integral");
+    double m1 = 0.5 * (a + c), fm1 = call_f1(I, f, m1, "integral");
+    double m2 = 0.5 * (c + b), fm2 = call_f1(I, f, m2, "integral");
+    double w1 = (c - a) / 6.0 * (fa2 + 4.0 * fm1 + fc);
+    double w2 = (b - c) / 6.0 * (fc + 4.0 * fm2 + fb2);
+    return val_float(sgn * (simpson_rec(I, f, a, fa2, m1, fm1, c, fc, w1, 0.5 * tol, 0)
+                          + simpson_rec(I, f, c, fc, m2, fm2, b, fb2, w2, 0.5 * tol, 0)));
 }
 
 /* ------------------------------------------------------------------ */

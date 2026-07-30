@@ -226,6 +226,20 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.21.0: the spectrum analyzer, and the integrator it debugged.** The
+  owner piped a function into a fan-out record of Fourier extractors —
+  and the idea worked (functions are values; they ride the pipe), then
+  immediately caught a real numerical bug: b2 of the sawtooth came back
+  0 because x sin 2x vanishes at every probe of a midpoint-launched
+  adaptive Simpson on [-pi, pi] — false convergence on garbage. The
+  integrator now launches from a golden-section split (no simple
+  symmetry survives 1/phi; +3 evaluations; all 914 prior goldens pass
+  unchanged), with the trap pinned in tests/51 and its story in
+  LESSONS. Book Problem 10.6 enshrines the analyzer: spectrum(n) bakes
+  k-ranges into closures, one pipe yields both Fourier ledgers, the
+  sawtooth reads 2(-1)^(k+1)/k and the parabola 4(-1)^k/k^2 — with the
+  two idioms (fan-out fields are unary; fan-out is literal syntax)
+  taught beside the caution. 917 goldens.
 - **v2.20.0: format becomes systematic.** The owner's bill printed as
   1.0e+02 under format(2) — correct, since format(n) has always meant
   SIGNIFICANT digits, and two of them cannot spell 100.51 — but nothing
