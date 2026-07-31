@@ -5,6 +5,12 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.21.2: the right element this time.** v2.21.1 brightened the Docs
+  pane's pre blocks — but markdown fences render as pre > code, and the
+  inline-chip rule (#docview code, dark teal) styles the inner element,
+  overriding the pre. The reset rule (#docview pre code) now carries the
+  color explicitly; the owner's second screenshot was the regression
+  test.
 - **v2.21.1: the book reaches the terminal, and the docs pane lights up.**
   Two owner catches from the workbench screenshot: the Docs tab rendered
   transcripts in #1b2733 — near-black on the dark theme, a light-theme
