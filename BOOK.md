@@ -1804,5 +1804,146 @@ language.
 
 ---
 
+## Appendix G. Two languages, five problems
+
+*The same five tasks in Neutrino and in Python — idiomatic Python, with
+numpy and scipy where a Python programmer would reach for them. Ground
+rules: no strawmen; every Python block below was executed (CPython 3.12,
+numpy 2.4.4, scipy 1.17.1) and produces the results shown; deterministic
+pairs match Neutrino digit for digit, and the stochastic pairs (G.1,
+G.4) match in distribution, since the two languages carry different
+random generators. Cases where Python wins cleanly were left out on
+purpose and deserve naming: a Basel sum is a lovely generator
+expression, a t-test is one scipy.stats call, and sympy's diff is
+elegant — those contrasts would measure libraries, not languages. What
+remains is structural: the grammar itself.*
+
+**G.1 — The mask that reads like the statistics.**
+
+```
+neutrino> rng(2); mean(-1.96 < z < 1.96) where z = randn(1, 10000)
+0.9484
+```
+
+```python
+import numpy as np
+z = np.random.randn(10000)
+((z > -1.96) & (z < 1.96)).mean()          # -> 0.948...
+```
+
+The mathematical sentence −1.96 < z < 1.96 is *illegal* on numpy arrays:
+Python's chained comparison desugars through `and`, which cannot work
+elementwise, so the idiom is two comparisons, both parenthesized
+(precedence bites otherwise), joined with `&` — a documented, famous
+wart. Neutrino's grammar just says the statistics.
+
+**G.2 — Formula first, constants after.**
+
+```
+neutrino> format(4)
+neutrino> (-b + [-d, d]) / (2 * a) where a = 1, b = -3, c = 2, d = sqrt(b ^ 2 - 4 * a * c)
+[1.000, 2.000]
+```
+
+```python
+import math
+a, b, c = 1, -3, 2
+d = math.sqrt(b**2 - 4*a*c)
+[(-b - d)/(2*a), (-b + d)/(2*a)]           # -> [1.0, 2.0]
+```
+
+Python reads bottom-up: plumbing first, idea last, and each root spelled
+out. `where` states the formula in blackboard word order, and `[-d, d]`
+broadcasts both roots from one expression.
+
+**G.3 — The birthday problem in one sentence.**
+
+```
+neutrino> 1:m ~> (fn k -> prod[j = 1:k] (1 - (j - 1) / 365)) |> (fn p -> find(p < 0.5)[1]) where m = 60
+23
+```
+
+```python
+from itertools import accumulate
+import operator
+probs = list(accumulate((1 - k/365 for k in range(60)), operator.mul))
+next(k + 1 for k, p in enumerate(probs) if p < 0.5)     # -> 23
+```
+
+One left-to-right sentence — map the survival products, find the first
+below one half — against two imports, an accumulator, an enumerate, and
+an off-by-one to reason about. Both are honest; only one is a sentence.
+
+**G.4 — The dashboard.**
+
+```
+neutrino> format(4)
+neutrino> rng(7); rand(1, 500) |> {mu = mean, sd = std, hi = max, lo = min}
+{mu = 0.5072, sd = 0.2912, hi = 0.9987, lo = 0.002616}
+```
+
+```python
+import numpy as np
+x = np.random.rand(500)
+{"mu": x.mean(), "sd": x.std(ddof=1), "hi": x.max(), "lo": x.min()}
+# -> {'mu': 0.502, 'sd': 0.2915, 'hi': 0.9992, 'lo': 0.0014}
+```
+
+The closest race of the five, kept for exactly that reason. Python names
+`x` four times and hides a landmine — `std` defaults to the population
+formula, so the statistician must remember `ddof=1`. Fan-out mentions
+the value once, and the record syntax *is* the report.
+
+**G.5 — The spectrum analyzer, from first principles.**
+
+```
+neutrino> format(4)
+neutrino> let fa = fn f, k -> integral(fn x -> f(x) * cos(k * x), -pi, pi) / pi
+<fn/2>
+neutrino> let fb = fn f, k -> integral(fn x -> f(x) * sin(k * x), -pi, pi) / pi
+<fn/2>
+neutrino> let spectrum = fn n -> {a = fn f -> 0:n ~> (fn k -> fa(f, k)), b = fn f -> 1:n ~> (fn k -> fb(f, k))}
+<fn/1>
+neutrino> let s = spectrum(4);
+neutrino> (fn x -> x) |> {a = s.a, b = s.b}
+{a = [0.000, 2.827e-16, 1.325e-16, 1.767e-17, 1.414e-16], b = [2.000, -1.000, 0.6667, -0.5000]}
+```
+
+```python
+from scipy.integrate import quad
+import numpy as np
+
+def fa(f, k):
+    return quad(lambda x: f(x) * np.cos(k * x), -np.pi, np.pi)[0] / np.pi
+
+def fb(f, k):
+    return quad(lambda x: f(x) * np.sin(k * x), -np.pi, np.pi)[0] / np.pi
+
+def spectrum(n):
+    return {"a": lambda f: [fa(f, k) for k in range(n + 1)],
+            "b": lambda f: [fb(f, k) for k in range(1, n + 1)]}
+
+s = spectrum(4)
+{name: g(lambda x: x) for name, g in s.items()}
+# -> {'a': [0.0, 0.0, 0.0, 0.0, 0.0], 'b': [2.0, -1.0, 0.6667, -0.5]}
+```
+
+Both sides from scratch — and fairness is acknowledged before it is
+overruled: factored properly, Python's coefficient functions weigh the
+same as Neutrino's, and the notorious `k=k` closure trick vanishes
+entirely (it haunts only inline lambdas). What survives fair treatment
+is isolated in the last line: applying one value to a bag of named
+functions. Python has no grammar for it — the applicator must be
+written by hand, a dict comprehension threading `f` through `.items()`
+— while `|> { }` *is* the applicator. Five lines against twelve, with
+the twelve at their best. (Python's cosines print cleaner zeros; ours
+carry honest quadrature dust at 10⁻¹⁶ — see Problem 10.6 for the trap
+that dust once hid.)
+
+---
+
+
+---
+
 *Every transcript above re-executes in `make test`. The prompt is waiting
 to disagree with this book; it never has.*

@@ -251,6 +251,20 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.23.0: Appendix G — Two languages, five problems.** The book
+  closes with the comparison it earned: five tasks in Neutrino and in
+  idiomatic Python (numpy 2.4.4 / scipy 1.17.1, every block executed),
+  escalating from grammar to functions-as-values — the mask that reads
+  like the statistics (chained comparisons are illegal on numpy arrays),
+  formula-first word order via where, the birthday problem as one
+  sentence, the dashboard fan-out (with numpy's ddof=1 landmine named),
+  and the spectrum analyzer from first principles on both sides, where
+  fairness is acknowledged before it is overruled: the k=k trick
+  vanishes in factored Python, and what survives is the last line —
+  Python writes its applicator by hand, |> {} is one. Ground rules in
+  the preface: no strawmen, deterministic pairs match digit for digit,
+  stochastic pairs match in distribution, and the contests Python wins
+  cleanly are named and excluded. 338 verified transcripts.
 - **v2.21.0: the spectrum analyzer, and the integrator it debugged.** The
   owner piped a function into a fan-out record of Fourier extractors —
   and the idea worked (functions are values; they ride the pipe), then
