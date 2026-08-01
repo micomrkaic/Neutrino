@@ -1812,7 +1812,11 @@ rules: no strawmen; every Python block below was executed (CPython 3.12,
 numpy 2.4.4, scipy 1.17.1) and produces the results shown; deterministic
 pairs match Neutrino digit for digit, and the stochastic pairs (G.1,
 G.4) match in distribution, since the two languages carry different
-random generators. Cases where Python wins cleanly were left out on
+random generators. Both sides show their full ceremony —
+seeds, and display rounding where the shown output is rounded; nothing a
+listing produced is hidden from it (Neutrino's rng lines are the same
+honesty: verified transcripts must be reproducible). Cases where Python
+wins cleanly were left out on
 purpose and deserve naming: a Basel sum is a lovely generator
 expression, a t-test is one scipy.stats call, and sympy's diff is
 elegant — those contrasts would measure libraries, not languages. What
@@ -1827,8 +1831,9 @@ neutrino> rng(2); mean(-1.96 < z < 1.96) where z = randn(1, 10000)
 
 ```python
 import numpy as np
+np.random.seed(2)
 z = np.random.randn(10000)
-((z > -1.96) & (z < 1.96)).mean()          # -> 0.948...
+((z > -1.96) & (z < 1.96)).mean()          # -> 0.948
 ```
 
 The mathematical sentence −1.96 < z < 1.96 is *illegal* on numpy arrays:
@@ -1840,9 +1845,8 @@ wart. Neutrino's grammar just says the statistics.
 **G.2 — Formula first, constants after.**
 
 ```
-neutrino> format(4)
 neutrino> (-b + [-d, d]) / (2 * a) where a = 1, b = -3, c = 2, d = sqrt(b ^ 2 - 4 * a * c)
-[1.000, 2.000]
+[1, 2]
 ```
 
 ```python
@@ -1877,15 +1881,16 @@ an off-by-one to reason about. Both are honest; only one is a sentence.
 **G.4 — The dashboard.**
 
 ```
-neutrino> format(4)
 neutrino> rng(7); rand(1, 500) |> {mu = mean, sd = std, hi = max, lo = min}
-{mu = 0.5072, sd = 0.2912, hi = 0.9987, lo = 0.002616}
+{mu = 0.507215, sd = 0.291248, hi = 0.998657, lo = 0.0026157}
 ```
 
 ```python
 import numpy as np
+np.random.seed(7)
 x = np.random.rand(500)
-{"mu": x.mean(), "sd": x.std(ddof=1), "hi": x.max(), "lo": x.min()}
+r = {"mu": x.mean(), "sd": x.std(ddof=1), "hi": x.max(), "lo": x.min()}
+{k: round(float(v), 4) for k, v in r.items()}
 # -> {'mu': 0.502, 'sd': 0.2915, 'hi': 0.9992, 'lo': 0.0014}
 ```
 
@@ -1897,7 +1902,6 @@ the value once, and the record syntax *is* the report.
 **G.5 — The spectrum analyzer, from first principles.**
 
 ```
-neutrino> format(4)
 neutrino> let fa = fn f, k -> integral(fn x -> f(x) * cos(k * x), -pi, pi) / pi
 <fn/2>
 neutrino> let fb = fn f, k -> integral(fn x -> f(x) * sin(k * x), -pi, pi) / pi
@@ -1906,7 +1910,7 @@ neutrino> let spectrum = fn n -> {a = fn f -> 0:n ~> (fn k -> fa(f, k)), b = fn 
 <fn/1>
 neutrino> let s = spectrum(4);
 neutrino> (fn x -> x) |> {a = s.a, b = s.b}
-{a = [0.000, 2.827e-16, 1.325e-16, 1.767e-17, 1.414e-16], b = [2.000, -1.000, 0.6667, -0.5000]}
+{a = [0, 2.82716e-16, 1.32523e-16, 1.76697e-17, 1.41358e-16], b = [2, -1, 0.666667, -0.5]}
 ```
 
 ```python
@@ -1924,7 +1928,8 @@ def spectrum(n):
             "b": lambda f: [fb(f, k) for k in range(1, n + 1)]}
 
 s = spectrum(4)
-{name: g(lambda x: x) for name, g in s.items()}
+out = {name: g(lambda x: x) for name, g in s.items()}
+{k: [round(v, 4) for v in vs] for k, vs in out.items()}
 # -> {'a': [0.0, 0.0, 0.0, 0.0, 0.0], 'b': [2.0, -1.0, 0.6667, -0.5]}
 ```
 
@@ -1935,8 +1940,8 @@ entirely (it haunts only inline lambdas). What survives fair treatment
 is isolated in the last line: applying one value to a bag of named
 functions. Python has no grammar for it — the applicator must be
 written by hand, a dict comprehension threading `f` through `.items()`
-— while `|> { }` *is* the applicator. Five lines against twelve, with
-the twelve at their best. (Python's cosines print cleaner zeros; ours
+— while `|> { }` *is* the applicator. Five lines against fifteen, with
+the fifteen at their best and nothing hidden. (Python's cosines print cleaner zeros; ours
 carry honest quadrature dust at 10⁻¹⁶ — see Problem 10.6 for the trap
 that dust once hid.)
 

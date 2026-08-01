@@ -5,6 +5,16 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.23.1: Appendix G rebalanced — this time the unfairness ran
+  against the house.** The owner's audit: Neutrino's blocks carried
+  visible format() and rng() housekeeping while the Python listings hid
+  theirs (the certification runs seeded and rounded off-page). Now
+  symmetric by rule, stated in the preface: both sides show their full
+  ceremony. Neutrino drops format(4) where defaults print clean (G.2,
+  G.4, G.5 each lose a line); Python gains its np.random.seed lines and
+  visible rounding where shown outputs are rounded (G.1, G.4, G.5); the
+  G.5 tally becomes five lines against fifteen, with the fifteen at
+  their best and nothing hidden.
 - **v2.22.0: mean joins its family.** The owner tried
   mean(-1.96 < z < 1.96) — the single most natural mask statistic — and
   it errored, while sum counted the same mask and var computed its
