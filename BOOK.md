@@ -1040,11 +1040,14 @@ and 36% of samples are perfectly clean.
 measurements; a 95% interval for the mean.
 
 ```
-neutrino> format(4)
-neutrino> let x = [12.1, 11.8, 12.4, 12.0, 11.9, 12.3, 12.2, 11.7];
-neutrino> let se = std(x) / sqrt(length(x));
-neutrino> mean(x) + [-1.96, 1.96] * se
-[11.88, 12.22]
+neutrino> rng(2)
+neutrino> let z = randn(1, 10000);
+neutrino> mean(-1.96 < z < 1.96)
+0.9484
+neutrino> sum(z > 3)
+10
+neutrino> mean(abs(z) > 2.576)
+0.0101
 ```
 
 **Discussion.** Mean ± 1.96 standard errors, the array `[-1.96, 1.96]`

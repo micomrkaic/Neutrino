@@ -703,6 +703,21 @@ functions rather than stateful modules. Errors inside a loaded file are
 reported with the file name; a parse error includes its line and column
 within the file.
 
+### Masks and reductions
+
+Comparisons on arrays yield Bool masks, and the reductions treat
+`true` as 1: `sum` of a mask counts, `mean` of a mask is the fraction —
+the one-line statistic for any condition.
+
+```
+neutrino> let mask = [1, 5, 2, 8, 3] > 2.5
+[false, true, false, true, true]
+neutrino> sum(mask)
+3
+neutrino> mean(mask)
+0.6
+```
+
 ## 12. Random numbers
 
 The generator is xoshiro256** seeded through splitmix64, and it is

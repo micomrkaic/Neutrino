@@ -5334,12 +5334,13 @@ static Value bi_mean(Interp *I, Value *args, uint32_t n)
         return out;
     }
     if (is_num(v)) return value_retain(v);
+    if (v.kind == VAL_BOOL) return val_int(v.as.b ? 1 : 0);
     if (!is_array(v)) runtime_error(I, "mean: expected an array or number");
     ArrObj *a = as_arr(v);
     size_t nn = (size_t)a->rows * a->cols;
     if (nn == 0) runtime_error(I, "mean: empty array");
     Value acc = val_int(0);
-    for (size_t k = 0; k < nn; k++) acc = scalar_arith_k(I, AR_ADD, acc, arr_get(a, k));
+    for (size_t k = 0; k < nn; k++) acc = scalar_arith_k(I, AR_ADD, acc, numify(arr_get(a, k)));   /* numify: masks mean their fraction, like every other reduction */
     return scalar_arith_k(I, AR_DIV, acc, val_int((int64_t)nn));
 }
 static Value bi_prod(Interp *I, Value *args, uint32_t n)

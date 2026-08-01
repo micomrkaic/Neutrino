@@ -5,6 +5,17 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.22.0: mean joins its family.** The owner tried
+  mean(-1.96 < z < 1.96) — the single most natural mask statistic — and
+  it errored, while sum counted the same mask and var computed its
+  variance: mean's whole-array loop added elements raw where every other
+  reduction routes through numify (bool -> int); even mean(mask, dim)
+  worked, since the dim branch shares sum's fold. One numify fixes it:
+  mean of a mask is its fraction of trues. The idiom is promoted
+  throughout — the demo's Act II and the book's CLT block now say
+  mean(mask) with no division to remember, the manual gains a
+  masks-and-reductions note, and two goldens (including the owner's
+  exact line, seeded) pin the family's consistency. 919 goldens.
 - **v2.21.2: the right element this time.** v2.21.1 brightened the Docs
   pane's pre blocks — but markdown fences render as pre > code, and the
   inline-chip rule (#docview code, dark teal) styles the inner element,
