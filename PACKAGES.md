@@ -489,9 +489,13 @@ self-composition converging on the golden ratio), the pipelines act with
 both crown jewels (the oscillation pipe — values flavor-changing between
 ~> and |> down one chain — and the fan-out dashboard), the calculus (symb.nu's `deriv` and a symbolic derivative fed to
 `fzero`), money (the HP-12C mortgage), and a plotted finale. Every
-number is computed live in the session, seeded where random,
-deterministic throughout; `make test` asserts the tour plays clean end
-to end. Point a newcomer at this file first.
+demonstration is a SINGLE SOURCE STRING — printed as the caption and
+executed by `eval` — so what the tour shows is, byte for byte, what it
+runs; drift between shown and real code is impossible by construction.
+The pacing is deliberate: `pause()` waits for Enter after each feature
+at a live prompt, while piped input or `make test` drains the pauses
+instantly at EOF — one file, both temperaments. Seeded where random,
+deterministic throughout. Point a newcomer at this file first.
 
 ```
 neutrino> load("packages/demo.nu")

@@ -261,6 +261,20 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.24.0: the tour becomes honest to the byte, and deliberate.** The
+  owner asked how demo.nu executes when its code appears inside print
+  strings — and the answer exposed the design's one weakness: every
+  formula lived twice, as inert caption and as live expression, twins
+  maintained by hand with nothing checking they matched. Rebuilt on
+  eval: each demonstration is ONE source string, printed as the caption
+  and executed for the result — drift impossible by construction (the
+  feature owed its existence to v2.19.0's eval, and repays it). And per
+  the owner's pacing order, pause() now waits for Enter after every
+  feature at a live prompt — while pause's EOF behavior means piped
+  input and make test drain the waits instantly, so one file serves
+  both temperaments. Act II's mask line rides the new mean(mask) idiom;
+  Act VI shows fixed-decimals money mode; run_demo.sh asserts the
+  single-source banner alongside the classics.
 - **v2.23.0: Appendix G — Two languages, five problems.** The book
   closes with the comparison it earned: five tasks in Neutrino and in
   idiomatic Python (numpy 2.4.4 / scipy 1.17.1, every block executed),
