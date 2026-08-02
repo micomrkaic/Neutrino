@@ -1919,9 +1919,11 @@ static Value bi_pause(Interp *I, Value *args, uint32_t n)
         StrObj *s0 = as_str(args[0]); msg = s0->data; mlen = s0->len;
     }
 #ifdef __EMSCRIPTEN__
-    char cm[256];
-    snprintf(cm, sizeof cm, "%.*s", (int)mlen, msg);
-    EM_ASM({ window.alert(UTF8ToString($0)); }, cm);
+    /* No modal: alert() blocks the main thread, so queued terminal output
+     * never paints — sixteen pauses meant sixteen blank-screen dialogs.
+     * In the browser the prompt prints as a visible pacing marker and the
+     * tour flows; at a real terminal pause still waits for Enter. */
+    fwrite(msg, 1, mlen, vout()); fputc('\n', vout()); fflush(vout());
 #else
     fwrite(msg, 1, mlen, stdout); fflush(stdout);
     int c;

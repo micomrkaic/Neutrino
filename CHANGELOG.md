@@ -5,6 +5,14 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.25.2: the browser tour un-hostaged.** In the wasm build pause()
+  raised a modal alert — and a modal blocks the main thread, so the
+  terminal's queued output never painted: the owner's screenshot showed
+  sixteen blank-screen dialogs where a tour should be. The browser
+  build now prints the pause prompt as a visible pacing marker and
+  flows on; a real terminal still waits for Enter; EOF still drains
+  under make test. One file, all three temperaments, and the doc row
+  says which is which.
 - **v2.25.1: the rite ran past a corpse, and the book had two 10.6s.**
   The v2.25.0 insertion script died on a justified assertion — chapter
   10 already owned a Problem 10.7 — but the release steps behind it

@@ -494,7 +494,9 @@ executed by `eval` — so what the tour shows is, byte for byte, what it
 runs; drift between shown and real code is impossible by construction.
 The pacing is deliberate: `pause()` waits for Enter after each feature
 at a live prompt, while piped input or `make test` drains the pauses
-instantly at EOF — one file, both temperaments. Seeded where random,
+instantly at EOF, and the browser build prints each prompt as a pacing
+marker and flows on (a modal would blank the terminal) — one file, all
+three temperaments. Seeded where random,
 deterministic throughout. Point a newcomer at this file first.
 
 ```
