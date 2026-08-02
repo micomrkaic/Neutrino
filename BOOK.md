@@ -864,7 +864,126 @@ symmetry survives.
 
 ---
 
-**Problem 10.6 — The derivative as an operator.** `d` takes a function
+**Problem 10.7 — |x| drawn from cosines.** The absolute value is even,
+so its series is pure cosine; the idiom is three moves — the coefficient
+functional, one map, one sigma closure — and a two-curve plot:
+
+```
+neutrino> format(4)
+neutrino> let fa = fn f, k -> integral(fn x -> f(x) * cos(k * x), -pi, pi) / pi
+<fn/2>
+neutrino> let a = 0:9 ~> (fn k -> fa(abs, k))
+[3.142, -1.273, 1.944e-16, -0.1415, -1.237e-16, -0.05093, -2.288e-15, -0.02598, -8.844e-15, -0.01572]
+neutrino> [pi, -4/pi, -4/(9*pi), -4/(25*pi)]
+[3.142, -1.273, -0.1415, -0.05093]
+neutrino> let S = fn x -> a[1] / 2 + (sum[k = 1:9] a[k + 1] * cos(k * x))
+<fn/1>
+neutrino> let xs = -pi:0.05:pi;
+neutrino> max(abs((xs ~> abs) - (xs ~> S)))
+0.06345
+neutrino> plot(xs, [xs ~> abs; xs ~> S]', {title = "|x| and its 10-term Fourier series", label1 = "|x|", label2 = "S"})
+  |x| and its 10-term Fourier series
+     3.14 |++                                                            ++
+     2.96 | +++                                                        +++
+     2.77 |   ++*                                                     ++
+     2.59 |     ++                                                  ++
+      2.4 |       ++                                              ++
+     2.22 |         ++                                          ++*
+     2.04 |           ++                                      +++
+     1.85 |            +++                                  +++
+     1.67 |              +++                               ++
+     1.48 |                ++*                           ++
+      1.3 |                  ++                        ++
+     1.11 |                    ++                    ++
+     0.93 |                      ++                +++
+    0.746 |                       +++            +++
+    0.561 |                         +++        +++
+    0.377 |                           ++*     ++
+    0.193 |                             ++  ++
+  0.00841 |                               +++
+          +----------------------------------------------------------------
+           -3.142                                                     3.108
+  * series 1 (|x|)
+  + series 2 (S)
+```
+
+**Discussion.** The computed coefficients sit beside the analytic row —
+π, −4/π, −4/9π, −4/25π — digit for digit, with the even entries showing
+honest quadrature dust; `abs` rides into `fa` bare, a builtin as a
+first-class value; and `[y1; y2]'` is the two-curves-one-plot spelling
+(columns are series, label1/label2 name the legend). The error line
+tells the story before the picture does: 0.0634, concentrated at the
+corner, where the plot's floor reads 0.008 instead of 0 — a kink that
+ten cosines round but cannot crease. |x| is continuous, so the series
+converges uniformly: no ringing, only smoothing. The next problem
+removes the continuity and watches what breaks.
+
+---
+
+**Problem 10.8 — Gibbs: the overshoot that will not die.** The square
+wave jumps, and a Fourier series near a jump overshoots by a fixed
+fraction no number of terms can cure — only sharpen:
+
+```
+neutrino> format(4)
+neutrino> let fb = fn f, k -> integral(fn x -> f(x) * sin(k * x), -pi, pi) / pi
+<fn/2>
+neutrino> let sq = fn x -> pick(x > 0, 1, -1)
+<fn/1>
+neutrino> let b = 1:9 ~> (fn k -> fb(sq, k))
+[1.273, 1.060e-16, 0.4244, -3.534e-17, 0.2546, 3.534e-17, 0.1819, -8.835e-18, 0.1415]
+neutrino> let S9 = fn x -> sum[k = 1:9] b[k] * sin(k * x)
+<fn/1>
+neutrino> max((0:0.002:1) ~> S9)
+1.182
+neutrino> let S99 = fn x -> 4 / pi * (sum[j = 1:50] sin((2 * j - 1) * x) / (2 * j - 1))
+<fn/1>
+neutrino> max((0:0.0005:0.2) ~> S99)
+1.179
+neutrino> 2 / pi * integral(fn t -> sin(t) / t, 1e-9, pi)
+1.179
+neutrino> plot(-pi:0.02:pi, [(-pi:0.02:pi) ~> sq; (-pi:0.02:pi) ~> S9]', {title = "square wave, 9 terms: Gibbs", label1 = "sq", label2 = "S9"})
+  square wave, 9 terms: Gibbs
+     1.18 |                                  +++                      +++
+     1.04 |                                **+*++*+++++*+++++**++++**++*+**
+    0.904 |                                 +   +++   +++   +++   ++++  +
+    0.765 |                                 +                            +
+    0.626 |                                 +                            +
+    0.487 |                                +                             +
+    0.348 |                                +                             +
+    0.209 |                                +                              +
+   0.0696 |                                +                              +
+  -0.0695 |+                              ++
+   -0.209 |+                              +
+   -0.348 | +                             +
+   -0.487 | +                             +
+   -0.626 | +                            +
+   -0.765 | +                            +
+   -0.904 |  +  ++++   +++   +++   +++   +
+    -1.04 |**+*++**++++**+++++*+++++*++*+***
+    -1.18 |  +++                      +++
+          +----------------------------------------------------------------
+           -3.142                                                     3.138
+  * series 1 (sq)
+  + series 2 (S9)
+```
+
+**Discussion.** Three numbers carry the whole theorem: the nine-term
+partial sum peaks at 1.182; the ninety-nine-term sum (written from the
+analytic 4/π Σ sin((2j−1)x)/(2j−1), which the computed b verified term
+by term) still peaks at 1.179; and (2/π)·Si(π) — the Gibbs constant,
+computed here by our own integrator — is 1.179. More terms squeeze the
+horns toward the jump but never lower them: the overshoot is a property
+of the discontinuity, not of the truncation. The plot shows both
+symptoms at once — the horns at ±1.18 flanking each jump, and the
+ripples along the plateaus. Set beside Problem 10.7, the pair is the
+classical dichotomy in two pictures: a corner smooths, a jump rings,
+and the difference is one derivative of continuity.
+
+---
+
+
+**Problem 10.9 — The derivative as an operator.** `d` takes a function
 and returns its derivative — a function eating a function, producing a
 function:
 
@@ -891,7 +1010,7 @@ composition: `arclen` places `d(f)` inside an integrand, so
 and the line y = x reports √2 as a sanity check. Operators on functions
 need no special machinery, because functions were never special.
 
-**Problem 10.7 — A gallery of famous integrals.** The factorial, and
+**Problem 10.10 — A gallery of famous integrals.** The factorial, and
 three roads to π:
 
 ```

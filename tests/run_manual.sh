@@ -20,3 +20,7 @@ echo "manual render: escapes clean"
 
 # worked-example tables in PACKAGES.md must match the interpreter
 python3 tools/gen_package_tables.py --check || exit 1
+
+# structural lint: no duplicated problem numbers in any book
+dups=$(grep -oE '\*\*Problem [0-9]+\.[0-9]+' BOOK.md | sort | uniq -d)
+if [ -n "$dups" ]; then echo "BOOK.md: duplicated problem numbers: $dups"; exit 1; fi

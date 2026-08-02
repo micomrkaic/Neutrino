@@ -251,3 +251,22 @@ existing goldens passed unchanged. The class: any fixed initial
 partition can be aligned with by some integrand; commensurate nodes are
 the enemy, and pretty intervals like [-pi, pi] are where they ambush.
 
+### The rite ran past a corpse
+
+The v2.25.0 insertion script died mid-pipeline on a justified
+assertion (the book already had a Problem 10.7 — itself the residue of
+an earlier insertion that never renumbered its chapter, leaving two
+10.6s across three shipped releases). Everything downstream proceeded
+anyway: changelog written, version bumped, wasm built, tarball shipped
+— internally inconsistent, changelog promising content the book lacked.
+Two failures, two fences. The numbering class: structural invariants
+that no transcript checks (problem numbering, section ordering) need
+their own lint — run_manual.sh now fails on duplicate problem numbers.
+The rite class: a multi-step release is a chain, and a chain that
+continues after a broken link ships the break. Steps must gate on the
+success of what they depend on — and when a verification line DOES
+print the evidence (the pdf grep said "10.8 in pdf: 0" plainly), the
+operator must read it before packaging, not after. The suite's exit
+code discipline exists precisely so green means green; the same law
+applies to every ad-hoc pipeline that touches a deliverable.
+

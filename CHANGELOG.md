@@ -5,6 +5,18 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.25.1: the rite ran past a corpse, and the book had two 10.6s.**
+  The v2.25.0 insertion script died on a justified assertion — chapter
+  10 already owned a Problem 10.7 — but the release steps behind it
+  proceeded anyway, shipping a changelog that described problems absent
+  from the book. Root cause of the assertion: the spectrum analyzer
+  (v2.21.0) was inserted as 10.6 without renumbering, leaving TWO
+  Problem 10.6s in three shipped releases. Both healed: the derivative
+  operator is 10.9, the integral gallery 10.10, the Fourier pair sits
+  at 10.7/10.8 beside its family, and the roster reads 10.1-10.10
+  cleanly. The class is fenced two ways: LESSONS records that a rite
+  must halt at the first dead step, and run_manual.sh now fails on any
+  duplicated problem number in any book.
 - **v2.24.1: tarballs carry their version in the name.** Deliveries are
   now neutrino-vX.Y.Z.tar.gz per the owner's archival request — the
   filename is the record, and the mismatched-download deploy of v2.19
@@ -267,6 +279,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.25.0: a corner smooths, a jump rings.** Two owner-requested
+  problems complete the Fourier suite. Problem 10.7 draws |x| from ten
+  cosines — coefficient functional, one map, one sigma closure, and the
+  two-curves-one-plot idiom [y1; y2]' — with the computed coefficients
+  matching pi, -4/pi, -4/9pi digit for digit and the 0.0634 error
+  visibly concentrated at the corner the series rounds but cannot
+  crease. Problem 10.8 removes the continuity: the square wave's partial
+  sums overshoot at 1.182 (nine terms) and 1.179 (ninety-nine), beside
+  the Gibbs constant (2/pi)Si(pi) = 1.179 computed by our own
+  integrator — three numbers carrying the whole theorem, horns and
+  ripples in the plot. 353 verified transcripts.
 - **v2.24.0: the tour becomes honest to the byte, and deliberate.** The
   owner asked how demo.nu executes when its code appears inside print
   strings — and the answer exposed the design's one weakness: every
