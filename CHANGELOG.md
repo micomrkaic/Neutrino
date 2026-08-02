@@ -5,6 +5,12 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.24.1: tarballs carry their version in the name.** Deliveries are
+  now neutrino-vX.Y.Z.tar.gz per the owner's archival request — the
+  filename is the record, and the mismatched-download deploy of v2.19
+  showed what bare names in a Downloads folder can do. The PLAYBOOK
+  records the convention and the version-globbing restore ritual; this
+  release is the first to exemplify it.
 - **v2.23.1: Appendix G rebalanced — this time the unfairness ran
   against the house.** The owner's audit: Neutrino's blocks carried
   visible format() and rng() housekeeping while the Python listings hid

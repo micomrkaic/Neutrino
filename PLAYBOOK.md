@@ -247,3 +247,14 @@ CODE. Filters may decorate a green run; they must never stand between a
 red one and the eyes. Run make test to a log, test $?, and only then
 summarize.
 
+### Delivery names carry the version
+
+Tarballs are named neutrino-vX.Y.Z.tar.gz (and cozy-vX.Y.Z.tar.gz),
+never bare neutrino.tar.gz — the owner keeps the full record of
+submissions by filename, and the two-workstation deploy taught what
+same-named files in a Downloads folder can do. Session restore
+therefore globs for the newest: 
+    tar xzf "$(ls /mnt/user-data/outputs/neutrino-v*.tar.gz | sort -V | tail -1)" --strip-components=1
+The version in the name must equal version.h inside — deploy.sh's
+banner is the cross-check.
+
