@@ -287,6 +287,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.26.0: the browser learns to wait.** v2.25.2 removed pause()'s
+  modal but with it the pacing — the owner's tour blasted through. The
+  real fix is three coordinated pieces: the wasm build gains Asyncify
+  (the interpreter can yield to the event loop mid-eval); pause streams
+  the memstream's pending output to the terminal FIRST (the blank-screen
+  sin fixed at its root — nu_eval's return contract preserved by
+  handing the page only the unstreamed tail); and the page holds an
+  Enter latch that releases the wait, swallowing the keypress so it
+  doesn't double as a REPL submission. A terminal waits on stdin, the
+  browser waits on the latch, EOF drains under make test — one file,
+  every temperament, and run_page.js asserts the latch wiring.
 - **v2.25.0: a corner smooths, a jump rings.** Two owner-requested
   problems complete the Fourier suite. Problem 10.7 draws |x| from ten
   cosines — coefficient functional, one map, one sigma closure, and the

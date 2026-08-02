@@ -1919,11 +1919,11 @@ static Value bi_pause(Interp *I, Value *args, uint32_t n)
         StrObj *s0 = as_str(args[0]); msg = s0->data; mlen = s0->len;
     }
 #ifdef __EMSCRIPTEN__
-    /* No modal: alert() blocks the main thread, so queued terminal output
-     * never paints — sixteen pauses meant sixteen blank-screen dialogs.
-     * In the browser the prompt prints as a visible pacing marker and the
-     * tour flows; at a real terminal pause still waits for Enter. */
-    fwrite(msg, 1, mlen, vout()); fputc('\n', vout()); fflush(vout());
+    /* Real waiting in the browser: wasm_api streams pending output to the
+     * page (so the terminal paints), then Asyncify-yields until the page's
+     * Enter latch fires. See nu_wasm_pause. */
+    extern void nu_wasm_pause(const char *, uint32_t);
+    nu_wasm_pause(msg, mlen);
 #else
     fwrite(msg, 1, mlen, stdout); fflush(stdout);
     int c;

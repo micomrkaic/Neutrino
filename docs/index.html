@@ -241,6 +241,16 @@
     scroll();
   }
 
+  // pause() support: the wasm side streams pending output here mid-eval,
+  // then waits (Asyncify) until Enter releases the latch below.
+  window.__nuStream = writeResult;
+  document.addEventListener('keydown', function (e) {
+    if (window.__nuPauseWaiting && e.key === 'Enter') {
+      window.__nuPauseDone = 1;
+      e.preventDefault(); e.stopPropagation();
+    }
+  }, true);
+
   function banner() {
     // Pure-ASCII wordmark: every glyph is fixed-width, so it aligns in any
     // monospace fallback (the Unicode atom logo sheared on proportional fonts).

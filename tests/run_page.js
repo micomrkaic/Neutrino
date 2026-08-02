@@ -73,5 +73,10 @@ setTimeout(() => {
         process.exit(0);
       }, 300);
     }, 100);
-  } catch (e) { console.log("page: real-bundle phase skipped (" + e.message + ")"); }
+  } catch (e) {   // pause wiring: stream sink bound, Enter releases the latch
+  if (typeof w.__nuStream !== "function") fail("__nuStream not bound");
+  w.__nuPauseWaiting = 1; w.__nuPauseDone = 0;
+  d.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  if (w.__nuPauseDone !== 1) fail("Enter did not release the pause latch");
+  console.log("page: real-bundle phase skipped (" + e.message + ")"); }
 }, 80);

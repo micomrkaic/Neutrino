@@ -139,7 +139,7 @@ EMCC       ?= emcc
 EMCC_C23   ?=
 WASM_SRCS   = lexer.c arena.c ast.c parser.c value.c eval.c chunk.c compile.c vm.c wasm_api.c
 WASM_FLAGS  = -sMODULARIZE=1 -sEXPORT_NAME=Neutrino -sALLOW_MEMORY_GROWTH=1 \
-              -sSUPPORT_LONGJMP=1 -sENVIRONMENT=web -sSINGLE_FILE=1 \
+              -sSUPPORT_LONGJMP=1 -sENVIRONMENT=web -sSINGLE_FILE=1 -sASYNCIFY=1 \
               -sEXPORTED_FUNCTIONS=_nu_init,_nu_eval,_nu_version,_malloc,_free \
               -sEXPORTED_RUNTIME_METHODS=cwrap,ccall,UTF8ToString,stringToUTF8,lengthBytesUTF8,FS
 wasm: $(WASM_SRCS) $(HDRS) wasm_api.c version.h
