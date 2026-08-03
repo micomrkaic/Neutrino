@@ -989,8 +989,20 @@ neutrino> who("scatter")
 ```
 
 Re-loading a file replaces its shelf; `clear`ed names drop from the
-counts. The registry follows names, not values — a rebound name stays
-on its shelf.
+counts; and `clear("scatter")` unloads a whole shelf — every member
+removed, the summary line gone, your own names untouched (a variable
+with the same name as a shelf wins the dispute). The registry follows
+names, not values — a rebound name stays on its shelf.
+
+```
+neutrino> load("packages/scatter.nu")
+neutrino> let zq = 5
+5
+neutrino> clear("scatter"); who
+  packages/scatter.nu      2 names   (who("scatter") to list)
+  zq           int        = 5
+```
+
 
 ## 17. Builtin reference
 

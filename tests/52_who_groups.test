@@ -9,3 +9,5 @@ let solo9 = 41; save("/tmp/g52.nu"); clear(); load("/tmp/g52.nu"); who("all")
 =>   solo9        int        = 41
 let solo9 = 41; save("/tmp/g52.nu"); clear(); load("/tmp/g52.nu"); load("/tmp/g52.nu"); who
 =>   /tmp/g52.nu              1 names   (who("g52") to list)
+let solo9 = 41; save("/tmp/g52.nu"); clear(); load("/tmp/g52.nu"); let mine9 = 7; clear("g52"); who
+=>   mine9        int        = 7

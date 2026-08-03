@@ -287,6 +287,14 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.28.0: clear speaks shelves.** The natural completion of the load
+  groups: clear("finance") removes a whole shelf — every member, then
+  the summary line — with variable names taking precedence over shelf
+  names in a dispute, clear() with no arguments dropping the registry
+  along with the workspace, and the unknown-name error upgraded to name
+  both possibilities. One golden pins the unload, the manual's
+  load-groups section shows it live, and test 31's error-message pins
+  updated in step.
 - **v2.27.0: who learns where names came from.** After the demo tour the
   workspace held 108 lines and the owner's own definitions drowned —
   the clutter that namespace records were reached for, solved at its

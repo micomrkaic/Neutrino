@@ -6,10 +6,10 @@ let a = 1; let b = 2; clear(); who
 let a = 1; clear("a"); let a = 7; a
 => 7
 clear("nosuch")
-=> !no such variable 'nosuch'
+=> !no such variable or loaded package 'nosuch'
 clear(5)
 => !expected variable name strings
 clear("sum")
-=> !no such variable 'sum'
+=> !no such variable or loaded package 'sum'
 let sum2 = 9; clear("sum2"); sum([1, 2, 3])
 => 6

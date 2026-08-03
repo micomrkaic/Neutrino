@@ -3714,6 +3714,8 @@ static Value bi_clear(Interp *I, Value *args, uint32_t n)
         for (uint32_t i = g->n_protected; i < g->count; i++)
             value_release(g->vals[i]);
         g->count = g->n_protected;                      /* shadows removed: originals resurface */
+        for (size_t gi = 0; gi < g_nlg; gi++) lg_free(&g_lg[gi]);
+        g_nlg = 0;                                      /* empty shelves go too */
         return val_null();
     }
     for (uint32_t a = 0; a < n; a++) {
@@ -3732,7 +3734,27 @@ static Value bi_clear(Interp *I, Value *args, uint32_t n)
                 break;
             }
         }
-        if (!found) runtime_error(I, "clear: no such variable '%.*s'", (int)s->len, s->data);
+        if (!found) {
+            int gi = lg_find(s->data, s->len);
+            if (gi < 0)
+                runtime_error(I, "clear: no such variable or loaded package '%.*s'",
+                              (int)s->len, s->data);
+            /* clear a shelf: remove every live member, then the shelf itself */
+            for (size_t m = 0; m < g_lg[gi].n; m++)
+                for (uint32_t i = g->n_protected; i < g->count; i++)
+                    if (g->namelens[i] == g_lg[gi].lens[m] &&
+                        !memcmp(g->names[i], g_lg[gi].names[m], g_lg[gi].lens[m])) {
+                        value_release(g->vals[i]);
+                        g->names[i]    = g->names[g->count - 1];
+                        g->namelens[i] = g->namelens[g->count - 1];
+                        g->vals[i]     = g->vals[g->count - 1];
+                        g->count--;
+                        break;
+                    }
+            lg_free(&g_lg[gi]);
+            memmove(&g_lg[gi], &g_lg[gi + 1], (g_nlg - gi - 1) * sizeof g_lg[0]);
+            g_nlg--;
+        }
     }
     return val_null();
 }
