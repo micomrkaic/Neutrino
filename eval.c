@@ -1932,6 +1932,48 @@ static Value bi_pause(Interp *I, Value *args, uint32_t n)
     return val_null();
 }
 
+/* ---- load groups: which names each load()ed file defined -------------
+ * who collapses each package to one summary line so the workspace stays
+ * readable (108 lines after the demo tour, measured); who("finance")
+ * opens a shelf. Registered by bi_load via snapshot-diff; nested loads
+ * claim their own names first, so the outer file gets only its own. */
+typedef struct { char *path; char *shortn; char **names; uint32_t *lens; size_t n; } LoadGroup;
+static LoadGroup g_lg[64];
+static size_t    g_nlg;
+
+static bool lg_has(const LoadGroup *g, const char *nm, uint32_t len)
+{
+    for (size_t i = 0; i < g->n; i++)
+        if (g->lens[i] == len && !memcmp(g->names[i], nm, len)) return true;
+    return false;
+}
+static bool lg_claimed_from(size_t from, const char *nm, uint32_t len)
+{
+    for (size_t gi = from; gi < g_nlg; gi++)
+        if (lg_has(&g_lg[gi], nm, len)) return true;
+    return false;
+}
+static int lg_find(const char *sel, uint32_t slen)
+{
+    for (size_t gi = 0; gi < g_nlg; gi++) {
+        if (strlen(g_lg[gi].path)   == slen && !memcmp(g_lg[gi].path,   sel, slen)) return (int)gi;
+        if (strlen(g_lg[gi].shortn) == slen && !memcmp(g_lg[gi].shortn, sel, slen)) return (int)gi;
+    }
+    return -1;
+}
+static void lg_free(LoadGroup *g)
+{
+    for (size_t i = 0; i < g->n; i++) free(g->names[i]);
+    free(g->names); free(g->lens); free(g->path); free(g->shortn);
+}
+static size_t lg_live(Interp *I, const LoadGroup *g)   /* members still bound */
+{
+    EnvObj *e = I->globals; size_t live = 0;
+    for (uint32_t i = e->n_protected; i < e->count; i++)
+        if (lg_has(g, e->names[i], e->namelens[i])) live++;
+    return live;
+}
+
 static Value bi_load(Interp *I, Value *args, uint32_t n)
 {
     (void)n;
@@ -1970,9 +2012,68 @@ static Value bi_load(Interp *I, Value *args, uint32_t n)
     }
 
     load_keep_push(a, src);                       /* owns them from here on */
+
+    /* who's load groups: snapshot the workspace, remember any prior group
+     * for this same path (its names count as "new again" on re-load), and
+     * note how many groups exist so nested loads keep their own names. */
+    LoadGroup reclaim = {0};
+    for (size_t gi = 0; gi < g_nlg; gi++)
+        if (!strcmp(g_lg[gi].path, path)) {
+            reclaim = g_lg[gi];
+            memmove(&g_lg[gi], &g_lg[gi + 1], (g_nlg - gi - 1) * sizeof g_lg[0]);
+            g_nlg--; break;
+        }
+    size_t pre_groups = g_nlg;
+    EnvObj *ge = I->globals;
+    size_t   pre_n = 0;
+    const char **pre_nm = malloc((ge->count + 1) * sizeof *pre_nm);
+    uint32_t *pre_ln = malloc((ge->count + 1) * sizeof *pre_ln);
+    if (pre_nm && pre_ln)
+        for (uint32_t i = ge->n_protected; i < ge->count; i++) {
+            if (reclaim.n && lg_has(&reclaim, ge->names[i], ge->namelens[i]))
+                continue;                       /* re-load: claim them anew */
+            pre_nm[pre_n] = ge->names[i]; pre_ln[pre_n] = ge->namelens[i]; pre_n++;
+        }
+
     g_load_depth++;
     Value r = vm_eval_program(I, prog, I->globals, /*echo=*/false);
     g_load_depth--;
+
+    if (pre_nm && pre_ln && g_nlg < 64) {
+        LoadGroup ng = {0};
+        ng.names = malloc(ge->count * sizeof *ng.names);
+        ng.lens  = malloc(ge->count * sizeof *ng.lens);
+        if (ng.names && ng.lens) {
+            for (uint32_t i = ge->n_protected; i < ge->count; i++) {
+                bool was = false;
+                for (size_t k = 0; k < pre_n; k++)
+                    if (pre_ln[k] == ge->namelens[i] &&
+                        !memcmp(pre_nm[k], ge->names[i], ge->namelens[i])) { was = true; break; }
+                if (was) continue;
+                if (lg_claimed_from(pre_groups, ge->names[i], ge->namelens[i]))
+                    continue;                   /* an inner load's name */
+                ng.names[ng.n] = malloc(ge->namelens[i] + 1);
+                if (!ng.names[ng.n]) continue;
+                memcpy(ng.names[ng.n], ge->names[i], ge->namelens[i]);
+                ng.names[ng.n][ge->namelens[i]] = '\0';
+                ng.lens[ng.n] = ge->namelens[i]; ng.n++;
+            }
+            if (ng.n) {
+                ng.path = strdup(path);
+                const char *slash = strrchr(path, '/');
+                const char *base = slash ? slash + 1 : path;
+                size_t bl = strlen(base);
+                if (bl > 3 && !strcmp(base + bl - 3, ".nu")) bl -= 3;
+                ng.shortn = malloc(bl + 1);
+                if (ng.path && ng.shortn) {
+                    memcpy(ng.shortn, base, bl); ng.shortn[bl] = '\0';
+                    g_lg[g_nlg++] = ng;
+                } else { lg_free(&ng); }
+            } else { free(ng.names); free(ng.lens); }
+        }
+    }
+    free(pre_nm); free(pre_ln);
+    if (reclaim.n) lg_free(&reclaim);
     value_release(r);
     if (I->had_error) {                           /* re-raise into the outer program */
         char saved[256];
@@ -3481,22 +3582,28 @@ static Value bi_more_stub(Interp *I, Value *args, uint32_t n)   { (void)args; (v
 enum WhoKind { W_ALL, W_REC, W_FN, W_VAR };
 
 static Value who_impl(Interp *I, enum WhoKind kind, bool sorted);
+static Value who_impl2(Interp *I, enum WhoKind kind, bool sorted, int group);
 
 static Value bi_who(Interp *I, Value *args, uint32_t n)
 {
     enum WhoKind kind = W_ALL;
     bool sorted = false;
+    int group = -1, gi;
     for (uint32_t i = 0; i < n; i++) {
         StrObj *sv = want_strobj(I, args[i], "who");
         if      (sv->len == 7  && !memcmp(sv->data, "records",   7))  kind = W_REC;
         else if (sv->len == 9  && !memcmp(sv->data, "functions", 9))  kind = W_FN;
         else if (sv->len == 4  && !memcmp(sv->data, "vars",      4))  kind = W_VAR;
         else if (sv->len == 6  && !memcmp(sv->data, "sorted",    6))  sorted = true;
+        else if (sv->len == 3  && !memcmp(sv->data, "all",       3))  group = -2;
+        else if ((gi = lg_find(sv->data, sv->len)) >= 0)              group = gi;
         else runtime_error(I, "who: unknown selector \"%.*s\" "
-                              "(try \"records\", \"functions\", \"vars\", \"sorted\")",
+                              "(try \"records\", \"functions\", \"vars\", \"sorted\", "
+                              "\"all\", or a loaded package name)",
                            (int)sv->len, sv->data);
     }
-    return who_impl(I, kind, sorted);
+    if (kind != W_ALL && group == -1) group = -2;   /* kind filters stay flat */
+    return who_impl2(I, kind, sorted, group);
 }
 
 /* whov/whof/whor: filtered who; whos: everything, sorted. Each shorthand
@@ -3514,15 +3621,30 @@ static Value bi_whof(Interp *I, Value *args, uint32_t n) { return who_impl(I, W_
 static Value bi_whor(Interp *I, Value *args, uint32_t n) { return who_impl(I, W_REC, who_arg_sorted(I, args, n, "whor")); }
 static Value bi_whos(Interp *I, Value *args, uint32_t n) { (void)args; (void)n; return who_impl(I, W_ALL, true); }
 
-static Value who_impl(Interp *I, enum WhoKind kind, bool sorted)
+/* group: -1 = grouped default view; -2 = flat (kind filters, "all");
+ * >= 0 = list only that load group's members. */
+static Value who_impl2(Interp *I, enum WhoKind kind, bool sorted, int group)
 {
     EnvObj *g = I->globals;
     uint32_t *sel = nullptr, nsel = 0;
+    size_t ngroupline = 0;
     if (g) {
+        if (group == -1)                          /* shelf summaries first */
+            for (size_t gi = 0; gi < g_nlg; gi++) {
+                size_t live = lg_live(I, &g_lg[gi]);
+                if (!live) continue;
+                fprintf(vout(), "  %-22s %3zu names   (who(\"%s\") to list)\n",
+                        g_lg[gi].path, live, g_lg[gi].shortn);
+                ngroupline++;
+            }
         sel = malloc(g->count * sizeof *sel);
         if (!sel) runtime_error(I, "out of memory");
         for (uint32_t i = 0; i < g->count; i++) {
         if (i < g->n_protected) continue;   /* standard library: not workspace */
+            if (group == -1 && lg_claimed_from(0, g->names[i], g->namelens[i]))
+                continue;                       /* shelved: summary covers it */
+            if (group >= 0 && !lg_has(&g_lg[group], g->names[i], g->namelens[i]))
+                continue;
             ValueKind k = g->vals[i].kind;
             /* a VAL_BUILTIN here is a user alias (let v = version): the
              * protected region is already skipped, so list it — under
@@ -3542,9 +3664,11 @@ static Value who_impl(Interp *I, enum WhoKind kind, bool sorted)
         }
         free(sel);
     }
-    if (!nsel) fputs(kind == W_ALL ? "(no variables defined)\n" : "(none match)\n", vout());
+    if (!nsel && !ngroupline) fputs(kind == W_ALL ? "(no variables defined)\n" : "(none match)\n", vout());
     return val_null();
 }
+static Value who_impl(Interp *I, enum WhoKind kind, bool sorted)
+{   return who_impl2(I, kind, sorted, -2); }    /* shorthands stay flat */
 
 /* clear() removes all user variables; clear("a", "b") removes those named.
  * Builtin bindings are invisible to clear, exactly as they are to who. */

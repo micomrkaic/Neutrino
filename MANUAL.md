@@ -966,6 +966,32 @@ any `.nu` buffer `C-c C-r` sends the region, `C-c C-b` the buffer,
 `.gitattributes` rule highlights `.nu` as Octave — close enough until
 linguist learns Neutrino.
 
+### The workspace stays readable: load groups
+
+`load` remembers which names each file defined, and `who` collapses
+every loaded file to one summary line — so after a package-heavy
+session your own definitions stay findable at a glance. `who("name")`
+(the file's basename, or its full path) opens a shelf in full;
+`who("all")` restores the flat listing; the kind filters
+(`who("functions")`, `who("vars")`, ...) remain flat, as before.
+
+```
+neutrino> load("packages/scatter.nu")
+neutrino> let zq = 5
+5
+neutrino> who
+  packages/scatter.nu      3 names   (who("scatter") to list)
+  zq           int        = 5
+neutrino> who("scatter")
+  scatter      function   (2 params)
+  scatter_titled function   (3 params)
+  jitter       function   (2 params)
+```
+
+Re-loading a file replaces its shelf; `clear`ed names drop from the
+counts. The registry follows names, not values — a rebound name stays
+on its shelf.
+
 ## 17. Builtin reference
 
 *Generated from the interpreter's own documentation table (the same data

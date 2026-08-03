@@ -557,11 +557,11 @@ neutrino> save("/tmp/mycase.nu")
 neutrino> clear(); who
 (no variables defined)
 neutrino> load("/tmp/mycase.nu"); who
+  /tmp/mycase.nu           3 names   (who("mycase") to list)
+neutrino> who("mycase")
   rate         float      = 0.0575
   horizon      int        = 30
   goal         int        = 250000
-neutrino> goal / horizon
-8333.33
 ```
 
 **Discussion.** `save` writes the workspace as an ordinary Neutrino

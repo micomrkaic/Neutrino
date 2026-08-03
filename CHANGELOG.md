@@ -287,6 +287,19 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.27.0: who learns where names came from.** After the demo tour the
+  workspace held 108 lines and the owner's own definitions drowned —
+  the clutter that namespace records were reached for, solved at its
+  root instead. load now remembers which names each file defined
+  (snapshot-diff around the eval; nested loads claim their own names
+  first, re-loads replace their shelf), and the default who collapses
+  every loaded file to one summary line while listing the user's names
+  in full. who("finance") opens a shelf (basename or full path),
+  who("all") restores the flat listing, kind filters stay flat and
+  untouched, cleared names drop from the counts. The book's save/load
+  problem recaptured to teach the shelf; manual section, four goldens,
+  and the runner's one-process-per-line law relearned en route. 923
+  goldens.
 - **v2.26.0: the browser learns to wait.** v2.25.2 removed pause()'s
   modal but with it the pacing — the owner's tour blasted through. The
   real fix is three coordinated pieces: the wasm build gains Asyncify
