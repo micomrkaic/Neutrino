@@ -270,3 +270,19 @@ operator must read it before packaging, not after. The suite's exit
 code discipline exists precisely so green means green; the same law
 applies to every ad-hoc pipeline that touches a deliverable.
 
+### The wraparound era ends
+
+x^x - 3^(x+81) returned -5054814671472437366 at the prompt while fzero,
+probing the same function at floats, printed the true -1.19725e+40 in
+its own error message — two arithmetic universes, one honest, one
+"documented." The wrap WAS documented (code comment, manual table,
+hardening pins): defined C behavior, chosen early, and wrong for a
+calculator whose books are verified truth. Revised to
+promote-on-overflow: checked add/sub/mul and a checked pow-by-squaring
+in scalar_arith_k — the one core every path shares — so Int stays exact
+while it fits and results turn Float the instant it doesn't. The
+lesson is double. A documented decision is still impeachable by field
+evidence; write the revision where the original lived (comment, manual,
+pins — all three). And a DISCREPANCY is a gift: when two paths through
+the same function disagree, one of them is confessing.
+

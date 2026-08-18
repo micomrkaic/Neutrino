@@ -2,13 +2,13 @@
 # 1. Integer arithmetic wraps as defined behavior (was UB signed overflow;
 #    the old ipow also effectively hung on astronomical exponents).
 9223372036854775807 * 2
-=> -2
+=> 1.84467e+19
 9223372036854775807 + 1
-=> -9223372036854775808
+=> 9.22337e+18
 9223372036854775807 .^ 9223372036854775807
-=> 9223372036854775807
+=> inf
 2 ^ 64
-=> 0
+=> 1.84467e+19
 # 2. Ranges are capped and count-safe (was: uint32 truncation -> heap overflow risk)
 1 : 4294967306
 => !range too large

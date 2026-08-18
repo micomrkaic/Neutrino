@@ -81,15 +81,18 @@ static Cplx c_div(Cplx a, Cplx b){ double d = b.re*b.re + b.im*b.im;
 /* Wrapping integer power by squaring: O(log e) even for huge exponents, and
  * all arithmetic in uint64 so the documented wraparound is defined behavior
  * (the old loop was UB on overflow and effectively hung for astronomical e). */
-static int64_t ipow(int64_t base, int64_t e)
+
+/* ipow with overflow detection: pow-by-squaring, every multiply checked.
+ * On overflow *ovf is set and the caller promotes to float. */
+static int64_t ipow_ck(int64_t base, int64_t e, bool *ovf)
 {
-    uint64_t r = 1, b = (uint64_t)base;
+    int64_t r = 1;
     while (e > 0) {
-        if (e & 1) r *= b;
-        b *= b;
+        if (e & 1) { if (__builtin_mul_overflow(r, base, &r)) { *ovf = true; return 0; } }
         e >>= 1;
+        if (e && __builtin_mul_overflow(base, base, &base)) { *ovf = true; return 0; }
     }
-    return (int64_t)r;
+    return r;
 }
 
 /* ---- PRNG: xoshiro256** seeded by splitmix64 (deterministic, reseed via rng()) ---- */
@@ -168,13 +171,22 @@ static Value scalar_arith_k(Interp *I, Arith kind, Value a, Value b)
 
     switch (rank) {
     case 0: {
-        int64_t x = a.as.i, y = b.as.i;
+        int64_t x = a.as.i, y = b.as.i, r;
         switch (kind) {
-        /* wraparound is documented; do it in uint64 so it is defined behavior */
-        case AR_ADD: return val_int((int64_t)((uint64_t)x + (uint64_t)y));
-        case AR_SUB: return val_int((int64_t)((uint64_t)x - (uint64_t)y));
-        case AR_MUL: return val_int((int64_t)((uint64_t)x * (uint64_t)y));
-        case AR_POW: return val_int(ipow(x, y));
+        /* Exact while it fits; the instant an operation would overflow
+         * int64 the RESULT promotes to float — integer arithmetic never
+         * wraps into garbage. (v2.29.0: the old documented-wraparound
+         * rule made x^x - 3^(x+81) return line noise at the prompt while
+         * fzero, probing at floats, told the truth beside it.) */
+        case AR_ADD: if (!__builtin_add_overflow(x, y, &r)) return val_int(r);
+                     return val_float((double)x + (double)y);
+        case AR_SUB: if (!__builtin_sub_overflow(x, y, &r)) return val_int(r);
+                     return val_float((double)x - (double)y);
+        case AR_MUL: if (!__builtin_mul_overflow(x, y, &r)) return val_int(r);
+                     return val_float((double)x * (double)y);
+        case AR_POW: { bool ovf = false; int64_t p = ipow_ck(x, y, &ovf);
+                       if (!ovf) return val_int(p);
+                       return val_float(pow((double)x, (double)y)); }
         default:     break;
         }
         break;

@@ -5,6 +5,20 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.29.0: integer overflow promotes instead of wrapping.** The owner's
+  f = fn x -> x^x - 3^(x+81) returned int64 line noise at the prompt
+  while fzero's error message printed the true -1.19725e+40 beside it —
+  the discrepancy that convicted the old documented-wraparound rule.
+  scalar_arith_k's Int paths now use checked add/sub/mul and a checked
+  pow-by-squaring: exact while it fits, the result promotes to Float
+  the instant it doesn't. Since every path — scalars, elementwise,
+  matmul, reductions — shares that core, one fix heals the family:
+  3^84 = 1.19725e+40, prod 1:25 = 1.55112e+25, MAX+1 = 9.22337e+18,
+  while 2^62 and 20! stay exact Ints. The manual's type table drops its
+  "documented footgun," the hardening pins repin to honest values, six
+  new goldens guard the edge, and LESSONS records the double lesson:
+  documented decisions are impeachable by field evidence, and when two
+  paths disagree, one is confessing. 930 goldens.
 - **v2.25.2: the browser tour un-hostaged.** In the wasm build pause()
   raised a modal alert — and a modal blocks the main thread, so the
   terminal's queued output never painted: the owner's screenshot showed

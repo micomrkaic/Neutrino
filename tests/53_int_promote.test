@@ -1,0 +1,13 @@
+# int64 arithmetic: exact while it fits, float the instant it doesn't
+3^84
+=> 1.19725e+40
+2^62
+=> 4611686018427387904
+2^63
+=> 9.22337e+18
+prod[k = 1:25] k
+=> 1.55112e+25
+prod[k = 1:20] k
+=> 2432902008176640000
+let f9 = fn x -> x^x - 3^(x+81); f9(3)
+=> -1.19725e+40

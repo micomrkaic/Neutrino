@@ -181,12 +181,26 @@ Neutrino has nine value kinds. The scalar kinds:
 
 | Type | Literals | Notes |
 |---|---|---|
-| `Int` | `42`, `-7` | 64-bit signed; overflow wraps silently (documented footgun) |
+| `Int` | `42`, `-7` | 64-bit signed; exact while it fits — overflow promotes the result to `Float` |
 | `Float` | `3.14`, `1e-9`, `2.5e3` | IEEE double |
 | `Bool` | `true`, `false` | distinct from numbers: `1 == true` is an error |
 | `Complex` | `2i`, `1 + 3i`, `2.5i` | double re/im pair |
 | `String` | `"hello"` | byte strings: `+` concatenates, comparisons are lexicographic, `s[i]`/`s[a:b]` index bytes (see the Strings section) |
 | `Null` | `null` | the "no value" value; a suppressed or valueless statement yields it |
+Integer arithmetic is exact up to the edge of int64 and honest past it:
+the instant an operation would overflow, the *result* promotes to
+`Float` — you get the right magnitude, never wrapped line noise. Stay
+under the edge and `Int` stays exact.
+
+```
+neutrino> 2^62
+4611686018427387904
+neutrino> 2^63
+9.22337e+18
+neutrino> 3^84
+1.19725e+40
+```
+
 
 And the compound kinds: `Array` (the 2-D numeric matrix — every array is
 rows x cols; a scalar is *not* a 1x1 array), `Record` (`{x = 1, y = 2}`, fields
