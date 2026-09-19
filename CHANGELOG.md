@@ -5,6 +5,10 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.30.1: det gets its real twin.** Same treatment as v2.30.0's
+  mldivide: real matrices now eliminate in plain doubles with restrict
+  row pointers (bit-identical; 930 goldens and three books unchanged),
+  complex inputs keep the Cplx kernel. 1000x1000 det: 0.166 s.
 - **v2.29.0: integer overflow promotes instead of wrapping.** The owner's
   f = fn x -> x^x - 3^(x+81) returned int64 line noise at the prompt
   while fzero's error message printed the true -1.19725e+40 beside it —
@@ -301,6 +305,18 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.30.0: a real fast path for left division.** The owner asked
+  whether the elimination loops could stream and vectorize; inspection
+  showed they already do (column index innermost) — the actual tax was
+  that real matrices were eliminated in complex arithmetic, struct ops
+  and all. mldivide now runs a plain-double kernel when both inputs are
+  real (restrict row pointers; bit-identical results, since real c_mul
+  is x*y - 0.0 and real c_div reduces to x/y — all 930 goldens and
+  three books pass unchanged), and inv inherits it via inv-by-solve.
+  Measured: 1000x1000 solve 0.306 s -> 0.150 s (2.0x; bandwidth-bound,
+  so halving bytes halves time). -march=native was benchmarked and
+  bought nothing (0.16 s) — not adopted; the complex path is unchanged
+  and still serves complex inputs.
 - **v2.28.0: clear speaks shelves.** The natural completion of the load
   groups: clear("finance") removes a whole shelf — every member, then
   the summary line — with variable names taking precedence over shelf

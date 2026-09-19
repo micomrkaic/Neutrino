@@ -465,6 +465,55 @@ static Value mldivide(Interp *I, Value A, Value B)
         runtime_error(I, "left division dimensions disagree: %ux%u \\ %ux%u",
                       a->rows, a->cols, b->rows, b->cols);
 
+    bool real_in = a->elt != ELT_COMPLEX && b->elt != ELT_COMPLEX;
+    if (real_in) {
+        /* Real fast path: same pivoting, same elimination, plain doubles.
+         * Bit-identical to the Cplx path with zero imaginaries (real c_mul
+         * is x*y - 0.0 and real c_div reduces to x/y), at a quarter of the
+         * arithmetic and half the bandwidth; restrict row pointers let the
+         * inner loops vectorize (rows i and k are disjoint, i > k). */
+        double *LU = malloc((size_t)n * n * sizeof *LU);
+        double *X  = malloc((size_t)n * m * sizeof *X);
+        if ((!LU && n) || (!X && n && m)) abort();
+        for (uint32_t i = 0; i < n; i++)
+            for (uint32_t j = 0; j < n; j++) LU[(size_t)i*n+j] = as_double(arr_get(a, (size_t)i*n+j));
+        for (uint32_t i = 0; i < n; i++)
+            for (uint32_t j = 0; j < m; j++) X[(size_t)i*m+j]  = as_double(arr_get(b, (size_t)i*m+j));
+        for (uint32_t k = 0; k < n; k++) {
+            uint32_t piv = k; double best = fabs(LU[(size_t)k*n+k]);
+            for (uint32_t i = k+1; i < n; i++) {
+                double mag = fabs(LU[(size_t)i*n+k]);
+                if (mag > best) { best = mag; piv = i; }
+            }
+            if (best == 0.0) { free(LU); free(X); runtime_error(I, "left division: matrix is singular"); }
+            if (piv != k) {
+                for (uint32_t j = 0; j < n; j++) { double t = LU[(size_t)k*n+j]; LU[(size_t)k*n+j] = LU[(size_t)piv*n+j]; LU[(size_t)piv*n+j] = t; }
+                for (uint32_t j = 0; j < m; j++) { double t = X[(size_t)k*m+j];  X[(size_t)k*m+j]  = X[(size_t)piv*m+j];  X[(size_t)piv*m+j]  = t; }
+            }
+            double akk = LU[(size_t)k*n+k];
+            const double *restrict rk = LU + (size_t)k*n;
+            const double *restrict xk = X  + (size_t)k*m;
+            for (uint32_t i = k+1; i < n; i++) {
+                double f = LU[(size_t)i*n+k] / akk;
+                double *restrict ri = LU + (size_t)i*n;
+                double *restrict xi = X  + (size_t)i*m;
+                for (uint32_t j = k; j < n; j++) ri[j] -= f * rk[j];
+                for (uint32_t j = 0; j < m; j++) xi[j] -= f * xk[j];
+            }
+        }
+        for (uint32_t c = 0; c < m; c++)
+            for (int64_t ii = (int64_t)n - 1; ii >= 0; ii--) {
+                uint32_t i = (uint32_t)ii;
+                double s2 = X[(size_t)i*m+c];
+                for (uint32_t j = i+1; j < n; j++) s2 -= LU[(size_t)i*n+j] * X[(size_t)j*m+c];
+                X[(size_t)i*m+c] = s2 / LU[(size_t)i*n+i];
+            }
+        Value out = val_array(ELT_FLOAT, n, m);
+        memcpy(as_arr(out)->data, X, (size_t)n * m * sizeof(double));
+        free(LU); free(X);
+        return out;
+    }
+
     Cplx *LU = malloc((size_t)n * n * sizeof *LU);
     Cplx *X  = malloc((size_t)n * m * sizeof *X);
     if ((!LU && n) || (!X && n && m)) abort();
@@ -500,14 +549,11 @@ static Value mldivide(Interp *I, Value A, Value B)
             X[(size_t)i*m+c] = c_div(s, LU[(size_t)i*n+i]);
         }
 
-    bool real_in = a->elt != ELT_COMPLEX && b->elt != ELT_COMPLEX;
-    Value out = val_array(real_in ? ELT_FLOAT : ELT_COMPLEX, n, m);
+    Value out = val_array(ELT_COMPLEX, n, m);
     ArrObj *R = as_arr(out);
     for (uint32_t i = 0; i < n; i++)
         for (uint32_t j = 0; j < m; j++) {
-            Cplx z = X[(size_t)i*m+j];
-            if (real_in) ((double *)R->data)[(size_t)i*m+j] = z.re;
-            else         ((Cplx   *)R->data)[(size_t)i*m+j] = z;
+            ((Cplx *)R->data)[(size_t)i*m+j] = X[(size_t)i*m+j];
         }
     free(LU); free(X);
     return out;
@@ -4023,6 +4069,36 @@ static Value bi_det(Interp *I, Value *args, uint32_t n)
     if (a->cols != N) runtime_error(I, "det: matrix must be square (got %ux%u)", a->rows, a->cols);
     bool real_in = a->elt != ELT_COMPLEX;
     if (N == 0) return val_int(1);
+    if (real_in) {
+        /* Real fast path, twin of mldivide's (v2.30.0): plain doubles,
+         * bit-identical to the Cplx path with zero imaginaries. */
+        double *M = malloc((size_t)N * N * sizeof *M);
+        if (!M) abort();
+        for (size_t k = 0; k < (size_t)N * N; k++) M[k] = as_double(arr_get(a, k));
+        double det = 1.0; int sign = 1;
+        for (uint32_t k = 0; k < N; k++) {
+            uint32_t p = k; double best = fabs(M[(size_t)k*N+k]);
+            for (uint32_t i = k+1; i < N; i++) {
+                double mg = fabs(M[(size_t)i*N+k]);
+                if (mg > best) { best = mg; p = i; }
+            }
+            if (best == 0.0) { free(M); return val_float(0.0); }
+            if (p != k) {
+                for (uint32_t j = k; j < N; j++) { double t = M[(size_t)k*N+j]; M[(size_t)k*N+j] = M[(size_t)p*N+j]; M[(size_t)p*N+j] = t; }
+                sign = -sign;
+            }
+            double akk = M[(size_t)k*N+k];
+            det *= akk;
+            const double *restrict rk = M + (size_t)k*N;
+            for (uint32_t i = k+1; i < N; i++) {
+                double f = M[(size_t)i*N+k] / akk;
+                double *restrict ri = M + (size_t)i*N;
+                for (uint32_t j = k; j < N; j++) ri[j] -= f * rk[j];
+            }
+        }
+        free(M);
+        return val_float(sign < 0 ? -det : det);
+    }
     Cplx *M = malloc((size_t)N * N * sizeof *M);
     for (size_t k = 0; k < (size_t)N * N; k++) M[k] = as_cplx(arr_get(a, k));
     Cplx det = { 1.0, 0.0 };
