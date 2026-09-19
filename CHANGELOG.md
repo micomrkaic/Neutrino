@@ -305,6 +305,15 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.31.0: matmul drops the boxes.** The generic loop ran every
+  multiply-add through scalar_arith_k with boxed Values — kind dispatch
+  and the checked-overflow branch per element, per inner step. A flat
+  double kernel now serves Float x Float (i-k-j order streams both
+  operands, restrict throughout; bit-identical, 930 goldens and three
+  books unchanged): 600x600 multiply 6.715 s -> 0.098 s, 68x. Int,
+  complex, and mixed inputs keep the generic path — integer matmul
+  stays exact. Third and largest of the real fast paths (mldivide
+  2.30.0, det 2.30.1); eig is the last holdout.
 - **v2.30.0: a real fast path for left division.** The owner asked
   whether the elimination loops could stream and vectorize; inspection
   showed they already do (column index innermost) — the actual tax was

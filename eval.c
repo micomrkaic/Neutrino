@@ -377,6 +377,26 @@ static Value matmul(Interp *I, Value a, Value b)
         runtime_error(I, "matmul inner dimensions disagree: %ux%u * %ux%u",
                       x->rows, x->cols, y->rows, y->cols);
     uint32_t m = x->rows, k = x->cols, nn = y->cols;
+    if (x->elt == ELT_FLOAT && y->elt == ELT_FLOAT) {
+        /* Flat double kernel (v2.31.0), third of the real fast paths: the
+         * generic loop boxes every multiply-add in a Value and dispatches
+         * scalar_arith_k — measured 6.7 s for 600x600. i-k-j order streams
+         * both operands; bit-identical to the generic path (0.0 + p = p,
+         * plain double mul/add throughout). */
+        const double *restrict A = (const double *)x->data;
+        const double *restrict B = (const double *)y->data;
+        Value out = val_array(ELT_FLOAT, m, nn);
+        double *restrict C = (double *)as_arr(out)->data;
+        memset(C, 0, (size_t)m * nn * sizeof(double));
+        for (uint32_t i = 0; i < m; i++)
+            for (uint32_t t = 0; t < k; t++) {
+                double aik = A[(size_t)i*k + t];
+                const double *restrict Bt = B + (size_t)t*nn;
+                double *restrict Ci = C + (size_t)i*nn;
+                for (uint32_t j = 0; j < nn; j++) Ci[j] += aik * Bt[j];
+            }
+        return out;
+    }
     size_t cells = (size_t)m * nn;
     Value *tmp = cells ? malloc(cells * sizeof *tmp) : nullptr;
     for (uint32_t i = 0; i < m; i++)
