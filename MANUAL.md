@@ -980,6 +980,23 @@ any `.nu` buffer `C-c C-r` sends the region, `C-c C-b` the buffer,
 `.gitattributes` rule highlights `.nu` as Octave — close enough until
 linguist learns Neutrino.
 
+### Finding packages: the load search path
+
+`load` takes a bare name and finds the file itself: `load("dist")`
+tries `packages/dist.nu` in the current directory, then each directory
+in `$NEUTRINO_PATH` (colon-separated), then `packages/` beside the real
+binary — symlinks resolved, so
+`ln -s ~/work/.../Neutrino/neutrino ~/.local/bin/neutrino` gives you a
+`neutrino` that loads its packages from anywhere, nothing copied or
+moved. Literal paths (`load("packages/dist.nu")`, absolute paths) work
+exactly as before, and also resolve beside the binary when the current
+directory lacks them.
+
+```
+neutrino> load("dist"); norm.cdf(1.96, 0, 1)
+0.975002
+```
+
 ### The workspace stays readable: load groups
 
 `load` remembers which names each file defined, and `who` collapses

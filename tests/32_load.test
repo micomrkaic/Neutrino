@@ -19,7 +19,7 @@ load("tests/data/badparse.nu")
 load("tests/data/badrun.nu")
 => !undefined name 'definitely_undefined'
 load("nonexistent.nu")
-=> !cannot open
+=> !cannot find
 load(42)
 => !expected a file name string
 # load returns null: silent on success

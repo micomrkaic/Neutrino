@@ -4,6 +4,10 @@
                                      rusage.ru_maxrss (Darwin clamps visibility to the requested
                                      standard); this re-widens it. Inert on other platforms. */
 #include <errno.h>
+#include <unistd.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 #include <float.h>
 #include <sys/resource.h>
 #include <time.h>
@@ -2052,6 +2056,64 @@ static size_t lg_live(Interp *I, const LoadGroup *g)   /* members still bound */
     return live;
 }
 
+/* Directory of the real binary, symlinks resolved — so a symlink in
+ * ~/.local/bin still finds the packages/ that live beside the true
+ * executable. Empty in the browser build (MEMFS paths are relative). */
+static const char *exe_dir(void)
+{
+    static char dir[1024];
+    static bool done = false;
+    if (!done) {
+        done = true; dir[0] = '\0';
+#if defined(__EMSCRIPTEN__)
+        /* no host filesystem */
+#elif defined(__APPLE__)
+        char tmp[1024]; uint32_t sz = sizeof tmp;
+        if (_NSGetExecutablePath(tmp, &sz) == 0) {
+            char rp[1024];
+            if (realpath(tmp, rp)) { strncpy(dir, rp, sizeof dir - 1); dir[sizeof dir - 1] = '\0'; }
+        }
+#else
+        ssize_t r = readlink("/proc/self/exe", dir, sizeof dir - 1);
+        if (r > 0) dir[r] = '\0'; else dir[0] = '\0';
+#endif
+        char *sl = strrchr(dir, '/');
+        if (sl && sl != dir) *sl = '\0'; else dir[0] = '\0';
+    }
+    return dir[0] ? dir : NULL;
+}
+
+/* Package search: resolve what load() was given to a real file.
+ * Order: the literal path (back-compat, CWD-relative); for bare names,
+ * packages/NAME.nu and NAME.nu in the CWD; each dir in $NEUTRINO_PATH
+ * (colon-separated), as DIR/NAME and DIR/NAME.nu; finally the binary's
+ * own directory — both the literal path and packages/NAME.nu under it,
+ * which is what makes a ~/.local/bin symlink self-sufficient. */
+static bool load_resolve(const char *given, char *out, size_t outsz)
+{
+    if (strlen(given) > 512) return false;   /* longer than any sane candidate; truncation guard */
+    if (access(given, F_OK) == 0) { snprintf(out, outsz, "%s", given); return true; }
+    bool bare = strchr(given, '/') == NULL;
+    if (bare) {
+        snprintf(out, outsz, "packages/%s.nu", given); if (access(out, F_OK) == 0) return true;
+        snprintf(out, outsz, "%s.nu", given);          if (access(out, F_OK) == 0) return true;
+    }
+    const char *pp = getenv("NEUTRINO_PATH");
+    if (pp && *pp) {
+        char buf[512]; if (strlen(pp) >= sizeof buf) pp = ""; snprintf(buf, sizeof buf, "%.511s", pp);
+        for (char *save = NULL, *d = strtok_r(buf, ":", &save); d; d = strtok_r(NULL, ":", &save)) {
+            snprintf(out, outsz, "%s/%s", d, given);    if (access(out, F_OK) == 0) return true;
+            if (bare) { snprintf(out, outsz, "%s/%s.nu", d, given); if (access(out, F_OK) == 0) return true; }
+        }
+    }
+    const char *ed = exe_dir();
+    if (ed) {
+        snprintf(out, outsz, "%s/%s", ed, given);              if (access(out, F_OK) == 0) return true;
+        if (bare) { snprintf(out, outsz, "%s/packages/%s.nu", ed, given); if (access(out, F_OK) == 0) return true; }
+    }
+    return false;
+}
+
 static Value bi_load(Interp *I, Value *args, uint32_t n)
 {
     (void)n;
@@ -2065,8 +2127,12 @@ static Value bi_load(Interp *I, Value *args, uint32_t n)
     if (g_load_depth >= 16)
         runtime_error(I, "load: nesting too deep (circular load?)");
 
+    char resolved[2048];
+    if (load_resolve(path, resolved, sizeof resolved))
+        snprintf(path, sizeof path, "%.1023s", resolved);
     FILE *f = fopen(path, "rb");
-    if (!f) runtime_error(I, "load: cannot open '%s'", path);
+    if (!f) runtime_error(I, "load: cannot find '%s' (tried the literal path, "
+                          "packages/ short names, $NEUTRINO_PATH, and the binary's directory)", path);
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);

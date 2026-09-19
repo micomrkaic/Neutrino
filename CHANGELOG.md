@@ -305,6 +305,17 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.32.0: load finds its own packages.** Two owner requirements in
+  one mechanism: load("poly") now works by bare name, and a symlink in
+  ~/.local/bin works from any directory with packages left in place.
+  The search order: the literal path as given (unchanged); for bare
+  names, packages/NAME.nu in the CWD; each dir in $NEUTRINO_PATH
+  (colon-separated); finally the real binary's own directory, symlinks
+  resolved via /proc/self/exe (Linux) or _NSGetExecutablePath (macOS) —
+  which is what makes the ~/.local/bin symlink self-sufficient. The
+  browser build keeps its MEMFS-relative behavior. Banner and manual
+  teach the short form; the miss error names every place it looked;
+  three goldens pin the resolution and test 32's error pin updated.
 - **v2.31.0: matmul drops the boxes.** The generic loop ran every
   multiply-add through scalar_arith_k with boxed Values — kind dispatch
   and the checked-overflow branch per element, per inner step. A flat
