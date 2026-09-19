@@ -5,6 +5,11 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.32.1: ls("packages") follows load home.** The listing was
+  CWD-relative, so the documented ls("packages") ~> load idiom broke in
+  exactly the symlink scenario v2.32.0 fixed for load. A bare directory
+  name the CWD lacks now retries beside the real binary; from any
+  directory, ls("packages") answers with all nine.
 - **v2.30.1: det gets its real twin.** Same treatment as v2.30.0's
   mldivide: real matrices now eliminate in plain doubles with restrict
   row pointers (bit-identical; 930 goldens and three books unchanged),

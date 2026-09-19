@@ -3624,7 +3624,16 @@ static Value bi_ls(Interp *I, Value *args, uint32_t n)
         }
         if (rc == 0) globfree(&g);
     } else {
+        char exerel[2048];
         DIR *d = opendir(arg);
+        if (!d && !strchr(arg, '/') && exe_dir()) {
+            /* same courtesy load() extends: a bare directory name that the
+             * CWD lacks is retried beside the real binary, so
+             * ls("packages") ~> load works from anywhere the symlink does */
+            snprintf(exerel, sizeof exerel, "%s/%.512s", exe_dir(), arg);
+            d = opendir(exerel);
+            if (d) arg = exerel;
+        }
         if (!d) runtime_error(I, "ls: %s: %s", arg, strerror(errno));
         struct dirent *e;
         while ((e = readdir(d))) {

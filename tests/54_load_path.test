@@ -6,3 +6,5 @@ load("poly"); "short name loads"
 => "short name loads"
 load("packages/dist.nu"); norm.cdf(0, 0, 1)
 => 0.5
+length(ls("packages"))
+=> 9
