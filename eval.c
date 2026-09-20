@@ -2094,9 +2094,16 @@ static bool load_resolve(const char *given, char *out, size_t outsz)
     if (strlen(given) > 512) return false;   /* longer than any sane candidate; truncation guard */
     if (access(given, F_OK) == 0) { snprintf(out, outsz, "%s", given); return true; }
     bool bare = strchr(given, '/') == NULL;
+    size_t gl = strlen(given);
+    bool has_nu = gl > 3 && strcmp(given + gl - 3, ".nu") == 0;
     if (bare) {
-        snprintf(out, outsz, "packages/%s.nu", given); if (access(out, F_OK) == 0) return true;
-        snprintf(out, outsz, "%s.nu", given);          if (access(out, F_OK) == 0) return true;
+        /* the name may already carry .nu — ls("packages") hands them out
+         * that way, and ls(...) ~> load is the documented idiom */
+        snprintf(out, outsz, "packages/%s", given);    if (access(out, F_OK) == 0) return true;
+        if (!has_nu) {
+            snprintf(out, outsz, "packages/%s.nu", given); if (access(out, F_OK) == 0) return true;
+            snprintf(out, outsz, "%s.nu", given);          if (access(out, F_OK) == 0) return true;
+        }
     }
     const char *pp = getenv("NEUTRINO_PATH");
     if (pp && *pp) {
@@ -2109,7 +2116,10 @@ static bool load_resolve(const char *given, char *out, size_t outsz)
     const char *ed = exe_dir();
     if (ed) {
         snprintf(out, outsz, "%s/%s", ed, given);              if (access(out, F_OK) == 0) return true;
-        if (bare) { snprintf(out, outsz, "%s/packages/%s.nu", ed, given); if (access(out, F_OK) == 0) return true; }
+        if (bare) {
+            snprintf(out, outsz, "%s/packages/%s", ed, given); if (access(out, F_OK) == 0) return true;
+            if (!has_nu) { snprintf(out, outsz, "%s/packages/%s.nu", ed, given); if (access(out, F_OK) == 0) return true; }
+        }
     }
     return false;
 }
@@ -2203,7 +2213,13 @@ static Value bi_load(Interp *I, Value *args, uint32_t n)
                 ng.lens[ng.n] = ge->namelens[i]; ng.n++;
             }
             if (ng.n) {
-                ng.path = strdup(path);
+                const char *label = path;
+                const char *ed2 = exe_dir();
+                if (ed2) {
+                    size_t el = strlen(ed2);
+                    if (!strncmp(path, ed2, el) && path[el] == '/') label = path + el + 1;
+                }
+                ng.path = strdup(label);
                 const char *slash = strrchr(path, '/');
                 const char *base = slash ? slash + 1 : path;
                 size_t bl = strlen(base);

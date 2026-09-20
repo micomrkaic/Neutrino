@@ -5,6 +5,15 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.32.2: the resolver stops double-suffixing, and shelves stay
+  tidy.** The owner ran the documented ls("packages") ~> load and hit
+  two v2.32.x defects at once: load_resolve appended .nu blindly, so
+  names already carrying it (exactly what ls hands out) became
+  astro.nu.nu and missed; and exe-resolved loads registered shelves
+  under full absolute paths, wrecking who's columns. Bare names now try
+  packages/NAME before packages/NAME.nu, and shelf labels trim the
+  binary's directory prefix — a symlinked session's who reads
+  packages/poly.nu, same as a CWD session's.
 - **v2.32.1: ls("packages") follows load home.** The listing was
   CWD-relative, so the documented ls("packages") ~> load idiom broke in
   exactly the symlink scenario v2.32.0 fixed for load. A bare directory
