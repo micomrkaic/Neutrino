@@ -5,6 +5,15 @@ Notable changes to Neutrino. Newest first.
 ## Unreleased
 
 ### Fixed
+- **v2.33.1: the emacs-mode list catches up, and its gate stops
+  skipping.** v2.33.0 registered packeur but never regenerated
+  editors/neutrino-mode.el; the drift lint sat below run_emacs.sh's
+  "emacs not installed" early-out, so every emacs-less clean-room
+  waived it and the owner's deploy — emacs present — caught it. The
+  keyword list is regenerated (160 names), and the python-only drift
+  check now runs before the availability skip, so it gates on every
+  machine; only the byte-compile may skip, and says so. LESSONS records
+  the rule: a gate that skips is a gate that lies.
 - **v2.32.2: the resolver stops double-suffixing, and shelves stay
   tidy.** The owner ran the documented ls("packages") ~> load and hit
   two v2.32.x defects at once: load_resolve appended .nu blindly, so
@@ -319,6 +328,18 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.33.0: packeur, the package picker.** An owner request from field
+  experience: a TUI table of the packages beside the binary — arrows or
+  j/k move, space toggles, Enter applies, q or ESC cancels. Checkboxes
+  show live state from who's shelf registry, so packeur is a manager,
+  not just a loader: newly checked packages load, newly unchecked
+  shelves clear (the shelf-clear now factored into lg_clear_shelf,
+  shared with clear("name")). Raw termios and ANSI, no new
+  dependencies; when stdout is not a terminal the drawing is skipped
+  and the same keys are read from stdin, EOF cancels, and only the
+  summary line prints — which makes it drivable by pipe: the harness
+  runs four key-driven scenarios and a golden pins the EOF cancel. The
+  browser build points to load() instead. 159 builtins, 936 goldens.
 - **v2.32.0: load finds its own packages.** Two owner requirements in
   one mechanism: load("poly") now works by bare name, and a symlink in
   ~/.local/bin works from any directory with packages left in place.

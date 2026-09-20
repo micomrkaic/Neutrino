@@ -286,3 +286,16 @@ evidence; write the revision where the original lived (comment, manual,
 pins — all three). And a DISCREPANCY is a gift: when two paths through
 the same function disagree, one of them is confessing.
 
+### A gate that skips is a gate that lies
+
+packeur shipped with a stale emacs-mode keyword list, and the clean-room
+certified it green — the owner's deploy caught it. The drift lint lived
+inside run_emacs.sh BELOW the "no emacs installed, skipping" early-out,
+so on any machine without emacs (every build container) the whole gate
+was waived, python-only lint included. The rule: split every
+environment-conditional test into the part that needs the environment
+(may skip, loudly) and the part that doesn't (gates everywhere,
+always) — and order them lint-first. Corollary for the rite: the regen
+tools are a SET — gen_reference, gen_book_index, gen_emacs_mode — and
+adding a builtin touches all three.
+

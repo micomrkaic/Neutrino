@@ -1861,6 +1861,7 @@ language.
 | `num` | `num(s)` | parse a string as a number (Int if exact, else Float) | strings |
 | `numel` | `numel(x)` | number of elements (rows*cols) | core |
 | `ones` | `ones(r, c)` | r-by-c matrix of ones | arrays |
+| `packeur` | `packeur` | pick packages in a little table: arrows or j/k move, space toggles, Enter applies (loads and clears), q cancels | workspace |
 | `pause` | `pause() \| pause("msg")` | wait for the user before continuing (alert in the browser) | files |
 | `phi` | `phi` | 1.61803..., the golden ratio | constant |
 | `pi` | `pi` | 3.14159..., the circle constant | constant |
@@ -1918,7 +1919,7 @@ language.
 | `writecsv` | `writecsv(file, A[, opts])` | matrix -> CSV, full precision (round-trips); opts: {delim} | files |
 | `zeros` | `zeros(r, c)` | r-by-c matrix of zeros | arrays |
 
-*158 names; the same table drives `help`, tab completion, the reference, and the Emacs mode.*
+*159 names; the same table drives `help`, tab completion, the reference, and the Emacs mode.*
 <!-- INDEX:END -->
 
 ---

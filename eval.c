@@ -1541,7 +1541,8 @@ static const BuiltinDoc builtin_docs[] = {
     { "eval",  "eval(\"code\")", "run a string as Neutrino code in this session; returns the last value", "core" , "eval(\"2 + 2\")                      % 4" },
     { "names", "names() | names(\"vars\"|\"funcs\")", "your workspace names as a sorted string column (the programmatic who)", "core" , "let a = 1; names(\"vars\")           % [\"a\"]" },
     { "input", "input(\"prompt\")", "read one line from the keyboard as a string (window.prompt in the browser)", "io" , "let name = input(\"who? \")          % interactive" },
-    { "pause", "pause() | pause(\"msg\")", "wait for the user before continuing (alert in the browser)", "io" , "pause()                            % interactive" },
+        { "packeur", "packeur",           "pick packages in a little table: arrows or j/k move, space toggles, Enter applies (loads and clears), q cancels", "workspace", "packeur   % checkboxes show what who's shelves hold" },
+{ "pause", "pause() | pause(\"msg\")", "wait for the user before continuing (alert in the browser)", "io" , "pause()                            % interactive" },
     { "clear", "clear() | clear(\"a\", ...)", "remove all user variables, or the named ones; clearing a shadow restores the standard-library original", "core" , "let junk = 42; clear(\"junk\")   % junk is gone\nclear                             % bare: everything user-defined" },
     { "keep",  "keep(\"a\", \"b\", ...)", "remove all user variables except the named ones (the complement of clear)", "core" , "let a = 1; let b = 2; keep(\"a\")     % b is gone, a survives" },
     { "mem",   "mem",               "print workspace size (variables) and peak process memory", "core" , "mem                               % e.g.  workspace: 3 variables, 2.1 MB" },
@@ -1993,6 +1994,7 @@ static Value bi_input(Interp *I, Value *args, uint32_t n)
 }
 
 /* pause() / pause("message"): wait for the user before continuing. */
+
 static Value bi_pause(Interp *I, Value *args, uint32_t n)
 {
     (void)I;
@@ -2122,6 +2124,27 @@ static bool load_resolve(const char *given, char *out, size_t outsz)
         }
     }
     return false;
+}
+
+/* Remove every live member of shelf gi, then the shelf itself. Shared by
+ * clear("name") and packeur's unchecked boxes. */
+static void lg_clear_shelf(Interp *I, size_t gi)
+{
+    EnvObj *g = I->globals;
+    for (size_t m = 0; m < g_lg[gi].n; m++)
+        for (uint32_t i = g->n_protected; i < g->count; i++)
+            if (g->namelens[i] == g_lg[gi].lens[m] &&
+                !memcmp(g->names[i], g_lg[gi].names[m], g_lg[gi].lens[m])) {
+                value_release(g->vals[i]);
+                g->names[i]    = g->names[g->count - 1];
+                g->namelens[i] = g->namelens[g->count - 1];
+                g->vals[i]     = g->vals[g->count - 1];
+                g->count--;
+                break;
+            }
+    lg_free(&g_lg[gi]);
+    memmove(&g_lg[gi], &g_lg[gi + 1], (g_nlg - gi - 1) * sizeof g_lg[0]);
+    g_nlg--;
 }
 
 static Value bi_load(Interp *I, Value *args, uint32_t n)
@@ -3753,6 +3776,125 @@ enum WhoKind { W_ALL, W_REC, W_FN, W_VAR };
 static Value who_impl(Interp *I, enum WhoKind kind, bool sorted);
 static Value who_impl2(Interp *I, enum WhoKind kind, bool sorted, int group);
 
+/* ---- packeur: the package picker ------------------------------------
+ * A little table of the packages beside the binary (or ./packages):
+ * arrows / j k move, space toggles, Enter applies — newly checked load,
+ * newly unchecked shelves clear — q or ESC cancels. Checkboxes show the
+ * live state from who's shelf registry. With stdout not a terminal the
+ * drawing is skipped, the same keys are read from stdin (EOF cancels),
+ * and only the final summary prints — which is how the test harness
+ * drives it. */
+#ifndef __EMSCRIPTEN__
+#include <termios.h>
+#include <dirent.h>
+static int pk_cmp(const void *a, const void *b) { return strcmp(*(char *const *)a, *(char *const *)b); }
+#endif
+
+static Value bi_packeur(Interp *I, Value *args, uint32_t n)
+{
+    (void)args; (void)n;
+#ifdef __EMSCRIPTEN__
+    runtime_error(I, "packeur needs a terminal; in the browser, load(\"name\") — the Docs tab lists the packages");
+    return val_null();
+#else
+    /* collect the package roster, same places ls("packages") looks */
+    char dirbuf[2048]; const char *pdir = "packages";
+    DIR *d = opendir(pdir);
+    if (!d && exe_dir()) {
+        snprintf(dirbuf, sizeof dirbuf, "%s/packages", exe_dir());
+        d = opendir(dirbuf); if (d) pdir = dirbuf;
+    }
+    if (!d) runtime_error(I, "packeur: no packages/ directory found (looked in the CWD and beside the binary)");
+    char *names[128]; size_t cnt = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) && cnt < 128) {
+        size_t L = strlen(e->d_name);
+        if (e->d_name[0] == '.' || L <= 3 || strcmp(e->d_name + L - 3, ".nu")) continue;
+        names[cnt++] = strdup(e->d_name);
+    }
+    closedir(d);
+    if (!cnt) runtime_error(I, "packeur: packages/ is empty");
+    qsort(names, cnt, sizeof *names, pk_cmp);
+
+    bool was[128], now[128];
+    for (size_t i = 0; i < cnt; i++) {
+        char shortn[256]; size_t L = strlen(names[i]) - 3;
+        if (L >= sizeof shortn) L = sizeof shortn - 1;
+        memcpy(shortn, names[i], L); shortn[L] = '\0';
+        int gi = lg_find(shortn, (uint32_t)L);
+        was[i] = now[i] = (gi >= 0 && lg_live(I, &g_lg[gi]) > 0);
+    }
+
+    bool tty = isatty(fileno(stdin)) && isatty(fileno(stdout));
+    struct termios oldt;
+    if (tty) {
+        tcgetattr(fileno(stdin), &oldt);
+        struct termios raw = oldt;
+        raw.c_lflag &= (tcflag_t)~(ICANON | ECHO);
+        raw.c_cc[VMIN] = 1; raw.c_cc[VTIME] = 0;
+        tcsetattr(fileno(stdin), TCSANOW, &raw);
+        fputs("\x1b[?25l", stdout);
+    }
+    size_t cur = 0; bool apply = false; bool first = true;
+    for (;;) {
+        if (tty) {
+            if (!first) printf("\x1b[%zuA", cnt + 1);
+            first = false;
+            puts("  packeur — space toggles, Enter applies, q cancels");
+            for (size_t i = 0; i < cnt; i++)
+                printf("  %s[%c] %-14s%s\n", i == cur ? "\x1b[7m" : "",
+                       now[i] ? 'x' : ' ', names[i], i == cur ? "\x1b[0m" : "");
+            fflush(stdout);
+        }
+        int c = getchar();
+        if (c == EOF || c == 'q' ) break;
+        if (c == 0x1b) {
+            int c2 = getchar();
+            if (c2 == '[') {
+                int c3 = getchar();
+                if (c3 == 'A' && cur > 0) cur--;
+                else if (c3 == 'B' && cur + 1 < cnt) cur++;
+                continue;
+            }
+            break;                                   /* bare ESC cancels */
+        }
+        if (c == 'k' && cur > 0) cur--;
+        else if (c == 'j' && cur + 1 < cnt) cur++;
+        else if (c == ' ') now[cur] = !now[cur];
+        else if (c == '\n' || c == '\r') { apply = true; break; }
+    }
+    if (tty) { tcsetattr(fileno(stdin), TCSANOW, &oldt); fputs("\x1b[?25h", stdout); }
+
+    char loaded[512] = "", cleared[512] = "";
+    if (apply)
+        for (size_t i = 0; i < cnt; i++) {
+            if (now[i] && !was[i]) {
+                Value pv = val_string(names[i], (uint32_t)strlen(names[i]));
+                bi_load(I, &pv, 1);
+                value_release(pv);
+                if (*loaded) strncat(loaded, ", ", sizeof loaded - strlen(loaded) - 1);
+                strncat(loaded, names[i], sizeof loaded - strlen(loaded) - 1);
+            } else if (!now[i] && was[i]) {
+                size_t L = strlen(names[i]) - 3;
+                int gi = lg_find(names[i], (uint32_t)L);   /* shortname match */
+                if (gi >= 0) lg_clear_shelf(I, (size_t)gi);
+                if (*cleared) strncat(cleared, ", ", sizeof cleared - strlen(cleared) - 1);
+                strncat(cleared, names[i], sizeof cleared - strlen(cleared) - 1);
+            }
+        }
+    for (size_t i = 0; i < cnt; i++) free(names[i]);
+    if (!apply)               fprintf(vout(), "packeur: cancelled\n");
+    else if (!*loaded && !*cleared) fprintf(vout(), "packeur: no changes\n");
+    else {
+        fprintf(vout(), "packeur:");
+        if (*loaded)  fprintf(vout(), " loaded %s", loaded);
+        if (*cleared) fprintf(vout(), "%s cleared %s", *loaded ? ";" : "", cleared);
+        fputc('\n', vout());
+    }
+    return val_null();
+#endif
+}
+
 static Value bi_who(Interp *I, Value *args, uint32_t n)
 {
     enum WhoKind kind = W_ALL;
@@ -3908,21 +4050,7 @@ static Value bi_clear(Interp *I, Value *args, uint32_t n)
             if (gi < 0)
                 runtime_error(I, "clear: no such variable or loaded package '%.*s'",
                               (int)s->len, s->data);
-            /* clear a shelf: remove every live member, then the shelf itself */
-            for (size_t m = 0; m < g_lg[gi].n; m++)
-                for (uint32_t i = g->n_protected; i < g->count; i++)
-                    if (g->namelens[i] == g_lg[gi].lens[m] &&
-                        !memcmp(g->names[i], g_lg[gi].names[m], g_lg[gi].lens[m])) {
-                        value_release(g->vals[i]);
-                        g->names[i]    = g->names[g->count - 1];
-                        g->namelens[i] = g->namelens[g->count - 1];
-                        g->vals[i]     = g->vals[g->count - 1];
-                        g->count--;
-                        break;
-                    }
-            lg_free(&g_lg[gi]);
-            memmove(&g_lg[gi], &g_lg[gi + 1], (g_nlg - gi - 1) * sizeof g_lg[0]);
-            g_nlg--;
+            lg_clear_shelf(I, (size_t)gi);
         }
     }
     return val_null();
@@ -6155,6 +6283,7 @@ EnvObj *globals_new(void)
     def_builtin(e, "eval",    bi_eval_str, 1, 1);
     def_builtin(e, "names",   bi_names,   0, 1);
     def_builtin(e, "input",   bi_input,   0, 1);
+    def_builtin(e, "packeur", bi_packeur, 0, 0);
     def_builtin(e, "pause",   bi_pause,   0, 1);
     def_builtin(e, "save",    bi_save,    1, 1);
     def_builtin(e, "body",    bi_body,    1, 1);

@@ -980,6 +980,17 @@ any `.nu` buffer `C-c C-r` sends the region, `C-c C-b` the buffer,
 `.gitattributes` rule highlights `.nu` as Octave — close enough until
 linguist learns Neutrino.
 
+### packeur: the package picker
+
+`packeur` (bare, at the prompt) opens a little table of every package
+beside the binary: arrow keys or `j`/`k` move, space toggles a
+checkbox, Enter applies — newly checked packages load, newly unchecked
+ones have their shelves cleared — `q` or ESC cancels. The checkboxes
+show live state: a box is checked exactly when `who` would show that
+shelf. It ends with a one-line summary of what changed. Piped input
+drives it headlessly (the keys ride the same stdin), which is how the
+test harness exercises it.
+
 ### Finding packages: the load search path
 
 `load` takes a bare name and finds the file itself: `load("dist")`
@@ -1168,6 +1179,12 @@ neutrino> clear("scatter"); who
 | `eps` | machine epsilon for Float (2^-52) |
 | `inf` | positive infinity (Float) |
 | `nan` | not-a-number (Float); nan never equals anything, itself included |
+
+### workspace
+
+| Signature | Description |
+|---|---|
+| `packeur` | pick packages in a little table: arrows or j/k move, space toggles, Enter applies (loads and clears), q cancels |
 
 ### Array utilities
 
