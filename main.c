@@ -74,6 +74,7 @@ int main(int argc, char **argv)
     signal(SIGPIPE, SIG_IGN);   /* broken pipes (gnuplot/pager absent) report via pclose, not death */
     enum { M_EVAL, M_AST, M_TOKENS, M_DIS } mode = M_EVAL;
     const char *path = nullptr;
+    const char *expr = nullptr;
     bool want_sample = false;
     for (int i = 1; i < argc; i++) {
         if      (strcmp(argv[i], "--version") == 0) {
@@ -84,16 +85,23 @@ int main(int argc, char **argv)
         else if (strcmp(argv[i], "--ast")    == 0) mode = M_AST;
         else if (strcmp(argv[i], "--dis")    == 0) mode = M_DIS;
         else if (strcmp(argv[i], "--sample") == 0) want_sample = true;
+        else if (strcmp(argv[i], "-e") == 0) {
+            if (i + 1 >= argc) { fprintf(stderr, "neutrino: -e needs an expression\n"); return 2; }
+            expr = argv[++i];
+        }
         else path = argv[i];
     }
 
+    if (expr && path) { fprintf(stderr, "neutrino: use -e or a file, not both\n"); return 2; }
+
     /* no file, plain eval mode -> interactive REPL */
-    if (!path && !want_sample && mode == M_EVAL)
+    if (!path && !expr && !want_sample && mode == M_EVAL)
         return repl_run();
 
     char *owned = nullptr;
     const char *src = SAMPLE;
-    if (path) {
+    if (expr) src = expr;        /* -e: the expression IS the script */
+    else if (path) {
         FILE *f = fopen(path, "rb");
         if (!f) { perror(path); return 1; }
         owned = read_all(f);

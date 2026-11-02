@@ -1,4 +1,4 @@
-.TH NEUTRINO 1 "November 2026" "neutrino 2.34.0" "User Commands"
+.TH NEUTRINO 1 "November 2026" "neutrino 2.35.0" "User Commands"
 .SH NAME
 neutrino \- a small functional array language
 .SH SYNOPSIS
@@ -26,6 +26,12 @@ shebang line works.
 .TP
 .B \-\-version
 print version and build date, then exit
+.TP
+.BI \-e \ expr
+evaluate one expression, print its value, and exit \(em the shell
+calculator mode:
+.B neutrino \-e 'pmt(360, 0.0575/12, 340000, 0)'
+(exit status 1 on error)
 .TP
 .B \-\-tokens
 dump the token stream of the input instead of evaluating
@@ -109,8 +115,9 @@ pager for long output and
 .BR manual .
 .SH FILES
 .TP
-.I ~/.neutrino_history
-REPL history.
+.I ~/.local/state/neutrino/history
+REPL history ( honored; a pre-2.35 ~/.neutrino_history is
+read once as a fallback).
 .TP
 .I ~/.local/share/neutrino/packages/
 installed standard packages.

@@ -4832,6 +4832,66 @@ static Value bi_eig(Interp *I, Value *args, uint32_t n)
             if (c_abs(d) > 1e-9 * (1.0 + c_abs(A[(size_t)i*N+j]))) { hermitian = false; break; }
         }
 
+    if (hermitian && real_in) {
+        /* Real symmetric fast path (v2.35.0): the same cyclic Jacobi in
+         * plain doubles — identical sweep order and rotation arithmetic,
+         * so bit-identical to the Cplx branch with zero imaginaries
+         * (real c_mul is x*y - 0.0; c_abs of a real is fabs), at a
+         * quarter of the arithmetic. Covariance/PCA matrices live here. */
+        double *Ar = malloc((size_t)(N ? N*N : 1) * sizeof *Ar);
+        double *Vr = calloc((size_t)(N ? N*N : 1), sizeof *Vr);
+        for (size_t k = 0; k < (size_t)N*N; k++) Ar[k] = A[k].re;
+        for (uint32_t i = 0; i < N; i++) Vr[(size_t)i*N+i] = 1.0;
+        for (int sweep = 0; sweep < 100; sweep++) {
+            double off = 0;
+            for (uint32_t i = 0; i < N; i++) for (uint32_t j = i+1; j < N; j++) { double a = fabs(Ar[(size_t)i*N+j]); off += a*a; }
+            if (off < 1e-30) break;
+            for (uint32_t p = 0; p < N; p++)
+                for (uint32_t q = p+1; q < N; q++) {
+                    double apq = Ar[(size_t)p*N+q];
+                    if (fabs(apq) < 1e-300) continue;
+                    double app = Ar[(size_t)p*N+p], aqq = Ar[(size_t)q*N+q];
+                    double a = fabs(apq);
+                    double tau = (aqq - app) / (2.0 * a);
+                    double t = (tau >= 0 ? 1.0 : -1.0) / (fabs(tau) + sqrt(tau*tau + 1.0));
+                    double cc = 1.0 / sqrt(t*t + 1.0);
+                    double sr = ((t * cc) / a) * apq;        /* s * sign(apq), formula-identical */
+                    for (uint32_t k = 0; k < N; k++) {       /* A <- A R */
+                        double kp = Ar[(size_t)k*N+p], kq = Ar[(size_t)k*N+q];
+                        Ar[(size_t)k*N+p] = cc*kp - sr*kq;
+                        Ar[(size_t)k*N+q] = sr*kp + cc*kq;
+                    }
+                    for (uint32_t k = 0; k < N; k++) {       /* A <- R' A */
+                        double pk = Ar[(size_t)p*N+k], qk = Ar[(size_t)q*N+k];
+                        Ar[(size_t)p*N+k] = cc*pk - sr*qk;
+                        Ar[(size_t)q*N+k] = sr*pk + cc*qk;
+                    }
+                    for (uint32_t k = 0; k < N; k++) {       /* V <- V R */
+                        double kp = Vr[(size_t)k*N+p], kq = Vr[(size_t)k*N+q];
+                        Vr[(size_t)k*N+p] = cc*kp - sr*kq;
+                        Vr[(size_t)k*N+q] = sr*kp + cc*kq;
+                    }
+                }
+        }
+        double *ev = malloc((N ? N : 1) * sizeof *ev);
+        uint32_t *ord = malloc((N ? N : 1) * sizeof *ord);
+        for (uint32_t i = 0; i < N; i++) { ev[i] = Ar[(size_t)i*N+i]; ord[i] = i; }
+        for (uint32_t i = 1; i < N; i++) {
+            uint32_t oi = ord[i]; double x = ev[oi]; uint32_t j = i;
+            while (j > 0 && ev[ord[j-1]] > x) { ord[j] = ord[j-1]; j--; }
+            ord[j] = oi;
+        }
+        Value vals = val_array(ELT_FLOAT, N, 1);
+        Value vecs = val_array(ELT_FLOAT, N, N);
+        for (uint32_t i = 0; i < N; i++) {
+            ((double *)as_arr(vals)->data)[i] = ev[ord[i]];
+            for (uint32_t r = 0; r < N; r++)
+                ((double *)as_arr(vecs)->data)[(size_t)r*N+i] = Vr[(size_t)r*N+ord[i]];
+        }
+        free(A); free(Ar); free(Vr); free(ev); free(ord);
+        return record2("values", vals, "vectors", vecs);
+    }
+
     if (hermitian) {                                   /* cyclic Jacobi, accumulating vectors in V */
         Cplx *V = calloc((size_t)(N ? N*N : 1), sizeof *V);
         for (uint32_t i = 0; i < N; i++) V[(size_t)i*N+i] = (Cplx){1,0};

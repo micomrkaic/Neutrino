@@ -127,3 +127,9 @@ compiled.
   trio — getfield(r, name), setfield(r, name, v) returning a new record,
   and construction from parallel name/value arrays — the same reflection
   family as ast(f).
+- **General (non-symmetric) `eig` is slow at size.** Real symmetric and
+  complex Hermitian matrices take the Jacobi path (real symmetric in
+  plain doubles since v2.35.0); the general case runs complex shifted QR
+  and converges slowly — a 300x300 general eig takes tens of seconds. The
+  proper fix is a real Francis double-shift (LAPACK-grade work), which is
+  chartered to the successor, not Neutrino.

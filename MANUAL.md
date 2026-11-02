@@ -43,6 +43,20 @@ make test         # golden suite + codegen goldens
 make install     # ~/.local: bin/neutrino + packages + man page (man neutrino)
 ```
 
+One-liners from the shell, once installed:
+
+```
+$ neutrino -e '2^62 + 1'
+4611686018427387905
+```
+
+REPL history persists in `~/.local/state/neutrino/history`
+(`$XDG_STATE_HOME` honored; a pre-2.35 `~/.neutrino_history` is read once
+as a fallback).
+
+```
+```
+
 The banner shows the version, when the binary was built, and when the
 session started. `neutrino --version` prints the same from the command line.
 Start the REPL and type an expression; its value echoes back:

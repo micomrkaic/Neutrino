@@ -328,6 +328,24 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.35.0: the freeze release.** The last three items on the docket,
+  then the application joins the language in maintenance mode.
+  (1) eig gets a real symmetric fast path: the same cyclic Jacobi in
+  plain doubles, identical sweep order and rotation arithmetic, so
+  bit-identical to the Cplx branch (all 936 goldens unchanged) — the
+  covariance/PCA case, 1.33x at 300x300; the general non-symmetric case
+  keeps complex QR and KNOWN_LIMITATIONS now states the boundary plainly
+  (a real Francis double-shift is LAPACK-grade work, chartered to the
+  successor). (2) neutrino -e 'expr' evaluates one expression and exits —
+  the shell-calculator mode the installed binary earns; exit 1 on error,
+  2 on usage; routed through the ordinary script pipeline, so it echoes
+  values exactly like a script. (3) REPL history moves to
+  $XDG_STATE_HOME/neutrino/history (default ~/.local/state/neutrino/
+  history), mkdir -p'd component by component; a pre-2.35
+  ~/.neutrino_history is read once as a fallback; and quit now saves via
+  an atexit hook instead of losing the session. tests/run_cli.sh gates
+  all of it inside make test; man page, README, and manual updated; the
+  README's Status section records the freeze.
 - **v2.34.0: a proper installation story.** Four owner requirements in
   one release. make install puts the binary in ~/.local/bin, the nine
   standard packages in ~/.local/share/neutrino/packages, and a new man

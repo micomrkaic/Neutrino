@@ -54,6 +54,10 @@ of clear, v2.10.0). The
 design docket (DESIGN_NOTES.md) is clear; the engineering methodology is
 distilled in PLAYBOOK.md for the successor language. Packages remain open
 territory: they are written in Neutrino and add no weight to the core.
+As of **v2.35.0 the application is frozen too**: installed, documented
+(README, manual, packages guide, problem book, man page), and gated end
+to end. Future linear-algebra tiers (blocked kernels, LAPACK) belong to
+the successor.
 
 ## Packages
 
@@ -170,10 +174,14 @@ copied. `packeur` at the prompt opens a picker of whatever it finds.
 ```
 neutrino                 # interactive REPL
 neutrino script.nu       # run a file
+neutrino -e 'expr'       # evaluate one expression and exit (shell calculator)
 neutrino --sample        # run the built-in demo program
 neutrino --ast    file   # dump the AST and exit
 neutrino --tokens file   # dump the token stream and exit
 ```
+
+History persists in `~/.local/state/neutrino/history` (a pre-2.35
+`~/.neutrino_history` is read once as a fallback).
 
 In the REPL: **Ctrl-D** exits, **Ctrl-C** cancels the current (possibly
 multi-line) entry, **Tab** completes keywords and defined names. Unbalanced

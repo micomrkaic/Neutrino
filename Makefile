@@ -128,6 +128,7 @@ test: vmtest $(BIN)
 	@python3 tests/run_doclint.py
 	@bash tests/run_emacs.sh
 	@bash tests/run_install.sh
+	@bash tests/run_cli.sh
 
 # Same corpus, every input run under AddressSanitizer/UBSan; fails on any leak.
 test-asan: vmtest-asan

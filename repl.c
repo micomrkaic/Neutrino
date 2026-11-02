@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <setjmp.h>
 #include <unistd.h>
@@ -344,6 +345,11 @@ static void md_render(FILE *in, FILE *o, bool color)
     free(line);
 }
 
+static char histpath[4096];
+#ifdef HAVE_READLINE
+static void save_history_atexit(void) { if (histpath[0]) write_history(histpath); }
+#endif
+
 int repl_run(void)
 {
     Interp I;
@@ -353,10 +359,25 @@ int repl_run(void)
     Keep keep = {0};
     value_set_multiline(true);                   /* aligned matrices in the interactive shell */
 
-    char histpath[4096];
+    /* History lives in the XDG state dir ($XDG_STATE_HOME/neutrino/history,
+     * default ~/.local/state/neutrino/history). A pre-2.35 ~/.neutrino_history
+     * is read once as a fallback; saving always goes to the new place. */
+    char oldhist[4096] = "";
     const char *home = getenv("HOME");
-    if (home) snprintf(histpath, sizeof histpath, "%s/.neutrino_history", home);
-    else      snprintf(histpath, sizeof histpath, ".neutrino_history");
+    const char *xs = getenv("XDG_STATE_HOME");
+    char stdir[4096];
+    if (xs && *xs)      snprintf(stdir, sizeof stdir, "%.3900s/neutrino", xs);
+    else if (home)      snprintf(stdir, sizeof stdir, "%.3880s/.local/state/neutrino", home);
+    else                snprintf(stdir, sizeof stdir, ".");
+    if (strcmp(stdir, ".") != 0) {              /* mkdir -p, component by component */
+        char walk[4096];
+        snprintf(walk, sizeof walk, "%.4000s", stdir);
+        for (char *sl = walk + 1; *sl; sl++)
+            if (*sl == '/') { *sl = '\0'; mkdir(walk, 0700); *sl = '/'; }
+        mkdir(walk, 0700);
+    }
+    snprintf(histpath, sizeof histpath, "%.4000s/history", stdir);
+    if (home) snprintf(oldhist, sizeof oldhist, "%.4000s/.neutrino_history", home);
 
 #ifdef HAVE_READLINE
     rl_readline_name = "neutrino";
@@ -367,7 +388,9 @@ int repl_run(void)
 #endif
     using_history();
     stifle_history(1000);
-    read_history(histpath);
+    if (read_history(histpath) != 0 && oldhist[0])
+        read_history(oldhist);                  /* one-time migration read */
+    atexit(save_history_atexit);               /* quit (exit from the builtin) saves too */
     if (isatty(fileno(stdin))) {
         print_banner(isatty(fileno(stdout)) && !getenv("NO_COLOR"));
         fputs("              type  help  for a tour  \u00b7  Ctrl-D to exit  \u00b7  Ctrl-C cancels\n\n", stdout);
