@@ -40,6 +40,7 @@ notes):
 ```sh
 make -j$(nproc)   # ./neutrino, the REPL (parallel; plain 'make' works too)
 make test         # golden suite + codegen goldens
+make install     # ~/.local: bin/neutrino + packages + man page (man neutrino)
 ```
 
 The banner shows the version, when the binary was built, and when the
@@ -995,8 +996,11 @@ test harness exercises it.
 
 `load` takes a bare name and finds the file itself: `load("dist")`
 tries `packages/dist.nu` in the current directory, then each directory
-in `$NEUTRINO_PATH` (colon-separated), then `packages/` beside the real
-binary — symlinks resolved, so
+in `$NEUTRINO_PATH` (colon-separated), then the user data directory
+(`$XDG_DATA_HOME/neutrino/packages`, default
+`~/.local/share/neutrino/packages` — where `make install` puts the
+standard packages), then `packages/` beside the real binary — symlinks
+resolved, so
 `ln -s ~/work/.../Neutrino/neutrino ~/.local/bin/neutrino` gives you a
 `neutrino` that loads its packages from anywhere, nothing copied or
 moved. Literal paths (`load("packages/dist.nu")`, absolute paths) work

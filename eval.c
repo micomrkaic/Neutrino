@@ -2091,6 +2091,28 @@ static const char *exe_dir(void)
  * (colon-separated), as DIR/NAME and DIR/NAME.nu; finally the binary's
  * own directory — both the literal path and packages/NAME.nu under it,
  * which is what makes a ~/.local/bin symlink self-sufficient. */
+/* The per-user data directory where `make install` puts the packages:
+ * $XDG_DATA_HOME/neutrino, defaulting to ~/.local/share/neutrino. Lets an
+ * INSTALLED binary (copied to ~/.local/bin, no packages/ beside it) find
+ * its standard library from any directory. Empty in the browser build. */
+static const char *data_dir(void)
+{
+    static char dir[1024];
+    static bool done = false;
+    if (!done) {
+        done = true; dir[0] = '\0';
+#ifndef __EMSCRIPTEN__
+        const char *x = getenv("XDG_DATA_HOME");
+        if (x && *x) snprintf(dir, sizeof dir, "%.900s/neutrino", x);
+        else {
+            const char *h = getenv("HOME");
+            if (h && *h) snprintf(dir, sizeof dir, "%.880s/.local/share/neutrino", h);
+        }
+#endif
+    }
+    return dir[0] ? dir : NULL;
+}
+
 static bool load_resolve(const char *given, char *out, size_t outsz)
 {
     if (strlen(given) > 512) return false;   /* longer than any sane candidate; truncation guard */
@@ -2113,6 +2135,14 @@ static bool load_resolve(const char *given, char *out, size_t outsz)
         for (char *save = NULL, *d = strtok_r(buf, ":", &save); d; d = strtok_r(NULL, ":", &save)) {
             snprintf(out, outsz, "%s/%s", d, given);    if (access(out, F_OK) == 0) return true;
             if (bare) { snprintf(out, outsz, "%s/%s.nu", d, given); if (access(out, F_OK) == 0) return true; }
+        }
+    }
+    const char *dd = data_dir();
+    if (dd) {
+        snprintf(out, outsz, "%s/%s", dd, given);              if (access(out, F_OK) == 0) return true;
+        if (bare) {
+            snprintf(out, outsz, "%s/packages/%s", dd, given); if (access(out, F_OK) == 0) return true;
+            if (!has_nu) { snprintf(out, outsz, "%s/packages/%s.nu", dd, given); if (access(out, F_OK) == 0) return true; }
         }
     }
     const char *ed = exe_dir();
@@ -2165,7 +2195,8 @@ static Value bi_load(Interp *I, Value *args, uint32_t n)
         snprintf(path, sizeof path, "%.1023s", resolved);
     FILE *f = fopen(path, "rb");
     if (!f) runtime_error(I, "load: cannot find '%s' (tried the literal path, "
-                          "packages/ short names, $NEUTRINO_PATH, and the binary's directory)", path);
+                          "packages/ short names, $NEUTRINO_PATH, the user data dir "
+                          "(~/.local/share/neutrino), and the binary's directory)", path);
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
@@ -2237,10 +2268,11 @@ static Value bi_load(Interp *I, Value *args, uint32_t n)
             }
             if (ng.n) {
                 const char *label = path;
-                const char *ed2 = exe_dir();
-                if (ed2) {
-                    size_t el = strlen(ed2);
-                    if (!strncmp(path, ed2, el) && path[el] == '/') label = path + el + 1;
+                const char *roots[2] = { exe_dir(), data_dir() };
+                for (int r = 0; r < 2; r++) {
+                    if (!roots[r]) continue;
+                    size_t el = strlen(roots[r]);
+                    if (!strncmp(path, roots[r], el) && path[el] == '/') { label = path + el + 1; break; }
                 }
                 ng.path = strdup(label);
                 const char *slash = strrchr(path, '/');
@@ -3673,6 +3705,11 @@ static Value bi_ls(Interp *I, Value *args, uint32_t n)
             d = opendir(exerel);
             if (d) arg = exerel;
         }
+        if (!d && !strchr(arg, '/') && data_dir()) {
+            snprintf(exerel, sizeof exerel, "%s/%.512s", data_dir(), arg);
+            d = opendir(exerel);
+            if (d) arg = exerel;
+        }
         if (!d) runtime_error(I, "ls: %s: %s", arg, strerror(errno));
         struct dirent *e;
         while ((e = readdir(d))) {
@@ -3804,7 +3841,12 @@ static Value bi_packeur(Interp *I, Value *args, uint32_t n)
         snprintf(dirbuf, sizeof dirbuf, "%s/packages", exe_dir());
         d = opendir(dirbuf); if (d) pdir = dirbuf;
     }
-    if (!d) runtime_error(I, "packeur: no packages/ directory found (looked in the CWD and beside the binary)");
+    if (!d && data_dir()) {
+        snprintf(dirbuf, sizeof dirbuf, "%s/packages", data_dir());
+        d = opendir(dirbuf); if (d) pdir = dirbuf;
+    }
+    if (!d) runtime_error(I, "packeur: no packages/ directory found (looked in the CWD, "
+                          "beside the binary, and in ~/.local/share/neutrino)");
     char *names[128]; size_t cnt = 0;
     struct dirent *e;
     while ((e = readdir(d)) && cnt < 128) {

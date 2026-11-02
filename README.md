@@ -13,7 +13,8 @@ in C23. Neutrino has a strict numeric tower, first-class functions, immutable
 refcounted values, complex numbers, logical (boolean) arrays, `for`/`while`
 loops, and a linear algebra core — matrix multiply, left/right division,
 least-squares, matrix power, `det`/`inv`, and `lu`/`qr`/`chol`/`eig`/`svd`
-decompositions (all carried out in complex, so real inputs give real results).
+decompositions (complex throughout, with plain-double fast paths when the
+inputs are real — solve, det, and matrix multiply all take them).
 It runs as a REPL with line editing, history, tab completion, and `ans` (the
 last value you saw and didn't name), or executes `.nu` scripts. Pipelines come
 in three flavours: `|>` feeds the whole value, `~>` feeds each element
@@ -147,6 +148,22 @@ Adding a test is two lines; `tests/run.sh` discovers files automatically. The
 `test-asan` target reruns every input (value *and* error cases) under the
 sanitizers, so the error-unwind paths are leak-checked on every run. See
 `tests/README.md` for the format.
+
+## Install
+
+```sh
+make install     # into ~/.local: bin/neutrino, share/neutrino/packages, man page
+make uninstall   # removes all of the above
+man neutrino     # the man page (after install)
+```
+
+`make install PREFIX=/some/where` overrides the destination. The installed
+binary finds the standard packages from **any** directory: `load("dist")`
+searches `packages/` in the CWD, each dir in `$NEUTRINO_PATH`,
+`~/.local/share/neutrino/packages` (where `make install` puts them), and
+finally `packages/` beside the real binary, symlinks resolved — so a plain
+symlink of the repo binary into `~/.local/bin` works too, with nothing
+copied. `packeur` at the prompt opens a picker of whatever it finds.
 
 ## Run
 

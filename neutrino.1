@@ -1,0 +1,140 @@
+.TH NEUTRINO 1 "November 2026" "neutrino 2.34.0" "User Commands"
+.SH NAME
+neutrino \- a small functional array language
+.SH SYNOPSIS
+.B neutrino
+.RI [ options ]
+.RI [ file.nu ]
+.SH DESCRIPTION
+.B neutrino
+is a small functional array language with Octave-flavoured syntax,
+implemented in C23. It has a strict numeric tower (Int exact until
+overflow, then Float), first-class functions, immutable refcounted
+values, complex numbers, and a linear algebra core: matrix multiply,
+left/right division, least squares, det/inv, and lu/qr/chol/eig/svd
+decompositions, with real fast paths for real inputs.
+.PP
+With no arguments it starts the REPL: line editing, history, tab
+completion, and
+.B ans
+(the last value you saw and didn't name). With a
+.I file.nu
+argument it executes the script and exits; a
+.B #!/usr/bin/env neutrino
+shebang line works.
+.SH OPTIONS
+.TP
+.B \-\-version
+print version and build date, then exit
+.TP
+.B \-\-tokens
+dump the token stream of the input instead of evaluating
+.TP
+.B \-\-ast
+dump the parse tree instead of evaluating
+.TP
+.B \-\-dis
+disassemble the compiled bytecode instead of evaluating
+.TP
+.B \-\-sample
+print a small sample program
+.SH "REPL COMMANDS"
+Typed bare at the prompt (not as function calls):
+.B help
+lists every builtin and
+.B help(name)
+shows one with verified examples;
+.B who
+lists the workspace, with loaded packages folded into one-line shelves
+.RB ( who(\[dq]finance\[dq])
+opens one);
+.B packeur
+opens a package picker \(em arrows or j/k move, space toggles, Enter
+loads newly checked packages and clears newly unchecked shelves;
+.B clear()
+empties the workspace and
+.B clear(\[dq]name\[dq])
+removes a variable or a whole package shelf;
+.B manual
+pages the rendered manual
+.RB ( manual\ packages ,
+.BR manual\ changelog ,
+\&...);
+.B format(n)
+sets displayed significant digits and
+.B format(\[dq]fixed\[dq],\ d)
+sets decimals;
+.B mem
+shows workspace size;
+.B dis(f)
+disassembles a function;
+.B !cmd
+runs a shell command.
+.SH PACKAGES
+The standard library ships as
+.I .nu
+packages (probability distributions, polynomials, finance, physical
+constants, symbolic differentiation, and more).
+.B load(\[dq]dist\[dq])
+loads one by bare name;
+.B ls(\[dq]packages\[dq])
+lists them. Bare names are searched, in order: the literal path;
+.I packages/NAME.nu
+in the current directory; each colon-separated directory in
+.BR $NEUTRINO_PATH ;
+.IR $XDG_DATA_HOME/neutrino/packages
+(default
+.IR ~/.local/share/neutrino/packages ,
+where
+.B make install
+puts them); and finally
+.I packages/
+beside the real binary, symlinks resolved.
+.SH ENVIRONMENT
+.TP
+.B NEUTRINO_PATH
+colon-separated extra directories searched by
+.BR load .
+.TP
+.B XDG_DATA_HOME
+overrides the user data directory root.
+.TP
+.B NEUTRINO_PLOT_TERM
+set to
+.B ascii
+to force terminal plots.
+.TP
+.B PAGER
+pager for long output and
+.BR manual .
+.SH FILES
+.TP
+.I ~/.neutrino_history
+REPL history.
+.TP
+.I ~/.local/share/neutrino/packages/
+installed standard packages.
+.SH EXAMPLES
+.nf
+$ neutrino
+neutrino> load("dist"); norm.cdf(1.96, 0, 1)
+0.975002
+neutrino> [1,2,3,4] |> map((_ .^ 2), @) |> sum(@)
+30
+$ echo 'prod[k = 1:20] k' | neutrino
+2432902008176640000
+.fi
+.SH SEE ALSO
+The full manual (MANUAL.pdf), the packages guide (PACKAGES.pdf), and
+the problem book (BOOK.pdf) ship with the source and render in the
+REPL via
+.BR manual .
+Browser build and documentation:
+.UR https://micomrkaic.github.io/Neutrino/
+.UE
+.SH AUTHOR
+Mico Mrkaic
+.UR https://github.com/micomrkaic/Neutrino
+.UE
+.SH LICENSE
+GPL-3.0.

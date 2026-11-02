@@ -92,6 +92,26 @@ vmtest-asan: $(ASAN_O)
 
 # Regression suite: golden-output tests in tests/*.test (see tests/run.sh),
 # plus bytecode-disassembly goldens in tests/dis/ (see tests/run_dis.sh).
+# ---- install / uninstall (user-local by default; override PREFIX for else) --
+PREFIX  ?= $(HOME)/.local
+BINDIR   = $(PREFIX)/bin
+DATADIR  = $(PREFIX)/share/neutrino
+MANDIR   = $(PREFIX)/share/man/man1
+
+install: $(BIN)
+	install -d $(BINDIR) $(DATADIR)/packages $(MANDIR)
+	install -m 0755 $(BIN) $(BINDIR)/
+	install -m 0644 packages/*.nu $(DATADIR)/packages/
+	install -m 0644 neutrino.1 $(MANDIR)/
+	@echo "installed: $(BINDIR)/neutrino"
+	@echo "packages:  $(DATADIR)/packages (found from any directory)"
+	@echo "man page:  $(MANDIR)/neutrino.1  (try: man neutrino)"
+
+uninstall:
+	rm -f $(BINDIR)/$(BIN) $(MANDIR)/neutrino.1
+	rm -rf $(DATADIR)
+	@echo "uninstalled neutrino from $(PREFIX)"
+
 test: vmtest $(BIN)
 	@bash tests/run.sh
 	@bash tests/run_dis.sh
@@ -107,6 +127,7 @@ test: vmtest $(BIN)
 	@bash tests/run_io.sh
 	@python3 tests/run_doclint.py
 	@bash tests/run_emacs.sh
+	@bash tests/run_install.sh
 
 # Same corpus, every input run under AddressSanitizer/UBSan; fails on any leak.
 test-asan: vmtest-asan
@@ -150,4 +171,4 @@ wasm: $(WASM_SRCS) $(HDRS) wasm_api.c version.h
 	  $(WASM_SRCS) -o docs/neutrino.js  # gnu2x: EM_ASM needs GNU extensions; docs+packages ride in the bundle
 	@echo "built docs/neutrino.js ($$(wc -c < docs/neutrino.js) bytes) — commit and push to update GitHub Pages"
 
-.PHONY: run repl sample ast tokens clean test test-asan wasm
+.PHONY: run repl sample ast tokens clean test test-asan wasm install uninstall

@@ -328,6 +328,23 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.34.0: a proper installation story.** Four owner requirements in
+  one release. make install puts the binary in ~/.local/bin, the nine
+  standard packages in ~/.local/share/neutrino/packages, and a new man
+  page in ~/.local/share/man/man1 (make uninstall reverses all three;
+  PREFIX= overrides). The package search chain gains the XDG user data
+  dir ($XDG_DATA_HOME/neutrino/packages) between $NEUTRINO_PATH and the
+  binary's directory, in load, ls("packages"), and packeur alike — so
+  an installed (copied, not just symlinked) binary finds its standard
+  library from any directory, and shelf labels trim that root too. The
+  man page (neutrino.1) covers the CLI, REPL commands, the search
+  chain, environment, and examples, and renders warning-free under
+  groff. tests/run_install.sh gates the whole story in make test:
+  install into a scratch PREFIX, load from /, man page structure
+  everywhere and render where groff exists (lint-first, per LESSONS),
+  uninstall leaves nothing. README gains an Install section and drops
+  the stale "all carried out in complex" mechanism claim; MANUAL and
+  PACKAGES teach the full chain.
 - **v2.33.0: packeur, the package picker.** An owner request from field
   experience: a TUI table of the packages beside the binary — arrows or
   j/k move, space toggles, Enter applies, q or ESC cancels. Checkboxes
