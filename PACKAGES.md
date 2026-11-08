@@ -5,7 +5,10 @@ polynomials, finance, a solar almanac, structured random matrices,
 physical constants, scatter plots,
 symbolic differentiation, and a guided tour — all written in Neutrino itself.*
 
-A package loads by bare name — `load("dist")` — searched in `packages/`, `$NEUTRINO_PATH`, `~/.local/share/neutrino/packages`, then beside the (symlink-resolved) binary; literal paths work as ever. A package is a file of `let` definitions; `load("packages/name.nu")` runs it
+A package loads by bare name — `load("dist")` — searched in `packages/`, `$NEUTRINO_PATH`, `~/.local/share/neutrino/packages`, then beside the (symlink-resolved) binary; literal paths work as ever. Every exported name carries a docstring — comment lines directly above
+its `let` — which `help(f)` serves at the prompt with signature,
+description, provenance, and a machine-verified example (the `%=` marker
+in an `e.g.` line is executed by `tests/run_pkgdoc.sh`). A package is a file of `let` definitions; `load("packages/name.nu")` runs it
 in the current session and its bindings persist. Records of closures act as
 namespaces (`norm.cdf`), and packages validate their inputs with `assert`, so
 they fail like builtins do — with a message, not an accident. Every transcript

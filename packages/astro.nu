@@ -61,19 +61,31 @@ let astro_event = fn lat, lon, y, m, d, tz, zenith, rising -> (
 
 # ---- the almanac -----------------------------------------------------
 let sunrise    = fn lat, lon, y, m, d, tz -> astro_event(lat, lon, y, m, d, tz, 90.833, true)
+# sunset(lat, lon, y, m, d, tz): local sunset, decimal hours (hm() renders it).
+# e.g.  hm(sunset(46.24, 14.36, 2026, 11, 8, 1)) %= "16:39"
 let sunset     = fn lat, lon, y, m, d, tz -> astro_event(lat, lon, y, m, d, tz, 90.833, false)
+# dawn_civil(lat, lon, y, m, d, tz): civil dawn — sun 6 degrees below the horizon.
 let dawn_civil = fn lat, lon, y, m, d, tz -> astro_event(lat, lon, y, m, d, tz, 96, true)
+# dusk_civil(lat, lon, y, m, d, tz): civil dusk — sun 6 degrees below the horizon.
 let dusk_civil = fn lat, lon, y, m, d, tz -> astro_event(lat, lon, y, m, d, tz, 96, false)
+# dawn_nautical(lat, lon, y, m, d, tz): nautical dawn — sun 12 degrees below.
 let dawn_nautical = fn lat, lon, y, m, d, tz -> astro_event(lat, lon, y, m, d, tz, 102, true)
+# dusk_nautical(lat, lon, y, m, d, tz): nautical dusk — sun 12 degrees below.
 let dusk_nautical = fn lat, lon, y, m, d, tz -> astro_event(lat, lon, y, m, d, tz, 102, false)
+# dawn_astro(lat, lon, y, m, d, tz): astronomical dawn — sun 18 degrees below.
 let dawn_astro = fn lat, lon, y, m, d, tz -> astro_event(lat, lon, y, m, d, tz, 108, true)
+# dusk_astro(lat, lon, y, m, d, tz): astronomical dusk — sun 18 degrees below.
 let dusk_astro = fn lat, lon, y, m, d, tz -> astro_event(lat, lon, y, m, d, tz, 108, false)
 
+# solar_noon(lon, y, m, d, tz): the moment the sun crosses the local meridian.
+# e.g.  hm(solar_noon(14.36, 2026, 11, 8, 1)) %= "11:46"
 let solar_noon = fn lon, y, m, d, tz -> (
   let jd0 = astro_jd(y, m, d) + 0.5 - lon / 360;
   let s = astro_sun_core((jd0 - 2451545) / 36525);
   mod((720 - 4 * lon - s.eqt) / 60 + tz, 24))
 
+# day_length(lat, lon, y, m, d): hours of daylight on a date.
+# e.g.  day_length(46.24, 14.36, 2026, 6, 21) %= 15.789
 let day_length = fn lat, lon, y, m, d -> (
   mod(sunset(lat, lon, y, m, d, 0) - sunrise(lat, lon, y, m, d, 0), 24))
 

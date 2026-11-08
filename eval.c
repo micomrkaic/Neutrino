@@ -1499,7 +1499,7 @@ static const BuiltinDoc builtin_docs[] = {
     { "pretty", "pretty on|off", "aligned multi-line matrix display (default on in the REPL)", "repl" , "pretty off                        % single-line matrices" },
     { "more",   "more on|off",   "page long output through $PAGER", "repl" , "more on                           % long results go through less" },
     { "who",   "who | who(\"functions\", \"sorted\")", "list the workspace; filter by \"records\"/\"functions\"/\"vars\", add \"sorted\" for name order", "core" , "who(\"functions\")                  % only your fn bindings\nwho(\"sorted\")                     % everything, alphabetical" },
-    { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one", "core" , "help(sum)                         % details and examples for one builtin" },
+    { "help",  "help / help(f)",    "help lists every builtin; help(f) describes one — package and user functions too, from docstring comments", "core" , "help(sum)                         % details and examples for one builtin" },
     { "system","system(cmd)",       "run a shell command string; return its exit status", "core" , "system(\"date\")                    % run a shell command, returns its exit status" },
     { "dis",   "dis(f)",            "disassemble a function's bytecode (compiler/VM introspection)", "core" , "dis(fn x -> x + 1)                % prints the compiled bytecode" },
     { "fzero",   "fzero(f, a, b)",      "root of f in [a, b] (Brent; f(a), f(b) must differ in sign)", "solve" , "format(6); fzero(cos, 1, 2)       %= 1.57080\nfzero(fn x -> x^3 - 2*x - 5, 2, 3)" },
@@ -2156,6 +2156,75 @@ static bool load_resolve(const char *given, char *out, size_t outsz)
     return false;
 }
 
+/* ---- package/user docstrings --------------------------------------------
+ * At load() time, a run of comment lines sitting IMMEDIATELY above a
+ * top-level `let NAME =` (column 0, no blank line between) is captured as
+ * NAME's documentation, the way the packages have been commented all
+ * along. help(f) then serves it in the builtin format: first line
+ * "name(args): description" becomes the signature and description;
+ * further lines continue the description; lines starting "e.g." become
+ * examples. Re-loading replaces a name's entry. */
+typedef struct { char *name; uint32_t len; char *doc; } DocEntry;
+static DocEntry *g_docs; static size_t g_ndocs, g_capdocs;
+
+static const char *docs_find(const char *name, uint32_t len)
+{
+    for (size_t i = 0; i < g_ndocs; i++)
+        if (g_docs[i].len == len && !memcmp(g_docs[i].name, name, len))
+            return g_docs[i].doc;
+    return NULL;
+}
+
+static void docs_set(const char *name, uint32_t len, const char *doc, size_t doclen)
+{
+    for (size_t i = 0; i < g_ndocs; i++)
+        if (g_docs[i].len == len && !memcmp(g_docs[i].name, name, len)) {
+            free(g_docs[i].doc);
+            g_docs[i].doc = strndup(doc, doclen);
+            return;
+        }
+    if (g_ndocs == g_capdocs) {
+        g_capdocs = g_capdocs ? g_capdocs * 2 : 64;
+        g_docs = realloc(g_docs, g_capdocs * sizeof *g_docs);
+        if (!g_docs) abort();
+    }
+    g_docs[g_ndocs].name = strndup(name, len);
+    g_docs[g_ndocs].len  = len;
+    g_docs[g_ndocs].doc  = strndup(doc, doclen);
+    g_ndocs++;
+}
+
+/* Scan a loaded file's raw source for docstring comments. */
+static void docs_capture(const char *src)
+{
+    char block[4096]; size_t blen = 0; bool have = false;
+    const char *p = src;
+    while (*p) {
+        const char *nl = strchr(p, '\n');
+        size_t len = nl ? (size_t)(nl - p) : strlen(p);
+        const char *q = p; while (q < p + len && (*q == ' ' || *q == '\t')) q++;
+        if (q < p + len && (*q == '#' || *q == '%')) {
+            q++; if (q < p + len && *q == ' ') q++;        /* strip "# " */
+            size_t cl = (size_t)(p + len - q);
+            if (blen + cl + 2 < sizeof block) {
+                memcpy(block + blen, q, cl); blen += cl;
+                block[blen++] = '\n';
+            }
+            have = true;
+        } else if (have && p[0] == 'l' && len > 4 && !memcmp(p, "let ", 4)) {
+            const char *n0 = p + 4; while (*n0 == ' ') n0++;
+            const char *n1 = n0;
+            while (n1 < p + len && (((*n1|0x20) >= 'a' && (*n1|0x20) <= 'z') || *n1 == '_' ||
+                                    (*n1 >= '0' && *n1 <= '9'))) n1++;
+            if (n1 > n0) docs_set(n0, (uint32_t)(n1 - n0), block, blen);
+            blen = 0; have = false;
+        } else {                                            /* blank or code: block detaches */
+            blen = 0; have = false;
+        }
+        p += len + (nl ? 1 : 0);
+    }
+}
+
 /* Remove every live member of shelf gi, then the shelf itself. Shared by
  * clear("name") and packeur's unchecked boxes. */
 static void lg_clear_shelf(Interp *I, size_t gi)
@@ -2211,6 +2280,7 @@ static Value bi_load(Interp *I, Value *args, uint32_t n)
     Parser p;
     parser_init(&p, src, a);
     AstNode *prog = parser_parse(&p);
+    if (prog && !p.had_error) docs_capture(src);   /* docstrings ride the comments */
     if (p.had_error) {
         char msg[256];
         snprintf(msg, sizeof msg, "%s", p.err_msg);
@@ -4165,11 +4235,111 @@ static void help_arity(FILE *out, BuiltinObj *b)
     else                                   fprintf(out, "%u to %u arguments", b->min_arity, b->max_arity);
 }
 
+/* Reverse lookup: which global name is bound to exactly this value?
+ * (object identity for heap values — the trick who's shelves rely on). */
+static const char *name_of_value(Interp *I, Value v, uint32_t *len_out)
+{
+    EnvObj *g = I->globals;
+    if (!g) return NULL;
+    for (uint32_t i = g->n_protected; i < g->count; i++) {
+        Value b = g->vals[i];
+        if (b.kind != v.kind) continue;
+        bool same = false;
+        switch (v.kind) {
+        case VAL_CLOSURE: case VAL_RECORD: case VAL_ARRAY: case VAL_STRING:
+            same = b.as.obj == v.as.obj; break;
+        case VAL_INT:   same = b.as.i == v.as.i; break;
+        case VAL_FLOAT: same = b.as.f == v.as.f; break;
+        default: break;
+        }
+        if (same) { *len_out = g->namelens[i]; return g->names[i]; }
+    }
+    return NULL;
+}
+
+/* The shelf (loaded file) that claims this name, or NULL. */
+static const char *shelf_of_name(const char *name, uint32_t len)
+{
+    for (size_t gi = 0; gi < g_nlg; gi++)
+        for (size_t m = 0; m < g_lg[gi].n; m++)
+            if (g_lg[gi].lens[m] == len && !memcmp(g_lg[gi].names[m], name, len))
+                return g_lg[gi].path;
+    return NULL;
+}
+
+/* Serve a captured docstring in the builtin-help format. Returns false if
+ * the value has no name or no doc, so the caller falls through. */
+static bool help_from_docs(Interp *I, Value v)
+{
+    uint32_t nlen; const char *nm = name_of_value(I, v, &nlen);
+    if (!nm) return false;
+    const char *doc = docs_find(nm, nlen);
+    if (!doc) return false;
+
+    /* first line: "name(args): desc" -> sig + desc; else all description */
+    const char *p = doc;
+    const char *nl = strchr(p, '\n');
+    size_t l0 = nl ? (size_t)(nl - p) : strlen(p);
+    const char *colon = memchr(p, ':', l0);
+    bool sig_shaped = colon && l0 > nlen && !memcmp(p, nm, nlen) && p[nlen] == '(';
+    if (!sig_shaped && colon && l0 > nlen && !memcmp(p, nm, nlen) && p[nlen] == ':') {
+        /* "name: description" (records, constants): header is the bare name */
+        fprintf(vout(), "  %.*s\n", (int)nlen, nm);
+        const char *d = p + nlen + 1; while (*d == ' ') d++;
+        fprintf(vout(), "      %.*s\n", (int)(p + l0 - d), d);
+    } else if (sig_shaped) {
+        fprintf(vout(), "  %.*s\n", (int)(colon - p), p);
+        const char *d = colon + 1; while (*d == ' ') d++;
+        fprintf(vout(), "      %.*s\n", (int)(p + l0 - d), d);
+    } else {
+        fprintf(vout(), "  %.*s\n", (int)nlen, nm);
+        fprintf(vout(), "      %.*s\n", (int)l0, p);
+    }
+    p += l0 + (nl ? 1 : 0);
+
+    /* remaining lines: "e.g." lines are examples, the rest description */
+    char ex[2048]; size_t exn = 0;
+    while (*p) {
+        nl = strchr(p, '\n');
+        size_t len = nl ? (size_t)(nl - p) : strlen(p);
+        if (len >= 4 && !memcmp(p, "e.g.", 4)) {
+            const char *e = p + 4; while (*e == ' ') e++;
+            size_t el = (size_t)(p + len - e);
+            if (exn + el + 1 < sizeof ex) { memcpy(ex + exn, e, el); ex[exn += el] = '\n'; exn++; }
+        } else if (len) {
+            fprintf(vout(), "      %.*s\n", (int)len, p);
+        }
+        p += len + (nl ? 1 : 0);
+    }
+
+    const char *shelf = shelf_of_name(nm, nlen);
+    if (v.kind == VAL_CLOSURE) {
+        uint32_t np = as_clo(v)->chunk->nparams;
+        if (shelf) fprintf(vout(), "      package function (%s), %u argument%s\n", shelf, np, np == 1 ? "" : "s");
+        else       fprintf(vout(), "      your function, %u argument%s\n", np, np == 1 ? "" : "s");
+    } else if (shelf) {
+        fprintf(vout(), "      from %s\n", shelf);
+    }
+    bool first = true;
+    for (size_t k = 0, st = 0; k < exn; k++)
+        if (ex[k] == '\n') {
+            fprintf(vout(), "      %s", first ? "e.g.  " : "      ");
+            for (size_t i = st; i < k; i++) {       /* '%=' is the verifier marker; show '%' */
+                if (ex[i] == '%' && i + 1 < k && ex[i+1] == '=') { fputc('%', vout()); i++; }
+                else fputc(ex[i], vout());
+            }
+            fputc('\n', vout());
+            st = k + 1; first = false;
+        }
+    return true;
+}
+
 static Value bi_help(Interp *I, Value *args, uint32_t n)
 {
-    (void)I;
     if (n == 1) {
         Value v = args[0];
+        if (v.kind != VAL_BUILTIN && help_from_docs(I, v))
+            return val_null();
         if (v.kind == VAL_BUILTIN) {
             BuiltinObj *b = as_blt(v);
             const BuiltinDoc *d = builtin_info(b->name);
@@ -4195,8 +4365,23 @@ static Value bi_help(Interp *I, Value *args, uint32_t n)
                 }
             }
         } else if (v.kind == VAL_CLOSURE) {
-            uint32_t np = as_clo(v)->chunk->nparams;
-            fprintf(vout(), "  a function you defined, taking %u argument%s\n", np, np == 1 ? "" : "s");
+            CloObj *c = as_clo(v);
+            uint32_t np = c->chunk->nparams;
+            uint32_t nlen; const char *nm = name_of_value(I, v, &nlen);
+            if (nm && c->chunk->src && c->chunk->srclen > 3 && !memcmp(c->chunk->src, "fn", 2)) {
+                /* synthesize "name(params)" from the lambda source */
+                const char *ps = c->chunk->src + 2;
+                const char *pe = ps;
+                const char *end = c->chunk->src + c->chunk->srclen;
+                while (pe + 1 < end && !(pe[0] == '-' && pe[1] == '>')) pe++;
+                while (ps < pe && *ps == ' ') ps++;
+                const char *pt = pe; while (pt > ps && pt[-1] == ' ') pt--;
+                fprintf(vout(), "  %.*s(%.*s)\n", (int)nlen, nm, (int)(pt - ps), ps);
+            }
+            const char *shelf = nm ? shelf_of_name(nm, nlen) : NULL;
+            if (shelf) fprintf(vout(), "      package function (%s), %u argument%s — see body(%.*s); docs: the manual's packages chapter\n",
+                               shelf, np, np == 1 ? "" : "s", (int)nlen, nm);
+            else fprintf(vout(), "      a function you defined, taking %u argument%s\n", np, np == 1 ? "" : "s");
         } else if (v.kind == VAL_ARRAY) {
             ArrObj *a = as_arr(v);
             fprintf(vout(), "  a %ux%u %s array\n", a->rows, a->cols, elt_name(a->elt));

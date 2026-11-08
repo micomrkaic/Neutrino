@@ -7,8 +7,10 @@
 % overlays would require backend changes, so they are deliberately absent.
 % For full option control call plot(x, y, {style = "points", ...}) directly.
 
+# scatter(x, y): scatter plot — plot() with style = points.
 let scatter = fn x, y -> plot(x, y, {style = "points"})
 
+# scatter_titled(x, y, t): scatter plot with a title.
 let scatter_titled = fn x, y, t -> plot(x, y, {style = "points", title = t})
 
 % jitter(x, amount): spread overplotted values by uniform noise in

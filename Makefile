@@ -129,6 +129,7 @@ test: vmtest $(BIN)
 	@bash tests/run_emacs.sh
 	@bash tests/run_install.sh
 	@bash tests/run_cli.sh
+	@bash tests/run_pkgdoc.sh
 
 # Same corpus, every input run under AddressSanitizer/UBSan; fails on any leak.
 test-asan: vmtest-asan

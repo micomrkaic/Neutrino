@@ -49,8 +49,9 @@ neutrino> [2.1, 3.7, 1.4] |> {n = length, mu = mean}
 
 Neutrino is **feature-complete and frozen at 2.x** — maintenance mode: bug
 fixes only, where a bug is a divergence between behavior and the manual
-(one owner-sanctioned orthogonality completion since: keep, the complement
-of clear, v2.10.0). The
+(owner-sanctioned completions since: keep, the complement of clear,
+v2.10.0; and docstrings — help() for package and user functions,
+v2.36.0). The
 design docket (DESIGN_NOTES.md) is clear; the engineering methodology is
 distilled in PLAYBOOK.md for the successor language. Packages remain open
 territory: they are written in Neutrino and add no weight to the core.

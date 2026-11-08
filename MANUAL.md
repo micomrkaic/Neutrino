@@ -1006,6 +1006,30 @@ shelf. It ends with a one-line summary of what changed. Piped input
 drives it headlessly (the keys ride the same stdin), which is how the
 test harness exercises it.
 
+### Documenting functions: docstrings
+
+A run of comment lines sitting immediately above a top-level
+`let name = ...` (no blank line between) is that name's documentation,
+captured when the file is loaded. `help(f)` then serves it in the same
+format as builtin help. The convention: the first line is
+`name(args): description`; further lines continue the description; lines
+starting `e.g.` are examples, and an example may carry its expected
+output after a `%=` marker — the test suite executes every such example
+against the interpreter, so package documentation cannot lie any more
+than the manual can. All nine standard packages are documented this way.
+
+```
+neutrino> load("finance")
+neutrino> help(npv)
+  npv(r, cfs)
+      net present value of a cash-flow vector at rate r (CF0 first, the HP-12C way).
+      package function (packages/finance.nu), 2 arguments
+      e.g.  npv(0.10, [-100, 30, 40, 50]) % -2.10368
+```
+
+A function without a docstring still gets a synthesized signature from
+its recorded source, plus its provenance if it came off a package shelf.
+
 ### Finding packages: the load search path
 
 `load` takes a bare name and finds the file itself: `load("dist")`
@@ -1084,7 +1108,7 @@ neutrino> clear("scatter"); who
 | `whor \| whor("sorted")` | your records only (shorthand for who("records")) |
 | `whos` | the whole workspace, sorted by name (who("sorted")) |
 | `who \| who("functions", "sorted")` | list the workspace; filter by "records"/"functions"/"vars", add "sorted" for name order |
-| `help / help(f)` | help lists every builtin; help(f) describes one |
+| `help / help(f)` | help lists every builtin; help(f) describes one — package and user functions too, from docstring comments |
 | `system(cmd)` | run a shell command string; return its exit status |
 | `dis(f)` | disassemble a function's bytecode (compiler/VM introspection) |
 | `format / format(n) / format(mode, digits)` | number display: format(n) sets SIGNIFICANT digits; format("fixed", d) / format("sci", d) / format("auto", d) set the mode and digits explicitly; format() shows the current setting |

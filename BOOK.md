@@ -1819,7 +1819,7 @@ language.
 | `fzero` | `fzero(f, a, b)` | root of f in [a, b] (Brent; f(a), f(b) must differ in sign) | solvers |
 | `gamma` | `gamma(x)` | gamma function (real, elementwise) | math |
 | `gammainc` | `gammainc(x, a)` | regularized lower incomplete gamma P(a, x) (the chi^2 CDF) | math |
-| `help` | `help / help(f)` | help lists every builtin; help(f) describes one | core |
+| `help` | `help / help(f)` | help lists every builtin; help(f) describes one — package and user functions too, from docstring comments | core |
 | `hist` | `hist(y[, nbins][, opts])` | histogram via gnuplot; opts as in plot (yrange to anchor the axis, label for the legend) | plot |
 | `hypot` | `hypot(a, b)` | sqrt(a^2 + b^2) without overflow (elementwise) | math |
 | `imag` | `imag(z)` | imaginary part (elementwise) | complex |

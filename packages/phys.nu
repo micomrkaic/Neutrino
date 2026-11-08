@@ -3,6 +3,8 @@
 % exact by definition; the rest are the CODATA recommended values.
 % Usage: load("packages/phys.nu");  phys.c, phys.hbar, phys.G, ...
 
+# phys: physical constants (SI, CODATA) as one record — phys.c, phys.h, phys.hbar, phys.G, phys.g, phys.k, phys.NA, phys.R, phys.qe, phys.me, phys.mp, phys.eps0, phys.mu0, phys.alpha, phys.sigma, phys.eV, phys.au, phys.ly.
+# e.g.  phys.c %= 299792458
 let phys = {
   c     = 299792458,            % speed of light in vacuum, m/s (exact)
   h     = 6.62607015e-34,       % Planck constant, J s (exact)

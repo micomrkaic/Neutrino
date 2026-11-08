@@ -11,9 +11,13 @@
 % Piped or under make test, stdin's EOF drains the pauses instantly,
 % so the same file is an interactive tour and a batch self-test.
 
+# praw(s): internal tour helper — print a line verbatim.
 let praw = fn t -> print(strrep(strrep(t, "{", "{{"), "}", "}}"))
+# dm(s): internal tour helper — print a dim caption line.
 let dm = fn src -> (praw("    " + src); praw("      => " + str(eval(src))); null)
+# df(code): internal tour helper — show a caption, then eval and echo it.
 let df = fn src -> (praw("    " + src); eval(src); null)
+# wait(): internal tour helper — pause for Enter between acts.
 let wait = fn -> pause("\n        [ Enter to continue ] ")
 
 print("")

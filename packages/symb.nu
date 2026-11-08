@@ -18,6 +18,7 @@
 
 % ---- constructors ----
 let C = fn v -> {op = "const", v = v}
+# X: the variable x itself — the leaf that ddx differentiates with respect to.
 let X = {op = "var"}
 let add = fn a, b -> {op = "add", l = a, r = b}
 let mul = fn a, b -> {op = "mul", l = a, r = b}
@@ -122,6 +123,8 @@ let simp = fn e -> (
 % ---- pretty printer (division- and subtraction-aware) ----
 let is_neg1 = fn e -> if e.op == "const" then e.v == -1 else false end
 let showdenom = fn b, m -> if m == 1 then show(b) else show(b) + "^" + str(m) end
+# show(e): render an expression tree as readable text.
+# e.g.  show(simp(ddx(parse("x^3 + sin(x)")))) %= "((3 * x^2) + cos(x))"
 let show = fn e -> (
   if e.op == "const" then str(e.v)
   elseif e.op == "var" then "x"
@@ -258,6 +261,8 @@ let expr_loop = fn s, st -> (
 )
 let parse_expr = fn s, i -> expr_loop(s, parse_term(s, i))
 
+# parse(src): parse "x^2 + sin(x)"-style text into an expression tree.
+# e.g.  evalx(parse("x^2 + 1"), 3) %= 10
 let parse = fn src -> (
   let r = parse_expr(src, 1);
   let j = skipws(src, r.i);

@@ -7,6 +7,7 @@
 # ---- time value of money (END mode) --------------------------------
 # The TVM identity: pv*(1+i)^n + pmt*((1+i)^n - 1)/i + fv = 0
 
+# fin_check_i(i): internal — assert a rate is sane (> -1).
 let fin_check_i = fn i -> assert(i > -1, "rate must be > -1, got {}", i)
 
 # pmt(n, i, pv, fv): the level payment.
@@ -38,6 +39,8 @@ let nper = fn i, pv0, p, f -> (
 # bracket grows adaptively so large n cannot overflow the probe.
 let fin_rate_hi = fn g, lo, hi -> (
   if isfinite(g(hi)) && (g(hi) * g(lo) > 0) then fin_rate_hi(g, lo, hi * 2) else hi end)
+# rate(n, pv0, p, f): the per-period rate implied by n, pv, pmt, fv (fzero on the TVM identity).
+# e.g.  rate(360, -340000, 1984.15, 0) %= 0.00479168
 let rate = fn n, pv0, p, f -> (
   let g = fn i -> pv0 * (1 + i)^n + p * ((1 + i)^n - 1) / i + f;
   let hi = fin_rate_hi(g, 1e-9, 0.01);
@@ -47,10 +50,14 @@ let rate = fn n, pv0, p, f -> (
 # ---- cash flows ------------------------------------------------------
 # Cash flows as a vector, first entry at t = 0 (the HP-12C's CF0).
 
+# npv(r, cfs): net present value of a cash-flow vector at rate r (CF0 first, the HP-12C way).
+# e.g.  npv(0.10, [-100, 30, 40, 50]) %= -2.10368
 let npv = fn r, cfs -> (
   fin_check_i(r);
   sum(cfs ./ (1 + r) .^ (0 : numel(cfs) - 1)))
 
+# irr(cfs): internal rate of return — the r with npv(r, cfs) = 0.
+# e.g.  irr([-100, 30, 40, 50, 20]) %= 0.153221
 let irr = fn cfs -> (
   assert(numel(cfs) >= 2, "irr: need at least two cash flows");
   assert((min(cfs) < 0) && (max(cfs) > 0),
@@ -60,16 +67,22 @@ let irr = fn cfs -> (
 # ---- bonds -----------------------------------------------------------
 # Period-based (n periods to maturity, freq coupons per year). Rates annual.
 
+# bond_price(face, crate, y, n, freq): price of a level-coupon bond — annual coupon rate crate, yield y, n years, freq coupons per year.
+# e.g.  bond_price(100, 0.05, 0.06, 10, 2) %= 92.5613
 let bond_price = fn face, crate, y, n, freq -> (
   assert(n > 0, "bond_price: n must be positive");
   let c = face * crate / freq;
   let k = 1 : n * freq;
   sum(c ./ (1 + y / freq) .^ k) + face / (1 + y / freq)^(n * freq))
 
+# bond_ytm(price, face, crate, n, freq): yield to maturity implied by a price (fzero on bond_price).
+# e.g.  bond_ytm(92.56, 100, 0.05, 10, 2) %= 0.0600018
 let bond_ytm = fn price, face, crate, n, freq -> (
   assert(price > 0, "bond_ytm: price must be positive");
   fzero(fn y -> bond_price(face, crate, y, n, freq) - price, 1e-9, 10))
 
+# bond_duration(face, crate, y, n, freq): Macaulay duration, in years.
+# e.g.  bond_duration(100, 0.05, 0.06, 10, 2) %= 7.895
 let bond_duration = fn face, crate, y, n, freq -> (
   let c = face * crate / freq;
   let k = 1 : n * freq;
@@ -77,9 +90,13 @@ let bond_duration = fn face, crate, y, n, freq -> (
   let P = sum(disc) + face / (1 + y / freq)^(n * freq);
   (sum((k ./ freq) .* disc) + (n * freq / freq) * face / (1 + y / freq)^(n * freq)) / P)
 
+# bond_mduration(face, crate, y, n, freq): modified duration — relative price sensitivity to yield.
+# e.g.  bond_mduration(100, 0.05, 0.06, 10, 2) %= 7.66505
 let bond_mduration = fn face, crate, y, n, freq -> (
   bond_duration(face, crate, y, n, freq) / (1 + y / freq))
 
+# bond_convexity(face, crate, y, n, freq): convexity — the second-order yield term.
+# e.g.  bond_convexity(100, 0.05, 0.06, 10, 2) %= 71.7854
 let bond_convexity = fn face, crate, y, n, freq -> (
   let c = face * crate / freq;
   let k = 1 : n * freq;
@@ -92,6 +109,8 @@ let bond_convexity = fn face, crate, y, n, freq -> (
 # amort(principal, i, n): the full schedule as a record of column vectors —
 # {period, payment, interest, principal, balance}. Plot the balance!
 
+# amort(principal, i, n): the full amortization schedule, a record of columns {period, payment, interest, principal, balance}.
+# e.g.  amort(1000, 0.01, 3).payment[1] %= 340.022
 let amort = fn principal, i, n -> (
   let p = -pmt(n, i, principal, 0);
   let period = reshape(1:n, n, 1);
@@ -112,6 +131,8 @@ let amort = fn principal, i, n -> (
 # ---- dates (HP-12C's date arithmetic) --------------------------------
 # Serial dates via the Julian Day Number; y, m, d as integers.
 
+# datenum(y, m, d): serial day number; differences are exact day counts.
+# e.g.  datenum(2026, 11, 8) - datenum(2026, 1, 1) %= 311
 let datenum = fn y, m, d -> (
   assert((m >= 1) && (m <= 12), "datenum: month must be 1..12, got {}", m);
   assert((d >= 1) && (d <= 31), "datenum: day must be 1..31, got {}", d);

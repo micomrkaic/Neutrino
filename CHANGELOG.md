@@ -328,6 +328,24 @@ Notable changes to Neutrino. Newest first.
   added; multi-line constructs remain single entries in-session.
 
 ### Added
+- **v2.36.0: help reaches the packages (owner-sanctioned).** Builtins
+  had signatures, descriptions, and verified examples; package functions
+  answered "a function you defined". Now a run of comment lines directly
+  above a top-level let — the way the packages were already commented —
+  is captured at load() as that name's docstring, and help(f) serves it
+  in the builtin format: "name(args): description" first line, e.g.
+  lines as examples with the %= marker executed by the new
+  tests/run_pkgdoc.sh gate (30 of 30 examples and renderings verified
+  inside make test). help identifies a value's name by object identity
+  against the workspace and its provenance from who's shelves —
+  "package function (packages/finance.nu), 2 arguments". All nine
+  packages documented: finance's cash-flow and bond family, dist's six
+  distribution records, astro's sun times, phys's constant record,
+  symb's parser trio, scatter, demo. Undocumented functions now at
+  least get a signature synthesized from their recorded source — so
+  help(f) on your own session function shows f(x, y) instead of an
+  arity count. Manual and PACKAGES teach the convention; 142 + 101
+  transcripts verified.
 - **v2.35.0: the freeze release.** The last three items on the docket,
   then the application joins the language in maintenance mode.
   (1) eig gets a real symmetric fast path: the same cyclic Jacobi in
